@@ -1,0 +1,2 @@
+# No dependencies: app.py uses the standard library only. The file exists so that the
+# default build command (uv venv .venv && uv pip install -r requirements.txt) works unchanged.

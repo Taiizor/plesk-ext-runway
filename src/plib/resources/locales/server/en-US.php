@@ -1,0 +1,95 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../en-US.php; the frontend strings live in ../app/en-US.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Install toolchains and run applications as services, without Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Build and run a Go, Rust, Bun, Java, .NET, Python, Ruby, PHP or prebuilt application on this domain.',
+    'permissionName' => 'Runway applications management',
+    'permissionDescription' => 'Allows the customer to build and run applications as background services with Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'The privileged helper failed: %%details%%',
+    'errorAccessDenied' => 'Access denied.',
+    'errorNoDomain' => 'The domain was not found.',
+    'errorNoHosting' => 'The domain has no web hosting.',
+    'errorNotConfigured' => 'The application is not configured yet. Save the settings first.',
+    'errorInvalidOperation' => 'Invalid operation.',
+    'errorInvalidValue' => 'Invalid value.',
+    'errorPostRequired' => 'This action requires a POST request.',
+    'errorInternal' => 'An internal error occurred. Details are in the Plesk panel log.',
+    'errorRuntime' => 'Choose a valid runtime.',
+    'errorToolchain' => 'Choose a valid toolchain version.',
+    'errorAppRoot' => 'The application root must be a path inside the subscription (letters, digits and . _ - @ + /), without "." or ".." segments.',
+    'errorBuildCmd' => 'The build command is too long or contains control characters.',
+    'errorStartCmd' => 'The start command must be a single line without control characters (max. 1000 characters).',
+    'errorStartCmdEmpty' => 'A start command is required to enable the application.',
+    'errorLimit' => '%%name%% must be a whole number within the allowed range.',
+    'errorEnvLine' => 'Line %%line%%: use the KEY=value format.',
+    'errorEnvKey' => 'Line %%line%%: "%%key%%" is not a valid variable name.',
+    'errorEnvReserved' => '%%key%% is managed by Runway and cannot be set.',
+    'errorEnvLoader' => '%%key%% cannot be set here; put it in the start command (e.g. %%key%%=... ./app).',
+    'errorEnvValue' => 'The value of %%key%% must not contain line breaks or control characters.',
+    'errorEnvTooMany' => 'Too many environment variables (maximum 200).',
+    'errorListen' => 'Choose a valid listen mode.',
+    'errorMode' => 'Choose a valid application mode.',
+    'errorMountPath' => 'The mount path must be a URL path like /api (letters, digits and . _ ~ -).',
+    'errorStaticPaths' => 'Static paths must be a list of URL paths.',
+    'errorStaticPath' => '"%%path%%" is not a valid URL path (example: /assets).',
+    'errorStaticPathsTooMany' => 'At most %%max%% static paths are allowed.',
+    'errorStaticPathsTooLong' => 'The static paths are too long together (at most %%max%% characters).',
+    'errorConfigTooLarge' => 'The settings are too long together (%%length%% of at most %%max%% characters): shorten the commands or the paths.',
+    'errorHealthPath' => 'The health check path must be a URL path like /healthz.',
+    'errorPortRange' => 'The first port must not be greater than the last port.',
+    'errorSettingRange' => 'Enter a whole number between %%min%% and %%max%%.',
+    'errorListenMode' => 'A background worker has no listener: choose "Nothing" as listen mode, or a web mode with a TCP port or Unix socket.',
+    'errorMountPathReserved' => '%%path%% is used by Plesk (web statistics or certificate validation) and cannot be proxied.',
+    'errorMaxApps' => 'This subscription already has the maximum number of enabled applications (%%max%%).',
+    'errorFetchUrl' => 'Enter an https:// URL (max. 2048 characters, without spaces).',
+    'errorFetchHttps' => 'Only https:// URLs can be downloaded.',
+    'errorSampleNotEmpty' => 'The application root is not empty. Confirm that the sample may overwrite files. %%details%%',
+    'errorSampleUnix' => 'The default PHP server (php -S) cannot listen on a Unix socket: install a FrankenPHP toolchain or choose TCP.',
+    'errorFetchSha256' => 'The SHA-256 checksum must be 64 hexadecimal characters.',
+    'errorFetchFilename' => 'The file name may contain letters, digits and . _ + - only (max. 128 characters).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Memory limit (MiB)',
+    'fieldCpuPercent' => 'CPU limit (%)',
+    'fieldTasks' => 'Process / thread limit',
+
+    // Messages
+    'messageSavedEnabled' => 'The settings were saved and the application is being (re)started.',
+    'messageSavedBuilding' => 'The settings were saved. The application is being built and will be (re)started when the build succeeds; follow it in the "Build & deploy" log.',
+    'messageSavedBuildNotStarted' => 'The settings were saved, but the build could not be started: %%details%%',
+    'messageSavedDisabled' => 'The settings were saved. The application is disabled.',
+    'messageAction_start' => 'The application is starting.',
+    'messageAction_stop' => 'The application was stopped. It stays stopped until you start it again.',
+    'messageAction_restart' => 'The application is restarting.',
+    'messageDeployStarted' => 'The build has started. Follow it in the "Build & deploy" log.',
+    'messageRemoved' => 'The application was removed.',
+    'messageJobStarted' => 'The job has started. Its progress is shown below.',
+    'messageToolchainRemoved' => '%%version%% was removed.',
+    'messageSampleWritten' => 'The sample application was written (%%count%% files) and the settings were updated.',
+    'messageSampleWrittenOne' => 'The sample application was written (one file) and the settings were updated.',
+    'messageFetchStarted' => 'The download has started. Follow it in the "Build & deploy" log.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'List the configured applications and their state.',
+    'cli.commands.status' => 'Show the state of the application of a domain: --status <domain>',
+    'cli.commands.start' => 'Start the application of a domain: --start <domain>',
+    'cli.commands.stop' => 'Stop the application of a domain; it stays stopped (also after a reboot or a deployment) until --start or --restart: --stop <domain>',
+    'cli.commands.restart' => 'Restart the application of a domain: --restart <domain>',
+    'cli.commands.deploy' => 'Build and restart the application of a domain and wait for the result (a stopped application is built but stays stopped): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'Enable the configured application of a domain: --enable <domain>',
+    'cli.commands.disable' => 'Disable the application of a domain: --disable <domain>',
+    'cli.commands.toolchains' => 'List the installed toolchains and the domains using them.',
+    'cli.commands.install-toolchain' => 'Install a toolchain and wait for the result: --install-toolchain <runtime> <version> [-no-wait]',
+    'cli.commands.reconcile' => 'Bring the application services in line with Plesk (deleted, renamed or suspended domains).',
+];

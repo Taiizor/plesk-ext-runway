@@ -1,0 +1,179 @@
+name: CI
+
+# Documentation-only changes (docs/, root-level *.md, LICENSE) skip CI; packaged markdown such as
+# src/CHANGES.md and src/DESCRIPTION.md is checked by build.py and does trigger it.
+on:
+  push:
+    branches: [develop]
+    paths: ["**", "!docs/**", "!*.md", "!LICENSE"]
+  pull_request:
+    paths: ["**", "!docs/**", "!*.md", "!LICENSE"]
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: Run the end-to-end tests in the Plesk container
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      version:
+        description: Package version X.Y.Z[-R] (build.py --version); empty = src/meta.xml
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BUN_VERSION: "1.4.4"
+  PYTHON_VERSION: "3.12"
+  GO_VERSION: "1.27.4"
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: pyflakes
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pyflakes
+          python -m pyflakes src/sbin/runway-helper build.py tests/check_locales.py \
+            examples/python-hello/app.py examples/python-fastapi/main.py
+
+      - name: Helper syntax is Python 3.8 compatible
+        run: |
+          python - <<'EOF'
+          import ast
+          path = "src/sbin/runway-helper"
+          with open(path, encoding="utf-8") as fh:
+              ast.parse(fh.read(), filename=path, feature_version=(3, 8))
+          print("%s: Python 3.8 grammar OK" % path)
+          EOF
+
+      - name: Shell scripts parse
+        run: |
+          rc=0
+          for f in tests/*.sh .github/scripts/*.sh; do
+            if bash -n "$f"; then echo "ok $f"; else rc=1; fi
+          done
+          exit $rc
+
+      - name: Locale keys (en-US, tr-TR)
+        run: python tests/check_locales.py
+
+      - name: Frontend build (bun + plesk-ext-sdk)
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Source tree check (structure, changelogs, leftover placeholders)
+        run: python build.py --check
+
+      - name: php -l (PHP 7.4 and 8.2)
+        run: |
+          for image in php:7.4-cli php:8.2-cli; do
+            echo "== $image"
+            docker run --rm -v "$PWD:/repo:ro" -w /repo "$image" sh -c '
+              rc=0
+              for f in $(find src examples -name "*.php" -not -path "src/htdocs/dist/*" | sort); do
+                out=$(php -l "$f" 2>&1) || { echo "$out"; rc=1; }
+              done
+              [ "$rc" = 0 ] && echo "all PHP files OK"
+              exit $rc'
+          done
+
+  build:
+    name: Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      package: ${{ steps.package.outputs.package }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Build and verify the zip
+        id: package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          bun install --frozen-lockfile
+          python build.py --strict ${VERSION:+--version "$VERSION"}
+          package=$(ls dist/*.zip)
+          echo "package=$(basename "$package")" >> "$GITHUB_OUTPUT"
+          unzip -l "$package"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runway-package
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  e2e:
+    name: End-to-end (Plesk container)
+    needs: [lint, build]
+    if: github.event_name != 'workflow_dispatch' || inputs.e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CONTAINER: runway-plesk
+      PLESK_IMAGE: plesk/plesk:latest
+      PANEL_PORT: "18880"
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: runway-package
+          path: dist
+
+      - name: Start Plesk
+        run: bash .github/scripts/plesk-e2e.sh start
+
+      - name: Install the package
+        run: bash .github/scripts/plesk-e2e.sh install "dist/${{ needs.build.outputs.package }}"
+
+      - name: Subscription, Go toolchain and sample app
+        run: bash .github/scripts/plesk-e2e.sh prepare
+
+      - name: Helper, API and customer smoke tests, Go runtime matrix
+        run: bash .github/scripts/plesk-e2e.sh smoke
+
+      - name: Collect diagnostics
+        if: failure()
+        run: bash .github/scripts/plesk-e2e.sh diagnostics e2e-logs
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-logs
+          path: e2e-logs
+          retention-days: 7
+
+      - name: Remove the container
+        if: always()
+        run: bash .github/scripts/plesk-e2e.sh stop

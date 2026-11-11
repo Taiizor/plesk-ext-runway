@@ -1,0 +1,13 @@
+# The extension is deployed to Linux: keep LF line endings everywhere.
+* text=auto eol=lf
+src/sbin/* text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.jar binary
+
+# Keep GitHub's language statistics about the extension, not the lock file.
+bun.lock linguist-generated=true

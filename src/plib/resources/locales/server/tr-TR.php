@@ -1,0 +1,95 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../tr-TR.php; the frontend strings live in ../app/tr-TR.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Araç zincirlerini kurun ve uygulamaları Docker olmadan servis olarak çalıştırın.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Bu alan adında bir Go, Rust, Bun, Java, .NET, Python, Ruby, PHP veya hazır derlenmiş uygulama derleyin ve çalıştırın.',
+    'permissionName' => 'Runway uygulama yönetimi',
+    'permissionDescription' => 'Müşterinin Runway ile uygulamaları arka plan servisi olarak derleyip çalıştırmasına izin verir.',
+
+    // Errors
+    'errorHelperFailed' => 'Yetkili yardımcı program başarısız oldu: %%details%%',
+    'errorAccessDenied' => 'Erişim reddedildi.',
+    'errorNoDomain' => 'Alan adı bulunamadı.',
+    'errorNoHosting' => 'Bu alan adının web barındırması yok.',
+    'errorNotConfigured' => 'Uygulama henüz yapılandırılmadı. Önce ayarları kaydedin.',
+    'errorInvalidOperation' => 'Geçersiz işlem.',
+    'errorInvalidValue' => 'Geçersiz değer.',
+    'errorPostRequired' => 'Bu işlem bir POST isteği gerektirir.',
+    'errorInternal' => 'Dahili bir hata oluştu. Ayrıntılar Plesk panel günlüğündedir.',
+    'errorRuntime' => 'Geçerli bir çalışma ortamı seçin.',
+    'errorToolchain' => 'Geçerli bir araç zinciri sürümü seçin.',
+    'errorAppRoot' => 'Uygulama kökü, abonelik içinde bir yol olmalıdır (harf, rakam ve . _ - @ + /); "." veya ".." bölümleri içeremez.',
+    'errorBuildCmd' => 'Derleme komutu çok uzun veya kontrol karakterleri içeriyor.',
+    'errorStartCmd' => 'Başlatma komutu kontrol karakteri içermeyen tek bir satır olmalıdır (en fazla 1000 karakter).',
+    'errorStartCmdEmpty' => 'Uygulamayı etkinleştirmek için bir başlatma komutu gereklidir.',
+    'errorLimit' => '%%name%% izin verilen aralıkta bir tam sayı olmalıdır.',
+    'errorEnvLine' => 'Satır %%line%%: ANAHTAR=değer biçimini kullanın.',
+    'errorEnvKey' => 'Satır %%line%%: "%%key%%" geçerli bir değişken adı değil.',
+    'errorEnvReserved' => '%%key%% Runway tarafından yönetilir ve ayarlanamaz.',
+    'errorEnvLoader' => '%%key%% burada ayarlanamaz; başlatma komutuna ekleyin (ör. %%key%%=... ./app).',
+    'errorEnvValue' => '%%key%% değeri satır sonu veya kontrol karakteri içeremez.',
+    'errorEnvTooMany' => 'Çok fazla ortam değişkeni var (en fazla 200).',
+    'errorListen' => 'Geçerli bir dinleme yöntemi seçin.',
+    'errorMode' => 'Geçerli bir uygulama modu seçin.',
+    'errorMountPath' => 'URL yolu /api gibi bir yol olmalıdır (harf, rakam ve . _ ~ -).',
+    'errorStaticPaths' => 'Statik yollar bir URL yolu listesi olmalıdır.',
+    'errorStaticPath' => '"%%path%%" geçerli bir URL yolu değil (örnek: /assets).',
+    'errorStaticPathsTooMany' => 'En fazla %%max%% statik yol tanımlanabilir.',
+    'errorStaticPathsTooLong' => 'Statik yolların toplam uzunluğu çok fazla (en fazla %%max%% karakter).',
+    'errorConfigTooLarge' => 'Ayarların toplam uzunluğu çok fazla (%%length%% karakter, en fazla %%max%%): komutları veya yolları kısaltın.',
+    'errorHealthPath' => 'Sağlık kontrolü yolu /healthz gibi bir URL yolu olmalıdır.',
+    'errorPortRange' => 'İlk port son porttan büyük olamaz.',
+    'errorSettingRange' => '%%min%% ile %%max%% arasında bir tam sayı girin.',
+    'errorListenMode' => 'Arka plan işçisinin dinleyicisi yoktur: dinleme yöntemi olarak "Hiçbiri"ni ya da TCP portu veya Unix soketi olan bir web modunu seçin.',
+    'errorMountPathReserved' => '%%path%% Plesk tarafından kullanılıyor (web istatistikleri veya sertifika doğrulaması) ve proxy ile yönlendirilemez.',
+    'errorMaxApps' => 'Bu abonelik, etkin uygulama sayısı sınırına (%%max%%) zaten ulaştı.',
+    'errorFetchUrl' => 'https:// ile başlayan bir URL girin (en fazla 2048 karakter, boşluksuz).',
+    'errorFetchHttps' => 'Yalnızca https:// adresleri indirilebilir.',
+    'errorSampleNotEmpty' => 'Uygulama kökü boş değil. Örnek uygulamanın mevcut dosyaların üzerine yazmasını onaylayın. %%details%%',
+    'errorSampleUnix' => 'Varsayılan PHP sunucusu (php -S) Unix soketinde dinleyemez: bir FrankenPHP sürümü kurun veya TCP seçin.',
+    'errorFetchSha256' => 'SHA-256 sağlama toplamı 64 onaltılık karakterden oluşmalıdır.',
+    'errorFetchFilename' => 'Dosya adı yalnızca harf, rakam ve . _ + - içerebilir (en fazla 128 karakter).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Bellek sınırı (MiB)',
+    'fieldCpuPercent' => 'CPU sınırı (%)',
+    'fieldTasks' => 'Süreç / iş parçacığı sınırı',
+
+    // Messages
+    'messageSavedEnabled' => 'Ayarlar kaydedildi ve uygulama (yeniden) başlatılıyor.',
+    'messageSavedBuilding' => 'Ayarlar kaydedildi. Uygulama derleniyor ve derleme başarılı olunca (yeniden) başlatılacak; "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+    'messageSavedBuildNotStarted' => 'Ayarlar kaydedildi ancak derleme başlatılamadı: %%details%%',
+    'messageSavedDisabled' => 'Ayarlar kaydedildi. Uygulama devre dışı.',
+    'messageAction_start' => 'Uygulama başlatılıyor.',
+    'messageAction_stop' => 'Uygulama durduruldu. Siz yeniden başlatana kadar durdurulmuş kalacak.',
+    'messageAction_restart' => 'Uygulama yeniden başlatılıyor.',
+    'messageDeployStarted' => 'Derleme başladı. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+    'messageRemoved' => 'Uygulama kaldırıldı.',
+    'messageJobStarted' => 'İş başladı. İlerlemesi aşağıda gösteriliyor.',
+    'messageToolchainRemoved' => '%%version%% kaldırıldı.',
+    'messageSampleWritten' => 'Örnek uygulama yazıldı (%%count%% dosya) ve ayarlar güncellendi.',
+    'messageSampleWrittenOne' => 'Örnek uygulama yazıldı (bir dosya) ve ayarlar güncellendi.',
+    'messageFetchStarted' => 'İndirme başladı. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Yapılandırılmış uygulamaları ve durumlarını listeler.',
+    'cli.commands.status' => 'Bir alan adındaki uygulamanın durumunu gösterir: --status <alan-adı>',
+    'cli.commands.start' => 'Bir alan adındaki uygulamayı başlatır: --start <alan-adı>',
+    'cli.commands.stop' => 'Bir alan adındaki uygulamayı durdurur; --start veya --restart ile başlatılana kadar (yeniden başlatma veya dağıtımdan sonra da) durdurulmuş kalır: --stop <alan-adı>',
+    'cli.commands.restart' => 'Bir alan adındaki uygulamayı yeniden başlatır: --restart <alan-adı>',
+    'cli.commands.deploy' => 'Bir alan adındaki uygulamayı derleyip yeniden başlatır ve sonucu bekler (durdurulmuş bir uygulama derlenir ama durdurulmuş kalır): --deploy <alan-adı> [-no-wait]',
+    'cli.commands.enable' => 'Bir alan adındaki yapılandırılmış uygulamayı etkinleştirir: --enable <alan-adı>',
+    'cli.commands.disable' => 'Bir alan adındaki uygulamayı devre dışı bırakır: --disable <alan-adı>',
+    'cli.commands.toolchains' => 'Kurulu araç zincirlerini ve bunları kullanan alan adlarını listeler.',
+    'cli.commands.install-toolchain' => 'Bir araç zinciri kurar ve sonucu bekler: --install-toolchain <çalışma-ortamı> <sürüm> [-no-wait]',
+    'cli.commands.reconcile' => 'Uygulama servislerini Plesk ile eşitler (silinen, yeniden adlandırılan veya askıya alınan alan adları).',
+];

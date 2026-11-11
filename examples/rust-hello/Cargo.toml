@@ -1,0 +1,10 @@
+[package]
+name = "rust-hello"
+version = "0.1.0"
+edition = "2021"
+
+# No dependencies on purpose: the example builds offline in a few seconds.
+[dependencies]
+
+[profile.release]
+strip = true

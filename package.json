@@ -1,0 +1,14 @@
+{
+  "name": "runway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runway Plesk extension frontend (React + Plesk UI Library via @plesk/plesk-ext-sdk)",
+  "license": "MIT",
+  "scripts": {
+    "build": "plesk-ext-sdk build",
+    "dev": "plesk-ext-sdk dev"
+  },
+  "dependencies": {
+    "@plesk/plesk-ext-sdk": "^0.9.0"
+  }
+}

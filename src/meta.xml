@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module>
+    <id>runway</id>
+    <name>Runway</name>
+    <description>Run Go, Rust, Bun, Java, .NET, Python, Ruby, PHP or prebuilt applications per domain without Docker: install toolchains, build as the subscription user and run each app as a hardened systemd service behind nginx.</description>
+    <description xml:lang="tr-TR">Go, Rust, Bun, Java, .NET, Python, Ruby, PHP veya hazır derlenmiş uygulamaları Docker olmadan alan adı başına çalıştırın: araç zincirlerini kurun, abonelik kullanıcısı olarak derleyin ve her uygulamayı nginx arkasında güçlendirilmiş bir systemd servisi olarak çalıştırın.</description>
+    <category>developer</category>
+    <category>webserver</category>
+    <version>1.0.0</version>
+    <release>1</release>
+    <vendor>Taiizor</vendor>
+    <url>https://github.com/Taiizor/plesk-ext-runway</url>
+    <plesk_min_version>18.0.55</plesk_min_version>
+    <os>unix</os>
+</module>
