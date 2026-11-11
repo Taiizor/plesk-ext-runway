@@ -21,11 +21,11 @@
 # commands in tcp and unix mode (needs a FrankenPHP toolchain).
 #
 # Needs the toolchains of the tested runtimes (installed through Runway, Ruby from Plesk or the
-# system). Environment: CONTAINER (grt-plesk), PANEL (http://localhost:18880), SITE_ID (1),
+# system). Environment: CONTAINER (runway-plesk), PANEL (http://localhost:18880), SITE_ID (1),
 # DOMAIN (gotest.local), APP_ROOT (apps/runway-e2e), RUNTIMES, LISTENS (tcp unix),
 # BUILD_WAIT (seconds per build, 1200), NGINX_IP (the container's address), PYTHON.
 set -u
-CONTAINER=${CONTAINER:-grt-plesk}
+CONTAINER=${CONTAINER:-runway-plesk}
 PANEL=${PANEL:-http://localhost:18880}
 SITE_ID=${SITE_ID:-1}
 DOMAIN=${DOMAIN:-gotest.local}

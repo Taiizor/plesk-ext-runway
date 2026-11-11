@@ -1,0 +1,28 @@
+# Dependabot version updates (weekly, grouped into one pull request per ecosystem).
+# The root helper (python3 standard library) and the PHP code (Plesk SDK only) have no package
+# dependencies; the examples are kept minimal on purpose and are not updated automatically.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    labels: [dependencies, ci]
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Istanbul
+    labels: [dependencies, frontend]
+    groups:
+      frontend:
+        patterns: ["*"]

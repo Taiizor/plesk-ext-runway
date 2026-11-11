@@ -1,0 +1,23 @@
+name: Question
+description: Ask about using Runway (setup, runtimes, deployments)
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [README](https://github.com/Taiizor/plesk-ext-runway#readme) and
+        [docs/runtimes](https://github.com/Taiizor/plesk-ext-runway/tree/develop/docs/runtimes) first.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: input
+    id: context
+    attributes:
+      label: Context
+      description: Runway version, Plesk version and OS, runtime, if they matter.
+      placeholder: Runway 1.0.0-1, Plesk 18.0.82 on Ubuntu 24.04, Python

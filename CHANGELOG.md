@@ -42,7 +42,10 @@ was renamed to Runway (extension id `runway`, units `runway-*`, paths under `/op
   (also of customer and reseller accounts), plus a scheduled reconcile every 10 minutes.
 - English and Turkish translations.
 - Examples for every runtime in `examples/`, CI (lint, package, end-to-end tests in the official
-  Plesk container) and tag-based GitHub releases.
+  Plesk container), CodeQL analysis, Dependabot and tag-based GitHub releases whose notes are
+  generated from this file and the merged pull requests.
+- `scripts/plesk-dev.sh` and `scripts/plesk-dev.ps1`: a local Plesk test server in Docker
+  (start, build and install, prepare the test subscription, run the CI suites).
 
 ### Security
 

@@ -1,8 +1,10 @@
 #!/bin/bash
 # End-to-end test of a Runway package in the official Plesk Docker image (real systemd).
-# Used by .github/workflows/ci.yml; also runs on a Linux or macOS machine with Docker.
+# Used by .github/workflows/ci.yml; also runs on a Linux or macOS machine, or in Git Bash on
+# Windows, with Docker (scripts/plesk-dev.sh wraps it for development).
 #
 #   .github/scripts/plesk-e2e.sh start             # start the Plesk container, wait for the panel
+#   .github/scripts/plesk-e2e.sh wait              # wait for the panel of a running container
 #   .github/scripts/plesk-e2e.sh install ZIP       # install or upgrade the extension package
 #   .github/scripts/plesk-e2e.sh prepare           # customer, subscription, Go toolchain, Go sample app
 #   .github/scripts/plesk-e2e.sh smoke             # helper-smoke, api-smoke, customer-smoke and the Go
@@ -13,11 +15,13 @@
 # Environment: CONTAINER (runway-plesk), PLESK_IMAGE (plesk/plesk:latest), PANEL_PORT (18880),
 # DOMAIN (gotest.local), SYSUSER (gotestuser, the name tests/helper-smoke.sh expects),
 # CUSTOMER (cust1, owner of DOMAIN for tests/customer-smoke.sh), GO_VERSION (1.27.4),
-# WAIT_MINUTES (25), E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "smoke", "" skips it).
+# WAIT_MINUTES (25), E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "smoke", "" skips it),
+# PUBLISH (extra port mappings of "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh).
 set -euo pipefail
 CONTAINER=${CONTAINER:-runway-plesk}
 PLESK_IMAGE=${PLESK_IMAGE:-plesk/plesk:latest}
 PANEL_PORT=${PANEL_PORT:-18880}
+PUBLISH=${PUBLISH:-}
 DOMAIN=${DOMAIN:-gotest.local}
 SYSUSER=${SYSUSER:-gotestuser}
 CUSTOMER=${CUSTOMER:-cust1}
@@ -44,13 +48,20 @@ json_field() { "${PY:-python3}" -c "import json,sys; print(json.load(sys.stdin).
 site_id() { in_c plesk db -Ne "select id from domains where name='$DOMAIN'" | tr -d '\r\n'; }
 
 cmd_start() {
+    local -a publish=()
+    local mapping
+    for mapping in $PUBLISH; do publish+=(-p "$mapping"); done
     dock rm -f "$CONTAINER" >/dev/null 2>&1 || true
     # The same flags as the documented local test environment (README.md, "Development").
     dock run -d --name "$CONTAINER" --hostname plesk.runway.test \
         --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
         -v /sys/fs/cgroup:/sys/fs/cgroup --cgroupns=host \
         --cap-add SYS_ADMIN --security-opt apparmor=unconfined \
-        -p "$PANEL_PORT:8880" "$PLESK_IMAGE" >/dev/null
+        -p "$PANEL_PORT:8880" ${publish[@]+"${publish[@]}"} "$PLESK_IMAGE" >/dev/null
+    cmd_wait
+}
+
+cmd_wait() {
     log "waiting for Plesk ($PLESK_IMAGE, at most $WAIT_MINUTES minutes)"
     local deadline=$(( $(date +%s) + WAIT_MINUTES * 60 )) state code
     while :; do
@@ -181,10 +192,11 @@ command=${1:-}
 [ $# -gt 0 ] && shift
 case "$command" in
     start) cmd_start ;;
+    wait) cmd_wait ;;
     install) cmd_install "$@" ;;
     prepare) cmd_prepare ;;
     smoke) cmd_smoke ;;
     diagnostics) cmd_diagnostics "$@" ;;
     stop) cmd_stop ;;
-    *) sed -n '2,15p' "$0"; exit 2 ;;
+    *) sed -n '2,19p' "$0"; exit 2 ;;
 esac

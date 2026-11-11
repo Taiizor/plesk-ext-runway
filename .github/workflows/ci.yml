@@ -1,13 +1,14 @@
 name: CI
 
-# Documentation-only changes (docs/, root-level *.md, LICENSE) skip CI; packaged markdown such as
-# src/CHANGES.md and src/DESCRIPTION.md is checked by build.py and does trigger it.
+# Pushes that only change documentation (docs/, root-level *.md, LICENSE) skip CI; packaged
+# markdown such as src/CHANGES.md and src/DESCRIPTION.md is checked by build.py and does trigger
+# it. Pull requests always run CI: the develop branch requires the Lint, Package and End-to-end
+# checks, and a check that never starts would block the merge.
 on:
   push:
     branches: [develop]
     paths: ["**", "!docs/**", "!*.md", "!LICENSE"]
   pull_request:
-    paths: ["**", "!docs/**", "!*.md", "!LICENSE"]
   workflow_dispatch:
     inputs:
       e2e:
@@ -21,6 +22,11 @@ on:
         type: string
         required: false
         default: ""
+      e2e:
+        description: Run the end-to-end tests in the Plesk container
+        type: boolean
+        required: false
+        default: true
 
 permissions:
   contents: read
@@ -69,10 +75,20 @@ jobs:
       - name: Shell scripts parse
         run: |
           rc=0
-          for f in tests/*.sh .github/scripts/*.sh; do
+          for f in tests/*.sh scripts/*.sh .github/scripts/*.sh; do
             if bash -n "$f"; then echo "ok $f"; else rc=1; fi
           done
           exit $rc
+
+      - name: PowerShell script parses
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/plesk-dev.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          foreach ($e in $errors) { Write-Host "::error file=scripts/plesk-dev.ps1,line=$($e.Extent.StartLineNumber)::$($e.Message)" }
+          if ($errors.Count) { exit 1 }
+          Write-Host "ok scripts/plesk-dev.ps1"
 
       - name: Locale keys (en-US, tr-TR)
         run: python tests/check_locales.py
@@ -136,6 +152,7 @@ jobs:
   e2e:
     name: End-to-end (Plesk container)
     needs: [lint, build]
+    # inputs.e2e: the "Run workflow" input, or the input of the calling release workflow.
     if: github.event_name != 'workflow_dispatch' || inputs.e2e
     runs-on: ubuntu-24.04
     timeout-minutes: 60

@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a change or an addition
+labels: [enhancement, needs triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a new runtime adapter use the *New runtime* template. Larger changes (a new listen or proxy mode, a change
+        of the helper contract in docs/DESIGN.md) are best discussed here before anyone writes code.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can you not do today, or what is harder than it should be?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work? Where in the panel or the CLI, with which settings and defaults.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      multiple: true
+      options:
+        - Go
+        - Rust
+        - Bun
+        - Java
+        - .NET
+        - Python
+        - Ruby
+        - PHP
+        - Binary
+        - Not runtime specific
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What you do instead today, or other ways to solve it.
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to implement this myself (see CONTRIBUTING.md).

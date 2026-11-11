@@ -1,0 +1,39 @@
+# Area labels that .github/workflows/labeler.yml (actions/labeler) adds to pull requests from
+# the files they change. Type labels (bug, enhancement, security, breaking change, ...) are set
+# by hand; see CONTRIBUTING.md, "Labels". CHANGELOG.md is deliberately not a "documentation"
+# file: nearly every pull request touches it.
+helper:
+  - changed-files:
+      - any-glob-to-any-file: ["src/sbin/**"]
+
+php:
+  - changed-files:
+      - any-glob-to-any-file: ["src/plib/controllers/**", "src/plib/hooks/**", "src/plib/library/**", "src/plib/scripts/**"]
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ["src/frontend/**", "extension.config.js", "package.json", "bun.lock"]
+
+locales:
+  - changed-files:
+      - any-glob-to-any-file: ["src/plib/resources/locales/**"]
+
+packaging:
+  - changed-files:
+      - any-glob-to-any-file: ["build.py", "src/meta.xml", "src/DESCRIPTION.md", "src/CHANGES.md", "src/_meta/**"]
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: ["tests/**"]
+
+examples:
+  - changed-files:
+      - any-glob-to-any-file: ["examples/**"]
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", "LICENSE", "examples/**/README.md"]
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**", "scripts/**"]

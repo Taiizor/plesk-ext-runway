@@ -15,7 +15,8 @@ Thanks for helping! Bug reports, runtime notes, fixes and new runtime adapters a
 - **Bun** is the only JavaScript runtime and package manager (`bun install`, `bun run`,
   `bunx`); the frontend builds without Node.js.
 - **Python 3.8+** for `build.py` and the tests; `pyflakes` for linting.
-- **Docker** for the local Plesk test server (see README, "Local test server").
+- **Docker** for the local Plesk test server: `scripts/plesk-dev.sh` (Linux, macOS, Git Bash)
+  or `scripts/plesk-dev.ps1` (PowerShell 7), see README, "Try it in Docker".
 
 ```sh
 bun install
@@ -36,18 +37,20 @@ python build.py            # package: dist/runway-<version>-<release>.zip
 ## Tests
 
 Run what your change touches. CI runs the lint and packaging checks, `helper-smoke.sh`,
-`api-smoke.sh`, `customer-smoke.sh` and the Go part of `runtime-e2e.sh` on every push and pull
-request that changes code (changes of `docs/`, root-level `*.md` files and `LICENSE` only skip
-CI); the full runtime matrix of `runtime-e2e.sh` needs every toolchain and runs locally:
+`api-smoke.sh`, `customer-smoke.sh` and the Go part of `runtime-e2e.sh` on every pull request
+and on every push that changes code (pushes that only change `docs/`, root-level `*.md` files or
+`LICENSE` skip CI); the full runtime matrix of `runtime-e2e.sh` needs every toolchain and runs
+locally:
 
 ```sh
 python -m pyflakes src/sbin/runway-helper build.py tests/check_locales.py
 python build.py --check
 python tests/check_locales.py
+scripts/plesk-dev.sh test                     # everything CI runs, against the local container
 bash tests/api-smoke.sh                       # against the local Plesk container
 bash tests/runtime-e2e.sh                     # every runtime's sample app through nginx (local only)
 bash tests/customer-smoke.sh                  # customer permission checks
-docker cp tests/helper-smoke.sh grt-plesk:/root/ && docker exec grt-plesk bash /root/helper-smoke.sh
+docker cp tests/helper-smoke.sh runway-plesk:/root/ && docker exec runway-plesk bash /root/helper-smoke.sh
 ```
 
 CI (`.github/workflows/ci.yml`):
@@ -60,7 +63,13 @@ CI (`.github/workflows/ci.yml`):
    `cust1`, installs Go through Runway and runs `tests/helper-smoke.sh`, `tests/api-smoke.sh`
    (with a real deployment), `tests/customer-smoke.sh` (skipped without the customer) and
    `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`). `.github/scripts/plesk-e2e.sh` does
-   the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`.
+   the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`
+   (`scripts/plesk-dev.sh` wraps it: `up`, `install`, `prepare`, `test`, `down`).
+
+CodeQL (`.github/workflows/codeql.yml`) analyses the helper, the frontend and the workflows on
+every push and pull request that changes code; its findings are under *Security > Code
+scanning*. Dependabot
+keeps the GitHub Actions and the frontend dependencies current (`.github/dependabot.yml`).
 
 When you change behaviour, extend `tests/helper-smoke.sh` (helper), `tests/api-smoke.sh` (API)
 or `tests/runtime-e2e.sh` (runtimes, web server) and, for UI changes, check the four pages in the
@@ -78,9 +87,22 @@ panel in the light and the dark theme (no console errors).
 ## Pull requests
 
 - One topic per pull request, with a description of what changed and how it was tested
-  (container, Plesk version, OS).
-- Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md).
+  (container, Plesk version, OS); the pull request template asks for both.
+- Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), or label the pull
+  request `skip-changelog` when nothing user-visible changes.
 - Do not commit generated files (`src/htdocs/index.php`, `src/htdocs/dist/`, `dist/`,
   `node_modules/`).
+- Pull requests are squash-merged into `develop` once the Lint, Package and End-to-end checks
+  are green, so the title should be a good one-line summary: it becomes the commit subject.
+
+## Labels
+
+Area labels (`helper`, `php`, `frontend`, `locales`, `packaging`, `tests`, `examples`,
+`documentation`, `ci`) are added to pull requests automatically from the files they change
+(`.github/labeler.yml`; labels are never removed automatically). The maintainer sets the type
+label, which also decides the category of the change in the generated release notes
+(`.github/release.yml`): `breaking change`, `security`, `enhancement`, `bug`, `runtime`,
+`documentation`, `dependencies` (Dependabot). Bug reports, feature requests and runtime
+proposals get `needs triage` from their issue template.
 
 By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).

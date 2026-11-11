@@ -17,11 +17,11 @@
 # creates the helper's test-only switch /etc/runway/allow-insecure-fetch while it runs.
 # RUNWAY_SMOKE_SUB=0 skips everything that needs the subdomain.
 #
-# Environment: CONTAINER (grt-plesk), PANEL (http://localhost:18880), SITE_ID (1),
+# Environment: CONTAINER (runway-plesk), PANEL (http://localhost:18880), SITE_ID (1),
 # DOMAIN (gotest.local), APP_ROOT (apps/gotest.local), GO_VERSION (1.27.4), SUB (runway-smoke),
 # FETCH_PORT (18765), PYTHON.
 set -u
-CONTAINER=${CONTAINER:-grt-plesk}
+CONTAINER=${CONTAINER:-runway-plesk}
 PANEL=${PANEL:-http://localhost:18880}
 SITE_ID=${SITE_ID:-1}
 DOMAIN=${DOMAIN:-gotest.local}

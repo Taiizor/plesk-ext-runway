@@ -24,8 +24,8 @@ reads it first. Decisions here are final unless this file is changed.
 
 ```
 Runway/
-  README.md  LICENSE (MIT)  SECURITY.md  CHANGELOG.md  CONTRIBUTING.md
-  package.json  bun.lock  extension.config.js  .gitignore  .gitattributes
+  README.md  LICENSE (MIT)  SECURITY.md  CHANGELOG.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md
+  package.json  bun.lock  extension.config.js  .gitignore  .gitattributes  .editorconfig
   build.py                       # packages src/ (incl. generated htdocs/index.php + htdocs/dist) into dist/runway-<ver>.zip
   src/
     meta.xml  DESCRIPTION.md  CHANGES.md
@@ -45,9 +45,11 @@ Runway/
     api-smoke.sh                 # logs into the panel (login link) and exercises the JSON API with curl
     customer-smoke.sh            # customer access with and without the permission (customer cust1)
     runtime-e2e.sh               # sample app per runtime and listen mode, features, through the API and nginx
-    check_locales.py  deploy-test.sh
+    check_locales.py
+  scripts/plesk-dev.sh, scripts/plesk-dev.ps1   # local Plesk test server in Docker (wraps plesk-e2e.sh)
   docs/DESIGN.md (this file)  docs/PLAN.md (status)  docs/runtimes/*.md (per-runtime notes)  docs/RELEASING.md
-  .github/workflows/{ci.yml,release.yml}  .github/scripts/plesk-e2e.sh (e2e driver, also usable locally)
+  .github/workflows/{ci.yml,codeql.yml,labeler.yml,release.yml}  .github/scripts/plesk-e2e.sh (e2e driver, also usable locally)
+  .github/{dependabot.yml,labeler.yml,release.yml,CODEOWNERS,PULL_REQUEST_TEMPLATE.md,ISSUE_TEMPLATE/}
 ```
 
 ## 3. Naming on the server
@@ -295,7 +297,7 @@ error (unknown command, domain or runtime). Admin context.
 
 ## 10. Testing and release
 
-- Local: `plesk/plesk` container (`tests/deploy-test.sh`), `tests/helper-smoke.sh` (root helper,
+- Local: `plesk/plesk` container (`scripts/plesk-dev.sh`), `tests/helper-smoke.sh` (root helper,
   fake domain id 999 with the reconcile pause flag), `tests/api-smoke.sh` (login link → cookies →
   API calls), `tests/customer-smoke.sh` (customer `cust1` with and without the permission),
   `tests/runtime-e2e.sh` (sample app per runtime and listen mode through the API and nginx, path
@@ -307,9 +309,12 @@ error (unknown command, domain or runtime). Admin context.
   `.github/scripts/plesk-e2e.sh` (install zip, subscription, customer `cust1` when the license
   allows it, install Go, then helper-smoke, api-smoke, customer-smoke (skipped without the customer)
   and the Go part of runtime-e2e, `RUNWAY_E2E_RUNTIMES=go`, about 2 minutes); the full runtime
-  matrix runs locally. Documentation-only changes skip CI. Release (`release.yml`): tag `v*` →
-  version gate (tag = `src/meta.xml`) → CI → GitHub Release with
-  the tested zip and SHA256SUMS (docs/RELEASING.md).
+  matrix runs locally. Pushes that only change documentation skip CI; pull requests always run
+  it (the required checks of `develop` must start). CodeQL (`codeql.yml`) analyses the helper,
+  the frontend and the workflows. Release (`release.yml`): tag `v*` → version gate (tag =
+  `src/meta.xml`) → CI → GitHub Release with the tested zip, SHA256SUMS and generated notes
+  (CHANGELOG section + install + checksums + "What's Changed" from the labelled pull requests,
+  docs/RELEASING.md); "Run workflow" rehearses it without publishing.
 - Packaging: `build.py` runs `bun run build` (= `plesk-ext-sdk build`) unless `--no-frontend`,
   then zips `src/` without `frontend/`; LF normalization and Unix modes as in the base. The
   packaged `htdocs/index.php` loads `dist/main.js?v=<version>-<release>.<sha256 prefix>` (cache

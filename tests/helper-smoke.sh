@@ -1,6 +1,6 @@
 #!/bin/bash
 # Regression checks for the root helper. Run INSIDE a Plesk test server as root, e.g.:
-#   docker cp tests/helper-smoke.sh grt-plesk:/root/ && docker exec grt-plesk bash /root/helper-smoke.sh
+#   docker cp tests/helper-smoke.sh runway-plesk:/root/ && docker exec runway-plesk bash /root/helper-smoke.sh
 # Requirements: the extension is installed, Go 1.27.4 is installed through Runway (Bun, Python and
 # FrankenPHP are installed by this script; it needs network access) and the
 # subscription gotest.local (system user gotestuser) exists. Uses domain id 999 (a fake id) so

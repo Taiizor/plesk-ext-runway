@@ -3,7 +3,8 @@
 Releases are built and published by GitHub Actions (`.github/workflows/release.yml`) when a
 tag `v<version>` is pushed. The workflow runs the whole CI first (lint, package, end-to-end
 tests in the Plesk container) and only then creates the GitHub release with the zip that the
-end-to-end job installed and tested.
+end-to-end job installed and tested. Title and notes of the release page are generated (see
+[Release page](#release-page)): nothing is typed by hand.
 
 ## Versioning
 
@@ -37,22 +38,51 @@ end-to-end job installed and tested.
    python tests/check_locales.py
    ```
 
-   Install the zip in the test container (`sh tests/deploy-test.sh`) and run
-   `tests/helper-smoke.sh` and `tests/api-smoke.sh` (see CONTRIBUTING.md). For a release that
-   changes runtime adapters, deploy the matching `examples/<runtime>-hello` once per runtime in
-   both listen modes.
-5. Commit (`Release X.Y.Z`), then tag and push:
+   Install the zip in the test container (`scripts/plesk-dev.sh install`) and run the CI suites
+   against it (`scripts/plesk-dev.sh test`, see CONTRIBUTING.md). For a release that changes
+   runtime adapters, deploy the matching `examples/<runtime>-hello` once per runtime in both
+   listen modes (`bash tests/runtime-e2e.sh`).
+5. Commit (`Release X.Y.Z`) and push. Optional: rehearse the release page without a tag (see
+   [Rehearsal](#rehearsal)).
+6. Tag and push:
 
    ```sh
    git tag -a vX.Y.Z -m "Runway X.Y.Z"
    git push origin develop vX.Y.Z
    ```
 
-6. Watch the *Release* workflow. It publishes `runway-X.Y.Z-R.zip` and `SHA256SUMS` with the
-   notes of the `CHANGELOG.md` section. If it fails after the tag was pushed, fix the problem,
-   delete the tag (`git push --delete origin vX.Y.Z`, `git tag -d vX.Y.Z`) and tag again, or
-   release `vX.Y.Z-<R+1>`.
-7. Afterwards: add a fresh `## [Unreleased]` section to `CHANGELOG.md`.
+7. Watch the *Release* workflow. It publishes `runway-X.Y.Z-R.zip` and `SHA256SUMS` with the
+   generated title and notes. If it fails after the tag was pushed, fix the problem, delete the
+   tag (`git push --delete origin vX.Y.Z`, `git tag -d vX.Y.Z`) and tag again, or release
+   `vX.Y.Z-<R+1>`.
+8. Afterwards: add a fresh `## [Unreleased]` section to `CHANGELOG.md`.
+
+## Release page
+
+The workflow writes the release page from a fixed template; the maintainer never types a title
+or a description:
+
+- **Title**: `Runway X.Y.Z` (or `Runway X.Y.Z-R` for a repackaged release).
+- **Notes**, in this order:
+  1. the `## [X.Y.Z] - YYYY-MM-DD` section of `CHANGELOG.md` (the workflow fails when the section
+     is missing or empty, so write it before tagging);
+  2. *Install*: the `plesk bin extension --upgrade` command for the zip, the panel upload hint and
+     the requirements link;
+  3. *Checksums (SHA-256)* of the zip (the same as the attached `SHA256SUMS`);
+  4. *What's Changed*: the list GitHub generates from the pull requests merged since the previous
+     release, grouped by their labels as configured in `.github/release.yml` (breaking changes,
+     security, new features, bug fixes, runtimes, documentation, dependencies, other), plus new
+     contributors and the compare link. Pull requests labelled `skip-changelog` are left out, so
+     label pull requests before tagging (CONTRIBUTING.md, "Labels").
+- **Assets**: `runway-X.Y.Z-R.zip` and `SHA256SUMS`.
+
+## Rehearsal
+
+*Actions > Release > Run workflow* on `develop` runs the release workflow without a tag: it
+takes the version from `src/meta.xml`, builds and verifies the package, runs the lint and
+packaging checks (tick *e2e* to run the end-to-end tests as well), renders the release notes
+into the job summary and uploads them with the zip as the `release-rehearsal` artifact. Nothing
+is published. Use it to proof-read the notes before pushing the tag.
 
 ## Package verification
 

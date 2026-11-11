@@ -8,10 +8,10 @@
 #
 # The permission is granted for the checks and restored to its previous value at the end. The
 # application of DOMAIN is only read and restarted (app/control restart), never reconfigured.
-# Environment: CONTAINER (grt-plesk), PANEL (http://localhost:18880), CUSTOMER (cust1),
+# Environment: CONTAINER (runway-plesk), PANEL (http://localhost:18880), CUSTOMER (cust1),
 # DOMAIN (gotest.local), SITE_ID (1), PYTHON.
 set -u
-CONTAINER=${CONTAINER:-grt-plesk}
+CONTAINER=${CONTAINER:-runway-plesk}
 PANEL=${PANEL:-http://localhost:18880}
 CUSTOMER=${CUSTOMER:-cust1}
 DOMAIN=${DOMAIN:-gotest.local}

@@ -1,0 +1,24 @@
+name: Label pull requests
+
+# Adds the area labels of .github/labeler.yml to pull requests from the files they change.
+# pull_request_target runs with the configuration of the base branch; nothing from the pull
+# request is checked out or executed.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Area labels
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          # No sync: "documentation" is also set by hand as a type label and must survive the
+          # next push of the pull request.
+          sync-labels: false

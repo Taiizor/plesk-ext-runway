@@ -1,0 +1,55 @@
+name: New runtime
+description: Propose a runtime adapter (see CONTRIBUTING.md, "Adding a runtime")
+labels: [enhancement, runtime, needs triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Node.js is not going to be added: Plesk ships its own Node.js support. Every other runtime needs the facts
+        below; they become `docs/runtimes/<key>.md` when the adapter is written.
+
+  - type: input
+    id: name
+    attributes:
+      label: Runtime
+      placeholder: Deno, Elixir, Zig, ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: toolchain
+    attributes:
+      label: Official toolchain source
+      description: |
+        Where prebuilt Linux x86_64 (and arm64) builds come from, how the available versions can be listed, and how
+        downloads are verified (SHA-256 files, signatures). Runway installs toolchains from official sources only.
+    validations:
+      required: true
+
+  - type: textarea
+    id: project
+    attributes:
+      label: Project detection and defaults
+      description: Files that identify a project, the usual build command, the usual start command and the per-user caches.
+      placeholder: |
+        detect: deno.json
+        build: deno cache main.ts
+        start: deno run --allow-net --allow-env main.ts
+        caches: ~/.cache/deno (DENO_DIR)
+    validations:
+      required: true
+
+  - type: textarea
+    id: listen
+    attributes:
+      label: Listen modes
+      description: How a typical application binds a TCP port from `PORT`/`LISTEN_ADDR` and whether it can listen on a Unix socket (`RUNWAY_SOCKET`).
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to write the adapter myself.

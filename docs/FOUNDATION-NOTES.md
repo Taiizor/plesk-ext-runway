@@ -25,7 +25,7 @@ src/
   plib/resources/locales/{en-US,tr-TR}.php  flat server keys + nested 'app' section for the frontend
   plib/scripts/{pre-install,post-install,pre-uninstall,reconcile}.php
   sbin/runway-helper                        python3 root helper
-tests/  helper-smoke.sh  api-smoke.sh  check_locales.py  deploy-test.sh
+tests/  helper-smoke.sh  api-smoke.sh  check_locales.py  deploy-test.sh (since replaced by scripts/plesk-dev.sh)
 examples/  go-hello  rust-hello
 ```
 
@@ -35,7 +35,8 @@ Removed from the base: `IndexController`/`DomainController`, all `views/`, `libr
 
 Everything was renamed per DESIGN sections 1 and 3 (ids, `Modules_Runway_`, paths, units,
 `RUNWAY_*` variables, `~/.runway`, `runwayApp`/`runwayLimits`, `manage_runway_apps`). The only
-remaining "grt" string is the name of the test container (`grt-plesk`).
+remaining "grt" string was the name of the test container (`grt-plesk`); the public repository
+calls it `runway-plesk`, and `tests/deploy-test.sh` became `scripts/plesk-dev.sh install`.
 
 ## 2. Frontend build with Bun
 
@@ -208,7 +209,8 @@ branches of the toolchain commands with the adapter registry, keeping these outp
 ## 7. Verified in the test container (grt-plesk, Plesk 18.0.82)
 
 - `go-rust-toolkit` uninstalled (its units, `/opt/go-rust-toolkit`, state removed), `runway`
-  installed and upgraded with `tests/deploy-test.sh`; post-install creates `/opt/runway`,
+  installed and upgraded with `tests/deploy-test.sh` (now `scripts/plesk-dev.sh install`);
+  post-install creates `/opt/runway`,
   `/var/lib/runway`, `/etc/runway/env`, the stable helper copy and the reconcile task.
 - Go 1.27.4 installed through `api/toolchain` (job log via `api/job`) into `/opt/runway/go/1.27.4`.
 - `api/app/save` enabled `gotest.local` (go 1.27.4, `apps/gotest.local`, tcp, port 20000):

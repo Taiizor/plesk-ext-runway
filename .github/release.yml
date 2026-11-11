@@ -1,0 +1,23 @@
+# Categories of the "What's Changed" list that GitHub generates for a release from the merged
+# pull requests and their labels (.github/workflows/release.yml appends it to the notes taken
+# from CHANGELOG.md). Pull requests labelled "skip-changelog" are left out.
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: Breaking changes
+      labels: [breaking change]
+    - title: Security
+      labels: [security]
+    - title: New features
+      labels: [enhancement]
+    - title: Bug fixes
+      labels: [bug]
+    - title: Runtimes
+      labels: [runtime]
+    - title: Documentation
+      labels: [documentation]
+    - title: Dependencies
+      labels: [dependencies]
+    - title: Other changes
+      labels: ["*"]

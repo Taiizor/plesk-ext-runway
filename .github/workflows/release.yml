@@ -2,39 +2,70 @@ name: Release
 
 # Push a tag vX.Y.Z (or vX.Y.Z-R for a repackaged release) to build, test and publish a GitHub
 # release with the installable zip. The whole CI (lint, package, end-to-end tests) must pass
-# first. See docs/RELEASING.md.
+# first. Title and notes of the release page are generated (docs/RELEASING.md, "Release page"):
+# the CHANGELOG.md section of the version, install instructions, the SHA-256 checksum and the
+# "What's Changed" list GitHub builds from the merged pull requests (.github/release.yml).
+# "Run workflow" rehearses all of it from the version in src/meta.xml and publishes nothing.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      e2e:
+        description: Also run the end-to-end tests in the Plesk container (a tag always does)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   version:
-    name: Version from the tag
+    name: Version
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
       base: ${{ steps.version.outputs.base }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
 
       - id: version
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?$'; then
-            echo "::error::Tag $GITHUB_REF_NAME must look like v1.2.3 or v1.2.3-4"
-            exit 1
-          fi
-          base="${version%%-*}"
           meta=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' src/meta.xml)
-          if [ "$meta" != "$base" ]; then
-            echo "::error::src/meta.xml has version $meta but the tag is $GITHUB_REF_NAME: bump src/meta.xml, package.json and the helper's VERSION first (docs/RELEASING.md)"
-            exit 1
+          # Only a pushed tag publishes. "Run workflow" is a rehearsal even when a tag is picked
+          # as its ref (the end-to-end tests may be skipped there).
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+            if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?$'; then
+              echo "::error::Tag $GITHUB_REF_NAME must look like v1.2.3 or v1.2.3-4"
+              exit 1
+            fi
+            base="${version%%-*}"
+            if [ "$meta" != "$base" ]; then
+              echo "::error::src/meta.xml has version $meta but the tag is $GITHUB_REF_NAME: bump src/meta.xml, package.json and the helper's VERSION first (docs/RELEASING.md)"
+              exit 1
+            fi
+            publish=true
+          else
+            # Rehearsal from "Run workflow": the version of src/meta.xml, nothing is published.
+            # An existing tag would make the generated notes describe that old release.
+            if git ls-remote --exit-code --tags origin "refs/tags/v$meta" >/dev/null 2>&1; then
+              echo "::error::v$meta is already released: bump the version in src/meta.xml (docs/RELEASING.md) before rehearsing"
+              exit 1
+            fi
+            version=$meta
+            base=$meta
+            publish=false
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "base=$base" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$version"
+            echo "base=$base"
+            echo "tag=v$version"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "Runway $version (tag v$version, publish: $publish)"
 
   ci:
     name: CI
@@ -42,9 +73,10 @@ jobs:
     uses: ./.github/workflows/ci.yml
     with:
       version: ${{ needs.version.outputs.version }}
+      e2e: ${{ github.event_name == 'push' || inputs.e2e }}
 
   release:
-    name: GitHub release
+    name: Release page
     needs: [version, ci]
     runs-on: ubuntu-24.04
     permissions:
@@ -52,6 +84,8 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       BASE: ${{ needs.version.outputs.base }}
+      TAG: ${{ needs.version.outputs.tag }}
+      PUBLISH: ${{ needs.version.outputs.publish }}
     steps:
       - uses: actions/checkout@v5
 
@@ -73,33 +107,80 @@ jobs:
           echo "PACKAGE=$(basename "${zips[0]}")" >> "$GITHUB_ENV"
           (cd dist && sha256sum -- *.zip > SHA256SUMS && cat SHA256SUMS)
 
-      - name: Release notes from CHANGELOG.md
+      - name: What's Changed from the merged pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # GitHub's generated notes (.github/release.yml): merged pull requests since the previous
+          # release grouped by label, new contributors and the compare link.
+          gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+            -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" --jq .body > generated-notes.md
+          cat generated-notes.md
+
+      - name: Release notes
         run: |
           python - <<'EOF'
           import os
           import re
 
           base = os.environ["BASE"]
+          package = os.environ["PACKAGE"]
+          repo = "https://github.com/" + os.environ["GITHUB_REPOSITORY"]
           with open("CHANGELOG.md", encoding="utf-8") as fh:
               text = fh.read()
-          match = re.search(r"^## \[%s\][^\n]*\n(.*?)(?=^## \[|^\[[^\]]+\]: |\Z)" % re.escape(base),
+          # The same heading rule as build.py's changelog check ("## [X.Y.Z]", optional "v").
+          match = re.search(r"^##\s*\[v?%s\][^\n]*\n(.*?)(?=^##\s*\[|^\[[^\]]+\]: |\Z)" % re.escape(base),
                             text, re.MULTILINE | re.DOTALL)
-          if not match:
-              raise SystemExit("CHANGELOG.md has no section for %s" % base)
-          notes = match.group(1).strip()
-          package = os.environ["PACKAGE"]
-          notes += ("\n\n### Install\n\nDownload `%s` and run, as root on the Plesk server:\n\n"
-                    "```sh\nplesk bin extension --upgrade %s\n```\n\n"
-                    "`SHA256SUMS` lists the checksum of the package. Documentation: "
-                    "https://github.com/Taiizor/plesk-ext-runway#readme\n" % (package, package))
+          if not match or not match.group(1).strip():
+              raise SystemExit("CHANGELOG.md has no section '## [%s] - YYYY-MM-DD' with content: "
+                               "write it before tagging (docs/RELEASING.md)" % base)
+          with open("dist/SHA256SUMS", encoding="utf-8") as fh:
+              checksums = fh.read().strip()
+          with open("generated-notes.md", encoding="utf-8") as fh:
+              generated = fh.read().strip()
+          parts = [
+              match.group(1).strip(),
+              "### Install\n\n"
+              "Download `%s` and run, as root on the Plesk server:\n\n"
+              "```sh\nplesk bin extension --upgrade %s\n```\n\n"
+              "or upload it under *Extensions > My Extensions > Upload Extension*. Requires Plesk "
+              "Obsidian 18.0.55 or newer on Linux with systemd; see the [README](%s#readme) for the "
+              "requirements and the [changelog](%s/blob/develop/CHANGELOG.md) for older versions."
+              % (package, package, repo, repo),
+              "### Checksums (SHA-256)\n\n```\n%s\n```" % checksums,
+          ]
+          if generated:
+              parts.append(generated)
+          notes = "\n\n".join(parts) + "\n"
           with open("release-notes.md", "w", encoding="utf-8") as fh:
               fh.write(notes)
           print(notes)
           EOF
 
+      - name: Preview in the job summary
+        run: |
+          {
+            echo "# Runway $VERSION"
+            echo
+            [ "$PUBLISH" = "true" ] || echo "> Rehearsal: nothing was published. A tag \`$TAG\` would create this release page."
+            echo
+            cat release-notes.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH != 'true'
+        with:
+          name: release-rehearsal
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
+            release-notes.md
+          retention-days: 7
+
       - name: Publish
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
+          gh release create "$TAG" dist/*.zip dist/SHA256SUMS \
             --title "Runway $VERSION" --notes-file release-notes.md --verify-tag
