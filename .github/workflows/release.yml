@@ -29,7 +29,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       publish: ${{ steps.version.outputs.publish }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - id: version
         run: |
@@ -87,13 +87,13 @@ jobs:
       TAG: ${{ needs.version.outputs.tag }}
       PUBLISH: ${{ needs.version.outputs.publish }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: runway-package
           path: dist
@@ -167,7 +167,7 @@ jobs:
             cat release-notes.md
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: env.PUBLISH != 'true'
         with:
           name: release-rehearsal
