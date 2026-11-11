@@ -112,8 +112,10 @@ cmd_prepare() {
             -email "$CUSTOMER@example.com" >/dev/null 2>&1 || echo "customer $CUSTOMER could not be created (license?)"
     fi
     if in_c plesk bin customer --info "$CUSTOMER" >/dev/null 2>&1; then
-        in_c plesk bin subscription --change-owner "$DOMAIN" -owner "$CUSTOMER" >/dev/null 2>&1 \
+        log "making $CUSTOMER the owner of $DOMAIN"
+        in_c plesk bin subscription --change-owner "$DOMAIN" -owner "$CUSTOMER" \
             || echo "the owner of $DOMAIN could not be changed to $CUSTOMER"
+        in_c plesk bin subscription --info "$DOMAIN" | grep -i "^Owner" || true
     fi
     if ! in_c test -x "/opt/runway/go/$GO_VERSION/bin/go"; then
         log "installing Go $GO_VERSION through the Runway helper"
@@ -144,7 +146,7 @@ cmd_smoke() {
         CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" CUSTOMER="$CUSTOMER" \
             bash "$ROOT/tests/customer-smoke.sh" || rc=1
     else
-        echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER"
+        echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER ($(in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -i "^Owner" | tr -s ' ' | tr -d '\r' | head -n 1))"
     fi
     if [ -n "$E2E_RUNTIMES" ]; then
         log "tests/runtime-e2e.sh (runtimes: $E2E_RUNTIMES)"

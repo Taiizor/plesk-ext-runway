@@ -84,6 +84,26 @@ wait_deploy() {
     done
     echo "$state"
 }
+# Plesk regenerates the vhost configuration through its task manager, so on a slow server the
+# files lag a few seconds behind app/save: poll before judging them.
+# wait_conf GREP_FLAGS PATTERN FILE: 0 as soon as PATTERN matches (within 30 s).
+wait_conf() {
+    local _i
+    for _i in $(seq 1 15); do
+        dock exec "$CONTAINER" grep "$1" "$2" "$3" 2>/dev/null && return 0
+        sleep 2
+    done
+    return 1
+}
+# wait_conf_gone GREP_FLAGS PATTERN FILE: 0 as soon as PATTERN no longer matches (within 30 s).
+wait_conf_gone() {
+    local _i
+    for _i in $(seq 1 15); do
+        dock exec "$CONTAINER" grep "$1" "$2" "$3" 2>/dev/null || return 0
+        sleep 2
+    done
+    return 1
+}
 cleanup() {
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
     # "[.]" keeps pkill from matching (and killing) this very shell.
@@ -283,6 +303,8 @@ if [ -n "$SUB_ID" ]; then
     out=$(post app/save "{\"site_id\": $SUB_ID, \"enabled\": true, \"runtime\": \"binary\", \"buildCmd\": \"\", \"startCmd\": \"./app\", \"mode\": \"path\", \"mountPath\": \"api/\", \"staticPaths\": \"/api/static, /assets\"}")
     check "app/save: path mode with static paths" "d['status'] == 'success' and d['data']['config']['mode'] == 'path' and d['data']['config']['mountPath'] == '/api' and d['data']['config']['staticPaths'] == ['/api/static', '/assets']" "$out"
     CONF=/var/www/vhosts/system/$SUB_DOMAIN/conf
+    wait_conf -qF 'location ~ ^/api(?!/(static)(/|$))(/|$) {' "$CONF/nginx.conf"
+    wait_conf -q 'ProxyPass /api ' "$CONF/httpd.conf"
     dock exec "$CONTAINER" grep -qF 'location ~ ^/api(?!/(static)(/|$))(/|$) {' "$CONF/nginx.conf" && ok "nginx: location for the mount path without the static path" || bad "nginx location: $(dock exec "$CONTAINER" grep -A1 Runway "$CONF/nginx.conf")"
     dock exec "$CONTAINER" sh -c "grep -q 'ProxyPass /api/static !' $CONF/httpd.conf && grep -q 'ProxyPass /api http://127.0.0.1:[0-9]*/api retry=0' $CONF/httpd.conf" && ok "apache: ProxyPass for the mount path, static path excluded" || bad "apache ProxyPass: $(dock exec "$CONTAINER" grep ProxyPass "$CONF/httpd.conf")"
     dock exec "$CONTAINER" nginx -t >/dev/null 2>&1 && ok "nginx -t" || bad "nginx -t: $(dock exec "$CONTAINER" nginx -t 2>&1 | tail -2)"
@@ -346,7 +368,7 @@ if [ -n "$SUB_ID" ]; then
         "d['status'] == 'success' and d['data']['config']['mode'] == 'worker' and d['data']['config']['listen'] == 'none'" \
         "$out" "Invalid listen mode"
     if [ "$(echo "$out" | jexpr "d['status']")" = "success" ]; then
-        dock exec "$CONTAINER" grep -q 'Runway' "$CONF/nginx.conf" && bad "nginx config of a worker still proxies" || ok "nginx: no proxy for a worker"
+        wait_conf_gone -q 'Runway' "$CONF/nginx.conf" && ok "nginx: no proxy for a worker" || bad "nginx config of a worker still proxies"
         check "overview: a worker has no port and no app URL" "[(a['port'], a['appUrl'], a['mode']) for a in d['data']['apps'] if a['domainId'] == $SUB_ID] == [(None, None, 'worker')]" "$(get overview)"
         check "app/save: mode web gives the worker a listener again" "d['status'] == 'success' and d['data']['config']['listen'] in ('tcp', 'unix') and d['data']['config']['mode'] == 'web'" \
             "$(post app/save "{\"site_id\": $SUB_ID, \"mode\": \"web\", \"listen\": \"none\"}")"

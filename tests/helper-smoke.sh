@@ -290,7 +290,8 @@ grep -q "^VIRTUAL_ENV=\"$HOME_DIR/apps/smoke-python/.venv\"" /etc/runway/env/$ID
 sample_app php "$FP" tcp
 sample_app php "$FP" unix
 sample_app php plesk-8.4 tcp
-sample_app ruby system tcp
+# The plesk/plesk image ships no Ruby: the system Ruby sample runs only where one is installed.
+if [ -x /usr/bin/ruby ]; then sample_app ruby system tcp; else echo "SKIP  ruby sample (no system Ruby installed)"; fi
 for rt in java dotnet; do
     # Large toolchains: tested when installed (toolchain-install {"runtime": "java", "version": "21"} / {"runtime": "dotnet", "version": "10.0"}).
     tc=$(call toolchains '{}' | jexpr "([t['id'] for t in d['runtimes']['$rt']['installed']] or [''])[0]")
@@ -319,7 +320,8 @@ as_user "cd '$HOME_DIR/apps/smoke-def' && printf 'package demo;\npublic class Ap
     && printf '{\"require\": {\"laravel/framework\": \"^13.0\", \"laravel/octane\": \"^2.24\"}}' > octane/composer.json && touch octane/artisan"
 [ "$(page_default apps/smoke-def/java java tcp "" "(d['build_cmd'], d['start_cmd'])")" = "('javac -d build App.java', 'java -XX:MaxRAMPercentage=75 -cp build demo.App')" ] && ok "Java: any top-level .java with a main method is detected" || bad "java defaults: $(page_default apps/smoke-def/java java tcp "" "d['start_cmd']")"
 [ "$(page_default apps/smoke-def/rust rust tcp "" "d['start_cmd']")" = "./target/release/server" ] && ok "Rust: the [[bin]] of src/main.rs names the binary" || bad "rust defaults: $(page_default apps/smoke-def/rust rust tcp "" "d['start_cmd']")"
-[ "$(page_default apps/smoke-def/rack ruby unix system "(d['start_cmd'].startswith('bundle exec rackup'), d['variants']['unix|system']['unix_supported'])")" = "(True, False)" ] && ok "Ruby: rackup is TCP only (unix_supported false)" || bad "rackup defaults: $(page_default apps/smoke-def/rack ruby unix system "d['variants']")"
+# Without an installed Ruby the page answers with the generic variant ("unix|") only.
+[ "$(page_default apps/smoke-def/rack ruby unix system "(d['start_cmd'].startswith('bundle exec rackup'), d['variants'].get('unix|system', d['variants']['unix|'])['unix_supported'])")" = "(True, False)" ] && ok "Ruby: rackup is TCP only (unix_supported false)" || bad "rackup defaults: $(page_default apps/smoke-def/rack ruby unix system "d['variants']")"
 [ "$(page_default apps/smoke-def/rails ruby tcp system "d['build_cmd'].endswith('bundle install && SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile')")" = "True" ] && ok "Ruby: Rails assets through bundle exec" || bad "rails defaults: $(page_default apps/smoke-def/rails ruby tcp system "d['build_cmd']")"
 [ "$(page_default apps/smoke-def/puma ruby unix system "d['start_cmd']")" = "bundle exec puma -C config/puma.rb -e production" ] && ok "Ruby: config/puma.rb decides the bind (no -b)" || bad "puma defaults: $(page_default apps/smoke-def/puma ruby unix system "d['start_cmd']")"
 [ "$(page_default apps/smoke-def/octane php tcp "$FP" "d['variants']['tcp|$FP']['start_cmd']")" = 'php artisan octane:frankenphp --caddyfile=.runway/Caddyfile --port=$PORT --admin-port=$PORT' ] && ok "PHP: Laravel Octane uses Runway's Caddyfile" || bad "octane defaults: $(page_default apps/smoke-def/octane php tcp "$FP" "d['variants']")"
