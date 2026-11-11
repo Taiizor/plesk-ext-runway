@@ -67,7 +67,7 @@ cmd_start() {
         sleep 10
     done
     [ "$state" = "degraded" ] && in_c systemctl --failed --no-pager || true
-    in_c plesk version | head -n 2
+    in_c plesk version | sed -n '1,2p'
 }
 
 cmd_install() {
@@ -76,7 +76,7 @@ cmd_install() {
     dock cp "$zip" "$CONTAINER:/root/runway.zip"
     in_c plesk bin extension --upgrade /root/runway.zip
     in_c plesk bin extension --list | grep -E '^runway\b'
-    echo '{}' | in_ci "$HELPER" info | head -c 600
+    echo '{}' | in_ci "$HELPER" info | cut -c1-600
     echo
 }
 
@@ -132,7 +132,7 @@ cmd_prepare() {
 }
 
 cmd_smoke() {
-    local rc=0 id
+    local rc=0 id owner
     id=$(site_id)
     log "tests/helper-smoke.sh (inside the container)"
     dock cp "$ROOT/tests/helper-smoke.sh" "$CONTAINER:/root/helper-smoke.sh"
@@ -141,13 +141,16 @@ cmd_smoke() {
     CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
         APP_ROOT="apps/$DOMAIN" GO_VERSION="$GO_VERSION" RUNWAY_SMOKE_DEPLOY=1 \
         bash "$ROOT/tests/api-smoke.sh" || rc=1
-    if in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -q "($CUSTOMER)"; then
-        log "tests/customer-smoke.sh (as $CUSTOMER)"
-        CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" CUSTOMER="$CUSTOMER" \
-            bash "$ROOT/tests/customer-smoke.sh" || rc=1
-    else
-        echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER ($(in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -i "^Owner" | tr -s ' ' | tr -d '\r' | head -n 1))"
-    fi
+    # No "grep -q" here: with pipefail an early exit of grep fails the pipeline when docker exec
+    # is still writing (EPIPE), which skipped this suite on GitHub's runners.
+    owner=$(in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -i "^Owner" | tr -s ' ' | tr -d '\r' || true)
+    case "$owner" in
+        *"($CUSTOMER)"*)
+            log "tests/customer-smoke.sh (as $CUSTOMER)"
+            CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" CUSTOMER="$CUSTOMER" \
+                bash "$ROOT/tests/customer-smoke.sh" || rc=1 ;;
+        *) echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER (${owner:-no owner line})" ;;
+    esac
     if [ -n "$E2E_RUNTIMES" ]; then
         log "tests/runtime-e2e.sh (runtimes: $E2E_RUNTIMES)"
         CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
