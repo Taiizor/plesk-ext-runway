@@ -48,6 +48,15 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
+          config: |
+            query-filters:
+              # The helper sets deliberate group/world-readable modes: root-owned read-only
+              # toolchain trees (0755/0644), user-owned application files (0750) and the
+              # web-server-group socket of the Python example. The query reports every mode
+              # that grants anything to group or others, so it only produces noise here;
+              # the modes were reviewed in docs/REVIEW-REPORT.md and SECURITY.md.
+              - exclude:
+                  id: py/overly-permissive-file
 
       - uses: github/codeql-action/analyze@v4
         with:
