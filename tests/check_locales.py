@@ -13,7 +13,10 @@ Checks:
 - every key used by the frontend (<Translate content="..."/>, content={'...'},
   translate('...') / lmsg('...') / t('...'), and keys listed in "// i18n-keys: A.b C.d"
   comments for keys built at runtime) exists in every app file;
-- every locale defines the same keys as en-US, with the same %%placeholders%%.
+- every locale defines the same keys as en-US, with the same %%placeholders%%;
+- every locale file (loader, server, app) mirrors its en-US counterpart line for line: only the
+  string values and line 3 (a comment naming the language) differ, so a key has the same line
+  number in every locale.
 
 Unused server keys are reported as warnings only.
 """
@@ -40,6 +43,9 @@ DYNAMIC_APP = {"Overview.title", "Toolchains.title", "Settings.title", "Domain.t
 RE_ENTRY = re.compile(r"""^\s*'([A-Za-z0-9_.-]+)'\s*=>\s*(?:'((?:[^'\\]|\\.)*)'|(\[))\s*,?\s*$""")
 RE_CLOSE = re.compile(r"^\s*\],?\s*;?\s*$")
 RE_PLACEHOLDER = re.compile(r"%%(\w+)%%")
+RE_VALUE = re.compile(r"""^(\s*'[A-Za-z0-9_.-]+'\s*=>\s*)'(?:[^'\\]|\\.)*'(\s*,?\s*)$""")
+# Line 3 of a translation names its language (a comment); en-US has "//" there.
+LANGUAGE_LINE = 3
 
 
 def parse_file(path, nested):
@@ -77,6 +83,34 @@ def check_loader(path, name):
     if "$messages['app']" not in text:
         problems.append("%s: the loader does not set $messages['app']" % name)
     return problems
+
+
+def shape(line):
+    """The line with its string value blanked: what has to match en-US line for line."""
+    return RE_VALUE.sub(r"\1''\2", line)
+
+
+def check_layout(label, path, reference_path, code):
+    """A locale file mirrors its en-US counterpart line for line (the same comments, brackets and
+    keys on the same lines; the locale code in place of en-US); only the string values and line
+    LANGUAGE_LINE differ. Reports the first difference."""
+    if not (os.path.isfile(path) and os.path.isfile(reference_path)):
+        return []
+    with open(path, encoding="utf-8", newline="") as fh:
+        lines = fh.read().split("\n")
+    with open(reference_path, encoding="utf-8", newline="") as fh:
+        reference = fh.read().split("\n")
+    for number, (line, ref) in enumerate(zip(lines, reference), 1):
+        if number == LANGUAGE_LINE:
+            if not line.startswith("//"):
+                return ["%s:%d: line %d must be the comment that names the language" % (label, number, number)]
+        elif shape(line) != shape(ref.replace("en-US", code)):
+            return ["%s:%d: differs from line %d of %s (every locale mirrors it line for line; only the "
+                    "string values and line %d may differ)" % (label, number, number, REFERENCE, LANGUAGE_LINE)]
+    if len(lines) != len(reference):
+        return ["%s: %d lines, %s has %d (every locale mirrors it line for line)"
+                % (label, len(lines), REFERENCE, len(reference))]
+    return []
 
 
 def cli_keys():
@@ -169,6 +203,12 @@ def main():
     for name, parts in data.items():
         compare("server", name, parts["server"], reference["server"], php_required, errors)
         compare("app", name, parts["app"], reference["app"], app_required, errors)
+        if name != REFERENCE:
+            code = name[:-len(".php")]
+            for part in ("", "server", "app"):
+                label = "%s/%s" % (part, name) if part else name
+                errors.extend(check_layout(label, os.path.join(LOCALES, part, name),
+                                           os.path.join(LOCALES, part, REFERENCE), code))
     for key in sorted(set(reference["server"]) - php_mentioned):
         warnings.append("server/%s: unused key %s" % (REFERENCE, key))
     for line in warnings:

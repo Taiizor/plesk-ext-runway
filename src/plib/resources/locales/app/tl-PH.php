@@ -1,7 +1,6 @@
 <?php
 // Copyright 2026 Taiizor. Licensed under the MIT License.
-// Filipino (Tagalog) translation
-//
+// Filipino (Tagalog) translation of en-US.php (same keys, placeholders and line numbers).
 // Strings of the React frontend (src/frontend), loaded into the 'app' section of the locale by
 // ../tl-PH.php and passed to the browser by the generated index.php (pm_Locale::getSection('app')).
 // Keys are nested per component and arrive flattened ("Domain.status.title"). Placeholders use

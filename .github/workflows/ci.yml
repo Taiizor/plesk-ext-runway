@@ -90,7 +90,7 @@ jobs:
           if ($errors.Count) { exit 1 }
           Write-Host "ok scripts/plesk-dev.ps1"
 
-      - name: Locale keys and placeholders (every locale against en-US)
+      - name: Locale files (keys, placeholders and line layout of every locale against en-US)
         run: python tests/check_locales.py
 
       - name: Frontend build (bun + plesk-ext-sdk)

@@ -565,7 +565,7 @@ Repository layout:
 ### Tests
 
 ```sh
-python tests/check_locales.py      # every locale defines the keys and placeholders of en-US
+python tests/check_locales.py      # every locale mirrors en-US line for line (keys, placeholders)
 scripts/plesk-dev.sh test          # everything CI runs, against the local container
 bash tests/api-smoke.sh            # JSON API through the panel (RUNWAY_SMOKE_DEPLOY=1 also deploys)
 bash tests/runtime-e2e.sh          # sample app of every runtime, tcp + unix, through nginx; path

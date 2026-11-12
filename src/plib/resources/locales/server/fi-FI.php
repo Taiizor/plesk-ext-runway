@@ -1,7 +1,6 @@
 <?php
 // Copyright 2026 Taiizor. Licensed under the MIT License.
-// Finnish translation
-//
+// Finnish translation of en-US.php (same keys, placeholders and line numbers).
 // Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
 // buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
 // Loaded by ../fi-FI.php; the frontend strings live in ../app/fi-FI.php.

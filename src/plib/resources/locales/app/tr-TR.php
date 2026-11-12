@@ -1,8 +1,10 @@
 <?php
 // Copyright 2026 Taiizor. Licensed under the MIT License.
-//
-// Turkish strings of the React frontend; same keys and placeholders as en-US.php in this
-// directory. One entry per line (tests/check_locales.py parses this file).
+// Turkish translation of en-US.php (same keys, placeholders and line numbers).
+// Strings of the React frontend (src/frontend), loaded into the 'app' section of the locale by
+// ../tr-TR.php and passed to the browser by the generated index.php (pm_Locale::getSection('app')).
+// Keys are nested per component and arrive flattened ("Domain.status.title"). Placeholders use
+// %%name%%. One entry per line (tests/check_locales.py parses this file).
 
 return [
     'Common' => [
