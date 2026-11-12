@@ -139,6 +139,14 @@ cmd_prepare() {
         wait_admin_job
     fi
     in_c "/opt/runway/go/$GO_VERSION/bin/go" version
+    # api-smoke's single-file sample test needs a Python toolchain; helper-smoke installs one
+    # itself, so only the panel job (api without helper) installs it here.
+    if want api && ! want helper && [ -z "$(in_c sh -c 'ls /opt/runway/python 2>/dev/null')" ]; then
+        log "installing Python 3.13 through the Runway helper (api-smoke sample test)"
+        echo '{"runtime": "python", "version": "3.13"}' | in_ci "$HELPER" toolchain-install
+        echo
+        wait_admin_job
+    fi
     log "copying examples/go-hello into apps/$DOMAIN"
     home=$(in_c getent passwd "$SYSUSER" | cut -d: -f6)
     in_c mkdir -p "$home/apps/$DOMAIN"
