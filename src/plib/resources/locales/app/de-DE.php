@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Läuft im Anwendungsstamm. Die Anwendung muss auf 127.0.0.1 und dem Port aus PORT oder auf dem Socket aus RUNWAY_SOCKET lauschen.',
             'startCmdWorkerHint' => 'Läuft im Anwendungsstamm als Dienst, der neu gestartet wird, wenn er sich beendet.',
             'useDefaults' => 'Standardbefehle dieser Laufzeitumgebung verwenden',
+            'useDefaultsDone' => 'Die Standardbefehle wurden eingetragen.',
+            'useDefaultsNone' => 'Für dieses Projekt ist kein Standard-Startbefehl bekannt.',
             'env' => 'Umgebungsvariablen',
             'envHint' => 'Ein SCHLÜSSEL=Wert pro Zeile; Zeilen, die mit # beginnen, werden ignoriert. Wird auf dem Server nur für root lesbar gespeichert. PORT, HOST, LISTEN_ADDR (TCP-Modus) und die RUNWAY_*-Variablen werden automatisch gesetzt; Loader-Variablen wie LD_PRELOAD gehören in den Startbefehl.',
             'envUnavailable' => 'Die gespeicherten Variablen konnten nicht geladen werden; sie bleiben beim Speichern unverändert erhalten.',

@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Dijalankan di root aplikasi. Aplikasi harus mendengarkan di 127.0.0.1 dan port dalam PORT, atau di soket dalam RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Dijalankan di root aplikasi sebagai layanan yang dimulai ulang ketika prosesnya berakhir.',
             'useDefaults' => 'Gunakan perintah default runtime ini',
+            'useDefaultsDone' => 'Perintah default telah diisi.',
+            'useDefaultsNone' => 'Tidak ada perintah start default yang diketahui untuk proyek ini.',
             'env' => 'Variabel lingkungan',
             'envHint' => 'Satu KUNCI=nilai per baris; baris yang diawali # diabaikan. Disimpan di server dan hanya dapat diakses oleh root. PORT, HOST, LISTEN_ADDR (mode TCP), dan variabel RUNWAY_* diatur secara otomatis; variabel loader seperti LD_PRELOAD harus diletakkan di perintah start.',
             'envUnavailable' => 'Variabel yang tersimpan tidak dapat dimuat; variabel tersebut tetap tidak berubah saat Anda menyimpan.',

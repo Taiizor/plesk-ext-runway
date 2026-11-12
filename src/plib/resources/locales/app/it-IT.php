@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Viene eseguito nella root dell\'applicazione. L\'applicazione deve essere in ascolto su 127.0.0.1 e sulla porta in PORT, oppure sul socket in RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Viene eseguito nella root dell\'applicazione come servizio che viene riavviato quando termina.',
             'useDefaults' => 'Usa i comandi predefiniti di questo runtime',
+            'useDefaultsDone' => 'I comandi predefiniti sono stati inseriti.',
+            'useDefaultsNone' => 'Non è noto alcun comando di avvio predefinito per questo progetto.',
             'env' => 'Variabili d\'ambiente',
             'envHint' => 'Una coppia CHIAVE=valore per riga; le righe che iniziano con # vengono ignorate. Memorizzate sul server in modo leggibile solo da root. PORT, HOST, LISTEN_ADDR (modalità TCP) e le variabili RUNWAY_* vengono impostate automaticamente; le variabili del loader come LD_PRELOAD vanno nel comando di avvio.',
             'envUnavailable' => 'Impossibile caricare le variabili memorizzate; al salvataggio verranno mantenute invariate.',

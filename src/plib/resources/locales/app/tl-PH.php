@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Tumatakbo sa application root. Dapat makinig ang application sa 127.0.0.1 at sa port na nasa PORT, o sa socket na nasa RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Tumatakbo sa application root bilang serbisyo na nire-restart kapag nag-exit ito.',
             'useDefaults' => 'Gamitin ang mga default na command ng runtime na ito',
+            'useDefaultsDone' => 'Nailagay na ang mga default na command.',
+            'useDefaultsNone' => 'Walang alam na default na start command para sa proyektong ito.',
             'env' => 'Mga environment variable',
             'envHint' => 'Isang KEY=value sa bawat linya; binabalewala ang mga linyang nagsisimula sa #. Nakaimbak sa server at root lamang ang makakabasa. Awtomatikong itinatakda ang PORT, HOST, LISTEN_ADDR (TCP mode) at ang mga RUNWAY_* variable; ang mga loader variable tulad ng LD_PRELOAD ay dapat nasa start command.',
             'envUnavailable' => 'Hindi ma-load ang mga nakaimbak na variable; mananatili ang mga ito nang hindi nababago kapag nag-save kayo.',

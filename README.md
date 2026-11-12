@@ -75,7 +75,8 @@ from native speakers are welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 - Plesk Obsidian **18.0.55** or newer on Linux with **systemd**: Ubuntu 22.04/24.04, Debian 12,
   AlmaLinux/RHEL 9. Developed and tested on Plesk 18.0.82 / Ubuntu 24.04.
-- `python3` 3.8+ (present on every Plesk server: `plesk-core` depends on it) and `/bin/bash`.
+- `python3` 3.8+ as `/usr/bin/python3` (present on every Plesk server: `plesk-core` depends on
+  it; the installation checks the version) and `/bin/bash`.
 - nginx (the Plesk default). Apache-only servers work through `mod_proxy`/`mod_proxy_http`;
   WebSockets through Apache alone need Apache 2.4.47 or newer (`ProxyPass ... upgrade=websocket`,
   emitted only for those versions).

@@ -345,6 +345,8 @@ return [
             'startCmdHint' => 'Runs in the application root. The application must listen on 127.0.0.1 and the port in PORT, or on the socket in RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Runs in the application root as a service that is restarted when it exits.',
             'useDefaults' => 'Use the default commands of this runtime',
+            'useDefaultsDone' => 'The default commands were filled in.',
+            'useDefaultsNone' => 'No default start command is known for this project.',
             'env' => 'Environment variables',
             'envHint' => 'One KEY=value per line; lines starting with # are ignored. Stored root-only on the server. PORT, HOST, LISTEN_ADDR (TCP mode) and the RUNWAY_* variables are set automatically; loader variables such as LD_PRELOAD belong in the start command.',
             'envUnavailable' => 'The stored variables could not be loaded; they are kept unchanged when you save.',

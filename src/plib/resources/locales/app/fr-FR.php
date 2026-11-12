@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'S\'exécute dans la racine de l\'application. L\'application doit écouter sur 127.0.0.1 et le port indiqué dans PORT, ou sur le socket indiqué dans RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'S\'exécute dans la racine de l\'application en tant que service, redémarré lorsqu\'il se termine.',
             'useDefaults' => 'Rétablir les commandes par défaut',
+            'useDefaultsDone' => 'Les commandes par défaut ont été renseignées.',
+            'useDefaultsNone' => 'Aucune commande de démarrage par défaut n\'est connue pour ce projet.',
             'env' => 'Variables d\'environnement',
             'envHint' => 'Une CLÉ=valeur par ligne ; les lignes commençant par # sont ignorées. Stockées sur le serveur, lisibles uniquement par root. PORT, HOST, LISTEN_ADDR (mode TCP) et les variables RUNWAY_* sont définies automatiquement ; les variables de chargement telles que LD_PRELOAD doivent figurer dans la commande de démarrage.',
             'envUnavailable' => 'Les variables stockées n\'ont pas pu être chargées ; elles sont conservées telles quelles lorsque vous enregistrez.',

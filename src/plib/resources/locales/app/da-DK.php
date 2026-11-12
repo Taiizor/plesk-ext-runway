@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Kører i applikationsroden. Applikationen skal lytte på 127.0.0.1 og porten i PORT eller på socketen i RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Kører i applikationsroden som en tjeneste, der genstartes, når den afsluttes.',
             'useDefaults' => 'Brug standardkommandoerne for denne runtime',
+            'useDefaultsDone' => 'Standardkommandoerne er indsat.',
+            'useDefaultsNone' => 'Der kendes ingen standardstartkommando for dette projekt.',
             'env' => 'Miljøvariabler',
             'envHint' => 'Én NØGLE=værdi pr. linje; linjer, der begynder med #, ignoreres. Gemmes på serveren, så kun root kan læse dem. PORT, HOST, LISTEN_ADDR (TCP-tilstand) og RUNWAY_*-variablerne sættes automatisk; loader-variabler som LD_PRELOAD hører hjemme i startkommandoen.',
             'envUnavailable' => 'De gemte variabler kunne ikke indlæses; de bevares uændret, når du gemmer.',

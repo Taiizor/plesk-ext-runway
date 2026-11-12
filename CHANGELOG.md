@@ -10,6 +10,22 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Fixed
+
+- The installation checks that `/usr/bin/python3` is 3.8 or newer, the version the root helper
+  needs (an older python3 passed the check before). The message names the version found; a
+  python3 that fails, prints no version or does not answer within 10 seconds also stops the
+  installation. The hint for a missing python3 fits the distribution: `apt-get` on
+  Debian/Ubuntu, `dnf` on AlmaLinux/Rocky/RHEL 9 and newer, the requirements on releases whose
+  python3 is older than 3.8 (EL 7 and 8, Debian 10, Ubuntu 18.04), otherwise the package manager
+  of the distribution.
+- Domain page: "Use the default commands of this runtime" seemed to do nothing when the commands
+  already were the defaults (for example the stored commands of a sample application, or right
+  after a change of runtime or listen mode, which follows the defaults by itself). A confirmation
+  next to the button now shows that the default commands were filled in. When no default start
+  command is known (.NET with a solution, several projects or no project yet), the button keeps
+  the commands and says so instead of clearing them.
+
 ## [1.0.0] - 2026-11-12
 
 First public release. Runway evolves from the private "Go & Rust Toolkit" extension; everything

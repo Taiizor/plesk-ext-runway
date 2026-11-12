@@ -344,6 +344,8 @@ return [
             'startCmdHint' => '在应用程序根目录中运行。应用程序必须监听 127.0.0.1 和 PORT 中的端口，或 RUNWAY_SOCKET 中的套接字。',
             'startCmdWorkerHint' => '在应用程序根目录中作为服务运行，退出后会自动重新启动。',
             'useDefaults' => '使用此运行时的默认命令',
+            'useDefaultsDone' => '已填入默认命令。',
+            'useDefaultsNone' => '此项目没有已知的默认启动命令。',
             'env' => '环境变量',
             'envHint' => '每行一个 KEY=value；以 # 开头的行将被忽略。在服务器上以仅 root 可读的方式存储。PORT、HOST、LISTEN_ADDR（TCP 模式）和 RUNWAY_* 变量会自动设置；LD_PRELOAD 等加载器变量应放在启动命令中。',
             'envUnavailable' => '无法加载已存储的变量；保存时它们将保持不变。',

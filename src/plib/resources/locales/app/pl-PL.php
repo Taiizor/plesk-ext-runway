@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Uruchamiane w katalogu głównym aplikacji. Aplikacja musi nasłuchiwać na 127.0.0.1 i porcie z PORT lub na gnieździe z RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Uruchamiane w katalogu głównym aplikacji jako usługa, która jest ponownie uruchamiana po zakończeniu.',
             'useDefaults' => 'Użyj domyślnych poleceń tego środowiska uruchomieniowego',
+            'useDefaultsDone' => 'Wstawiono domyślne polecenia.',
+            'useDefaultsNone' => 'Dla tego projektu nie jest znane domyślne polecenie startowe.',
             'env' => 'Zmienne środowiskowe',
             'envHint' => 'Jedna para KLUCZ=wartość w wierszu; wiersze zaczynające się od # są ignorowane. Przechowywane na serwerze z dostępem tylko dla roota. PORT, HOST, LISTEN_ADDR (tryb TCP) i zmienne RUNWAY_* są ustawiane automatycznie; zmienne programu ładującego, takie jak LD_PRELOAD, należy umieścić w poleceniu startowym.',
             'envUnavailable' => 'Nie udało się załadować zapisanych zmiennych; przy zapisie pozostaną niezmienione.',

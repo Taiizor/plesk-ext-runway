@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'S\'executa a l\'arrel de l\'aplicació. L\'aplicació ha d\'escoltar a 127.0.0.1 i al port de PORT, o al sòcol de RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'S\'executa a l\'arrel de l\'aplicació com a servei que es reinicia quan finalitza.',
             'useDefaults' => 'Utilitza les ordres per defecte d\'aquest entorn d\'execució',
+            'useDefaultsDone' => 'S\'han introduït les ordres per defecte.',
+            'useDefaultsNone' => 'No es coneix cap ordre d\'inici per defecte per a aquest projecte.',
             'env' => 'Variables d\'entorn',
             'envHint' => 'Una CLAU=valor per línia; les línies que comencen per # s\'ignoren. Es desen al servidor amb accés només per a root. PORT, HOST, LISTEN_ADDR (mode TCP) i les variables RUNWAY_* es defineixen automàticament; les variables del carregador com ara LD_PRELOAD van a l\'ordre d\'inici.',
             'envUnavailable' => 'No s\'han pogut carregar les variables desades; es mantindran sense canvis quan deseu.',

@@ -343,6 +343,8 @@ return [
             'startCmdHint' => 'Uygulama kökünde çalışır. Uygulama 127.0.0.1 ve PORT içindeki portu ya da RUNWAY_SOCKET içindeki soketi dinlemelidir.',
             'startCmdWorkerHint' => 'Uygulama kökünde, sonlandığında yeniden başlatılan bir servis olarak çalışır.',
             'useDefaults' => 'Bu çalışma ortamının varsayılan komutlarını kullan',
+            'useDefaultsDone' => 'Varsayılan komutlar dolduruldu.',
+            'useDefaultsNone' => 'Bu proje için bilinen bir varsayılan başlatma komutu yok.',
             'env' => 'Ortam değişkenleri',
             'envHint' => 'Her satıra bir ANAHTAR=değer; # ile başlayan satırlar yok sayılır. Sunucuda yalnızca root tarafından okunabilir şekilde saklanır. PORT, HOST, LISTEN_ADDR (TCP modu) ve RUNWAY_* değişkenleri otomatik ayarlanır; LD_PRELOAD gibi yükleyici değişkenleri başlatma komutuna yazılır.',
             'envUnavailable' => 'Kayıtlı değişkenler yüklenemedi; kaydettiğinizde değiştirilmeden korunurlar.',

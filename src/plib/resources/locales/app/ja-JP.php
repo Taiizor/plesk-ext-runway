@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'アプリケーションルートで実行されます。アプリケーションは 127.0.0.1 と PORT のポート、または RUNWAY_SOCKET のソケットでリッスンする必要があります。',
             'startCmdWorkerHint' => 'アプリケーションルートで、終了時に再起動されるサービスとして実行されます。',
             'useDefaults' => 'このランタイムのデフォルトコマンドを使用する',
+            'useDefaultsDone' => 'デフォルトコマンドを入力しました。',
+            'useDefaultsNone' => 'このプロジェクトのデフォルト起動コマンドは不明です。',
             'env' => '環境変数',
             'envHint' => '1 行に 1 つの KEY=value。# で始まる行は無視されます。サーバでは root のみが読める形で保存されます。PORT、HOST、LISTEN_ADDR（TCP モード）と RUNWAY_* 変数は自動的に設定されます。LD_PRELOAD などのローダ変数は起動コマンドに記述してください。',
             'envUnavailable' => '保存済みの変数を読み込めませんでした。保存時には変更されずにそのまま保持されます。',

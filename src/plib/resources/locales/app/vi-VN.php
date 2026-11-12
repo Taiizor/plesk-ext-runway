@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Chạy trong thư mục gốc ứng dụng. Ứng dụng phải lắng nghe trên 127.0.0.1 và cổng trong PORT, hoặc trên socket trong RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Chạy trong thư mục gốc ứng dụng dưới dạng dịch vụ được khởi động lại khi nó thoát.',
             'useDefaults' => 'Dùng các lệnh mặc định của môi trường chạy này',
+            'useDefaultsDone' => 'Đã điền các lệnh mặc định.',
+            'useDefaultsNone' => 'Không xác định được lệnh khởi động mặc định cho dự án này.',
             'env' => 'Biến môi trường',
             'envHint' => 'Mỗi dòng một BIẾN=giá trị; các dòng bắt đầu bằng # bị bỏ qua. Được lưu trên máy chủ, chỉ root mới đọc được. PORT, HOST, LISTEN_ADDR (chế độ TCP) và các biến RUNWAY_* được đặt tự động; các biến của trình nạp như LD_PRELOAD phải đặt trong lệnh khởi động.',
             'envUnavailable' => 'Không thể tải các biến đã lưu; chúng sẽ được giữ nguyên khi bạn lưu.',

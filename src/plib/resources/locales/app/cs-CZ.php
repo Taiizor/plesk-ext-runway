@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Spouští se v kořenovém adresáři aplikace. Aplikace musí naslouchat na 127.0.0.1 a portu z PORT, nebo na socketu z RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Spouští se v kořenovém adresáři aplikace jako služba, která se po ukončení znovu spustí.',
             'useDefaults' => 'Použít výchozí příkazy tohoto běhového prostředí',
+            'useDefaultsDone' => 'Výchozí příkazy byly vyplněny.',
+            'useDefaultsNone' => 'Pro tento projekt není znám žádný výchozí příkaz pro spuštění.',
             'env' => 'Proměnné prostředí',
             'envHint' => 'Na každý řádek jeden KLÍČ=hodnota; řádky začínající # se ignorují. Na serveru jsou uloženy jen s přístupem pro uživatele root. PORT, HOST, LISTEN_ADDR (režim TCP) a proměnné RUNWAY_* se nastavují automaticky; proměnné zavaděče jako LD_PRELOAD patří do příkazu pro spuštění.',
             'envUnavailable' => 'Uložené proměnné se nepodařilo načíst; při uložení zůstanou beze změny.',

@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Wordt uitgevoerd in de applicatiehoofdmap. De applicatie moet luisteren op 127.0.0.1 en de poort in PORT, of op de socket in RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Wordt uitgevoerd in de applicatiehoofdmap als een service die wordt herstart wanneer deze stopt.',
             'useDefaults' => 'De standaardopdrachten van deze runtime gebruiken',
+            'useDefaultsDone' => 'De standaardopdrachten zijn ingevuld.',
+            'useDefaultsNone' => 'Voor dit project is geen standaard startopdracht bekend.',
             'env' => 'Omgevingsvariabelen',
             'envHint' => 'Eén SLEUTEL=waarde per regel; regels die met # beginnen worden genegeerd. Op de server opgeslagen en alleen toegankelijk voor root. PORT, HOST, LISTEN_ADDR (TCP-modus) en de RUNWAY_*-variabelen worden automatisch ingesteld; loadervariabelen zoals LD_PRELOAD horen in de startopdracht.',
             'envUnavailable' => 'De opgeslagen variabelen konden niet worden geladen; ze blijven ongewijzigd wanneer u opslaat.',

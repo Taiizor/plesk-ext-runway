@@ -344,6 +344,8 @@ return [
             'startCmdHint' => '在應用程式根目錄中執行。應用程式必須監聽 127.0.0.1 以及 PORT 中的連接埠，或 RUNWAY_SOCKET 中的通訊端。',
             'startCmdWorkerHint' => '在應用程式根目錄中作為服務執行，結束時會重新啟動。',
             'useDefaults' => '使用此執行環境的預設指令',
+            'useDefaultsDone' => '已填入預設指令。',
+            'useDefaultsNone' => '此專案沒有已知的預設啟動指令。',
             'env' => '環境變數',
             'envHint' => '每行一個 KEY=value；以 # 開頭的行會被忽略。在伺服器上以僅 root 可讀的方式儲存。PORT、HOST、LISTEN_ADDR（TCP 模式）和 RUNWAY_* 變數會自動設定；LD_PRELOAD 等載入器變數應放在啟動指令中。',
             'envUnavailable' => '無法載入已儲存的變數；儲存時它們會保持不變。',

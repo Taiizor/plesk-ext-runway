@@ -344,6 +344,8 @@ return [
             'startCmdHint' => '애플리케이션 루트에서 실행됩니다. 애플리케이션은 127.0.0.1과 PORT의 포트 또는 RUNWAY_SOCKET의 소켓에서 수신 대기해야 합니다.',
             'startCmdWorkerHint' => '애플리케이션 루트에서 종료 시 재시작되는 서비스로 실행됩니다.',
             'useDefaults' => '이 런타임의 기본 명령 사용',
+            'useDefaultsDone' => '기본 명령을 입력했습니다.',
+            'useDefaultsNone' => '이 프로젝트의 기본 시작 명령을 알 수 없습니다.',
             'env' => '환경 변수',
             'envHint' => '한 줄에 하나의 키=값을 입력하며, #으로 시작하는 줄은 무시됩니다. 서버에 root만 읽을 수 있도록 저장됩니다. PORT, HOST, LISTEN_ADDR(TCP 모드) 및 RUNWAY_* 변수는 자동으로 설정되며, LD_PRELOAD 같은 로더 변수는 시작 명령에 넣어야 합니다.',
             'envUnavailable' => '저장된 변수를 불러올 수 없습니다. 저장 시 변경 없이 유지됩니다.',

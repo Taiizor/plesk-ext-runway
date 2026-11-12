@@ -3,18 +3,24 @@
 import { createElement, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Form, FormField, FormFieldCheckbox, FormFieldSelect, FormFieldText, Panel, Section, SelectOption, Translate, useTranslate,
+    Alert, Button, Form, FormField, FormFieldCheckbox, FormFieldSelect, FormFieldText, Panel, Section, SelectOption, Status, Translate,
+    useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
 const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
+// Fields the default commands depend on.
+const DEFAULTS_INPUTS = ['runtime', 'toolchain', 'listen', 'mode'];
 const monospace = { fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: '12px' };
 // Commands, variables and paths are code: left-to-right also in right-to-left panel languages
 // (Arabic, Hebrew), where the form itself is mirrored.
 const codeInput = { style: monospace, spellCheck: false, dir: 'ltr' };
 const pathInput = { spellCheck: false, dir: 'ltr' };
+const noticeStyle = { display: 'inline-block', marginInlineStart: '12px', verticalAlign: 'middle' };
+// How long the confirmation or warning next to "Use the default commands" stays visible.
+const NOTICE_MS = 5000;
 
 const text = value => (value === null || value === undefined ? '' : String(value));
 
@@ -95,6 +101,9 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
         return initial;
     });
     const [advanced, setAdvanced] = useState(false);
+    // Visible result of the last click on "Use the default commands" ({ applied }, null: none);
+    // every click sets a new object, which restarts the timer that hides it.
+    const [defaultsNotice, setDefaultsNotice] = useState(null);
     const translate = useTranslate();
     const toolchains = isObject(data.toolchains) ? data.toolchains : {};
     const defaults = isObject(data.defaults) ? data.defaults : {};
@@ -104,6 +113,8 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const supportsBuild = !meta || meta.supports_build !== false;
     const worker = values.mode === 'worker';
     const unixOk = unixSupported(defaults, values.runtime, values.toolchain);
+    // Default commands of the chosen runtime, listen mode and toolchain (null: none known).
+    const commandDefaults = runtimeDefaults(defaults, values.runtime, values.listen, values.toolchain);
     const fieldErrors = error && error.fieldErrors ? error.fieldErrors : null;
 
     // Validation errors in the advanced part open it.
@@ -112,6 +123,16 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
             setAdvanced(true);
         }
     }, [error]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // The confirmation or warning of "Use the default commands" disappears after a while (a new
+    // click restarts the timer).
+    useEffect(() => {
+        if (!defaultsNotice) {
+            return undefined;
+        }
+        const timer = setTimeout(() => setDefaultsNotice(null), NOTICE_MS);
+        return () => clearTimeout(timer);
+    }, [defaultsNotice]);
 
     // Fields rendered right now: errors of other fields are listed in the alert above the form.
     const visible = ['enabled', 'runtime', 'appRoot', 'mode', 'startCmd', 'env', 'autoDeploy']
@@ -124,45 +145,65 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
         ? Object.keys(fieldErrors).filter(key => visible.indexOf(key) === -1).map(key => [].concat(fieldErrors[key]).join(' '))
         : [];
 
-    const onFieldChange = (name, value) => setValues(prev => {
-        const next = { ...prev, [name]: value };
-        if (name === 'runtime' && value !== prev.runtime) {
-            const list = Array.isArray(toolchains[value]) ? toolchains[value] : [];
-            if (!list.some(item => item.id === prev.toolchain)) {
-                next.toolchain = list.length ? list[0].id : '';
-            }
+    const onFieldChange = (name, value) => {
+        const defaultsChange = DEFAULTS_INPUTS.indexOf(name) !== -1;
+        // The notice of "Use the default commands" was about the defaults before this change.
+        if (defaultsChange) {
+            setDefaultsNotice(null);
         }
-        if (name === 'mode') {
-            if (value === 'worker') {
-                next.listen = 'none';
-            } else if (prev.listen === 'none') {
+        setValues(prev => {
+            const next = { ...prev, [name]: value };
+            if (name === 'runtime' && value !== prev.runtime) {
+                const list = Array.isArray(toolchains[value]) ? toolchains[value] : [];
+                if (!list.some(item => item.id === prev.toolchain)) {
+                    next.toolchain = list.length ? list[0].id : '';
+                }
+            }
+            if (name === 'mode') {
+                if (value === 'worker') {
+                    next.listen = 'none';
+                } else if (prev.listen === 'none') {
+                    next.listen = 'tcp';
+                }
+                if (value === 'path') {
+                    setAdvanced(true);
+                }
+            }
+            if (next.listen === 'unix' && !unixSupported(defaults, next.runtime, next.toolchain)) {
                 next.listen = 'tcp';
             }
-            if (value === 'path') {
-                setAdvanced(true);
+            // The default commands depend on runtime, listen mode and (PHP) toolchain: follow a
+            // change unless the user edited the command.
+            if (defaultsChange) {
+                const before = runtimeDefaults(defaults, prev.runtime, prev.listen, prev.toolchain) || {};
+                const after = runtimeDefaults(defaults, next.runtime, next.listen, next.toolchain) || {};
+                if (!prev.buildCmd.trim() || prev.buildCmd === before.build_cmd) {
+                    next.buildCmd = text(after.build_cmd);
+                }
+                if (!prev.startCmd.trim() || prev.startCmd === before.start_cmd) {
+                    next.startCmd = text(after.start_cmd);
+                }
             }
-        }
-        if (next.listen === 'unix' && !unixSupported(defaults, next.runtime, next.toolchain)) {
-            next.listen = 'tcp';
-        }
-        // The default commands depend on runtime, listen mode and (PHP) toolchain: follow a
-        // change unless the user edited the command.
-        if (['runtime', 'toolchain', 'listen', 'mode'].indexOf(name) !== -1) {
-            const before = runtimeDefaults(defaults, prev.runtime, prev.listen, prev.toolchain) || {};
-            const after = runtimeDefaults(defaults, next.runtime, next.listen, next.toolchain) || {};
-            if (!prev.buildCmd.trim() || prev.buildCmd === before.build_cmd) {
-                next.buildCmd = text(after.build_cmd);
-            }
-            if (!prev.startCmd.trim() || prev.startCmd === before.start_cmd) {
-                next.startCmd = text(after.start_cmd);
-            }
-        }
-        return next;
-    });
+            return next;
+        });
+    };
 
+    /**
+     * Puts the default commands of the chosen runtime, listen mode and toolchain into the form.
+     * They often are the current commands already (the stored ones, or a change of runtime or
+     * listen mode followed the defaults by itself), so the field values do not change: a
+     * confirmation next to the button shows that the click did its work. Without a default
+     * start command (e.g. .NET with a solution, several projects or no project yet) the commands
+     * are kept, as an empty start command cannot be saved, and a warning says why.
+     */
     const useDefaults = () => {
-        const current = runtimeDefaults(defaults, values.runtime, values.listen, values.toolchain) || {};
+        const current = commandDefaults || {};
+        if (!text(current.start_cmd).trim()) {
+            setDefaultsNotice({ applied: false });
+            return;
+        }
         setValues(prev => ({ ...prev, buildCmd: text(current.build_cmd), startCmd: text(current.start_cmd) }));
+        setDefaultsNotice({ applied: true });
     };
 
     const toolchainOptions = installed.map(item => ({ id: String(item.id), label: item.label || String(item.id) }));
@@ -287,9 +328,18 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         inputProps={codeInput}
                     />
                     <FormField>
-                        <Button ghost icon="reset" onClick={useDefaults} disabled={!isObject(defaults[values.runtime])}>
+                        <Button ghost icon="reset" onClick={useDefaults} disabled={!commandDefaults}>
                             <Translate content="Domain.form.useDefaults" />
                         </Button>
+                        {defaultsNotice && (
+                            <span style={noticeStyle}>
+                                <Status intent={defaultsNotice.applied ? 'success' : 'warning'}>
+                                    {defaultsNotice.applied
+                                        ? <Translate content="Domain.form.useDefaultsDone" />
+                                        : <Translate content="Domain.form.useDefaultsNone" />}
+                                </Status>
+                            </span>
+                        )}
                     </FormField>
                     <FormFieldText
                         name="env"

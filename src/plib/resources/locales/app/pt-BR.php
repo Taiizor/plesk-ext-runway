@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Executado na raiz do aplicativo. O aplicativo deve escutar em 127.0.0.1 e na porta em PORT, ou no socket em RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Executado na raiz do aplicativo como um serviço que é reiniciado quando termina.',
             'useDefaults' => 'Usar os comandos padrão deste runtime',
+            'useDefaultsDone' => 'Os comandos padrão foram preenchidos.',
+            'useDefaultsNone' => 'Nenhum comando de inicialização padrão é conhecido para este projeto.',
             'env' => 'Variáveis de ambiente',
             'envHint' => 'Um par CHAVE=valor por linha; linhas que começam com # são ignoradas. Armazenadas no servidor com acesso restrito ao root. PORT, HOST, LISTEN_ADDR (modo TCP) e as variáveis RUNWAY_* são definidas automaticamente; variáveis do carregador, como LD_PRELOAD, devem ficar no comando de inicialização.',
             'envUnavailable' => 'As variáveis armazenadas não puderam ser carregadas; elas são mantidas sem alteração quando você salva.',

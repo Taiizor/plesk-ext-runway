@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Berjalan dalam akar aplikasi. Aplikasi mesti mendengar pada 127.0.0.1 dan port dalam PORT, atau pada soket dalam RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Berjalan dalam akar aplikasi sebagai perkhidmatan yang dimulakan semula apabila ia tamat.',
             'useDefaults' => 'Gunakan perintah lalai masa jalan ini',
+            'useDefaultsDone' => 'Perintah lalai telah diisi.',
+            'useDefaultsNone' => 'Tiada perintah mula lalai yang diketahui untuk projek ini.',
             'env' => 'Pembolehubah persekitaran',
             'envHint' => 'Satu KUNCI=nilai setiap baris; baris yang bermula dengan # diabaikan. Disimpan pada pelayan dengan akses root sahaja. PORT, HOST, LISTEN_ADDR (mod TCP) dan pembolehubah RUNWAY_* ditetapkan secara automatik; pembolehubah pemuat seperti LD_PRELOAD hendaklah diletakkan dalam perintah mula.',
             'envUnavailable' => 'Pembolehubah yang disimpan tidak dapat dimuatkan; ia dikekalkan tanpa perubahan apabila anda menyimpan.',

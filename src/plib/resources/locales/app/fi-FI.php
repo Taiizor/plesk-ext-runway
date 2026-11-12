@@ -344,6 +344,8 @@ return [
             'startCmdHint' => 'Suoritetaan sovelluksen juurihakemistossa. Sovelluksen on kuunneltava osoitetta 127.0.0.1 ja PORT-muuttujan porttia tai RUNWAY_SOCKET-muuttujan sokettia.',
             'startCmdWorkerHint' => 'Suoritetaan sovelluksen juurihakemistossa palveluna, joka käynnistetään uudelleen, kun se päättyy.',
             'useDefaults' => 'Käytä tämän ajoympäristön oletuskomentoja',
+            'useDefaultsDone' => 'Oletuskomennot on täytetty.',
+            'useDefaultsNone' => 'Tälle projektille ei tunneta oletuskäynnistyskomentoa.',
             'env' => 'Ympäristömuuttujat',
             'envHint' => 'Yksi AVAIN=arvo riviä kohden; #-alkuiset rivit ohitetaan. Tallennetaan palvelimelle vain root-käyttäjän luettavaksi. PORT, HOST, LISTEN_ADDR (TCP-tila) ja RUNWAY_*-muuttujat asetetaan automaattisesti; LD_PRELOADin kaltaiset lataajamuuttujat kuuluvat käynnistyskomentoon.',
             'envUnavailable' => 'Tallennettuja muuttujia ei voitu ladata; ne säilyvät ennallaan, kun tallennat.',

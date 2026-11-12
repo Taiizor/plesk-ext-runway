@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Az alkalmazás gyökérkönyvtárában fut. Az alkalmazásnak a 127.0.0.1 címen és a PORT változóban megadott porton, vagy a RUNWAY_SOCKET változóban megadott socketen kell figyelnie.',
             'startCmdWorkerHint' => 'Az alkalmazás gyökérkönyvtárában fut szolgáltatásként, amely kilépéskor újraindul.',
             'useDefaults' => 'A futtatókörnyezet alapértelmezett parancsainak használata',
+            'useDefaultsDone' => 'Az alapértelmezett parancsok be lettek írva.',
+            'useDefaultsNone' => 'Ehhez a projekthez nem ismert alapértelmezett indítási parancs.',
             'env' => 'Környezeti változók',
             'envHint' => 'Soronként egy KULCS=érték; a # jellel kezdődő sorok figyelmen kívül maradnak. A változókat a kiszolgáló csak a root számára olvashatóan tárolja. A PORT, HOST, LISTEN_ADDR (TCP mód) és a RUNWAY_* változókat a Runway automatikusan beállítja; a betöltő változók, például az LD_PRELOAD, az indítási parancsba valók.',
             'envUnavailable' => 'A tárolt változókat nem sikerült betölteni; mentéskor változatlanok maradnak.',

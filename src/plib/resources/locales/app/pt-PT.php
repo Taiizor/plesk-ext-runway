@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'É executado na raiz da aplicação. A aplicação deve escutar em 127.0.0.1 e na porta indicada em PORT, ou no socket indicado em RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'É executado na raiz da aplicação como um serviço que é reiniciado quando termina.',
             'useDefaults' => 'Usar os comandos predefinidos deste ambiente de execução',
+            'useDefaultsDone' => 'Os comandos predefinidos foram preenchidos.',
+            'useDefaultsNone' => 'Não é conhecido nenhum comando de arranque predefinido para este projeto.',
             'env' => 'Variáveis de ambiente',
             'envHint' => 'Uma CHAVE=valor por linha; as linhas que começam por # são ignoradas. Guardadas no servidor com acesso apenas para root. PORT, HOST, LISTEN_ADDR (modo TCP) e as variáveis RUNWAY_* são definidas automaticamente; as variáveis do loader, como LD_PRELOAD, devem ficar no comando de arranque.',
             'envUnavailable' => 'Não foi possível carregar as variáveis guardadas; são mantidas sem alterações quando guardar.',

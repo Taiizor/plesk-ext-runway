@@ -346,6 +346,8 @@ return [
             'startCmdHint' => 'Rulează în rădăcina aplicației. Aplicația trebuie să asculte pe 127.0.0.1 și pe portul din PORT sau pe socket-ul din RUNWAY_SOCKET.',
             'startCmdWorkerHint' => 'Rulează în rădăcina aplicației ca serviciu care este repornit când se încheie.',
             'useDefaults' => 'Utilizare comenzi implicite ale acestui mediu de execuție',
+            'useDefaultsDone' => 'Comenzile implicite au fost completate.',
+            'useDefaultsNone' => 'Nu se cunoaște nicio comandă de pornire implicită pentru acest proiect.',
             'env' => 'Variabile de mediu',
             'envHint' => 'Câte o CHEIE=valoare pe linie; liniile care încep cu # sunt ignorate. Stocate pe server cu acces numai pentru root. PORT, HOST, LISTEN_ADDR (mod TCP) și variabilele RUNWAY_* sunt setate automat; variabilele de încărcare precum LD_PRELOAD se pun în comanda de pornire.',
             'envUnavailable' => 'Variabilele stocate nu au putut fi încărcate; ele rămân neschimbate când salvați.',
