@@ -6,9 +6,13 @@
   "license": "MIT",
   "scripts": {
     "build": "plesk-ext-sdk build",
-    "dev": "plesk-ext-sdk dev"
+    "dev": "plesk-ext-sdk dev",
+    "assets": "bun scripts/render-assets.ts"
   },
   "dependencies": {
     "@plesk/plesk-ext-sdk": "^0.9.0"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
   }
 }

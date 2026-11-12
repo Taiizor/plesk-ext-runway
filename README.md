@@ -1,3 +1,5 @@
+<img src="assets/logo-tile.svg" alt="" width="72" align="right">
+
 # Runway for Plesk
 
 [![CI](https://github.com/Taiizor/plesk-ext-runway/actions/workflows/ci.yml/badge.svg)](https://github.com/Taiizor/plesk-ext-runway/actions/workflows/ci.yml)
@@ -413,6 +415,7 @@ On Windows with Git Bash prefix `docker` commands with `MSYS_NO_PATHCONV=1`.
 bun install                     # once: @plesk/plesk-ext-sdk (React 18, Plesk UI Library, webpack)
 bun run build                   # frontend only -> src/htdocs/index.php + src/htdocs/dist/
 bun run dev                     # frontend watch mode
+bun run assets                  # after editing assets/logo*.svg: icons, nav logo, docs/social-preview.png
 python build.py                 # frontend build + dist/runway-<version>-<release>.zip (verified)
 python build.py --no-frontend   # package the existing frontend build
 python build.py --check         # validate the source tree (fails on leftover placeholders)
@@ -429,7 +432,8 @@ Repository layout:
 | `src/plib/` | PHP: `controllers/ApiController.php` (JSON API), `hooks/`, `library/` (`Modules_Runway_*`), `resources/locales/`, `scripts/` |
 | `src/sbin/runway-helper` | the root helper (python3, standard library only, 3.8+) |
 | `tests/` | `helper-smoke.sh`, `api-smoke.sh`, `runtime-e2e.sh`, `customer-smoke.sh`, `check_locales.py` |
-| `scripts/` | `plesk-dev.sh` and `plesk-dev.ps1`: the local Plesk test server |
+| `scripts/` | `plesk-dev.sh` and `plesk-dev.ps1`: the local Plesk test server; `render-assets.ts` (`bun run assets`): icons and the social preview from `assets/` |
+| `assets/` | `logo.svg` (the mark) and `logo-tile.svg` (the mark on its tile), the masters of every rendered icon |
 | `examples/` | a minimal application per runtime |
 | `docs/` | [DESIGN.md](docs/DESIGN.md) (decisions and contracts), [runtimes/](docs/runtimes), [RELEASING.md](docs/RELEASING.md) |
 | `.github/` | CI, CodeQL and release workflows, `scripts/plesk-e2e.sh` (the container driver), Dependabot, issue and pull request templates |

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- The Runway mark (assets/logo.svg) in white on its navy tile: the extension catalog icons
+       (src/_meta/icons) are rendered from this file by "bun run assets". -->
+  <rect width="128" height="128" rx="28" fill="#162238"/>
+  <g transform="translate(9.5 11.52) scale(0.82)">
+    <path fill="#ffffff" fill-rule="evenodd" d="M16 8H64A36 36 0 0 1 77.41 77.41L120 120H80L53.33 80H40V120H16ZM40 32H64A12 12 0 0 1 64 56H40Z"/>
+    <path fill="#ffbe28" d="M67.37 86H75.97L83.03 94H73.63Z"/>
+    <path fill="#ffbe28" d="M79.12 101H89.22L100.7 114H89.3Z"/>
+  </g>
+</svg>

@@ -47,6 +47,7 @@ Runway/
     runtime-e2e.sh               # sample app per runtime and listen mode, features, through the API and nginx
     check_locales.py
   scripts/plesk-dev.sh, scripts/plesk-dev.ps1   # local Plesk test server in Docker (wraps plesk-e2e.sh)
+  scripts/render-assets.ts  assets/{logo.svg,logo-tile.svg}   # "bun run assets": icons, nav logo, social preview
   docs/DESIGN.md (this file)  docs/PLAN.md (status)  docs/runtimes/*.md (per-runtime notes)  docs/RELEASING.md
   .github/workflows/{ci.yml,codeql.yml,labeler.yml,release.yml}  .github/scripts/plesk-e2e.sh (e2e driver, also usable locally)
   .github/{dependabot.yml,labeler.yml,release.yml,CODEOWNERS,PULL_REQUEST_TEMPLATE.md,ISSUE_TEMPLATE/}

@@ -23,7 +23,7 @@ dist/main.js?v=<version>-<release>.<sha256 prefix of main.js> (cache-buster); th
 source file itself is left untouched.
 
 The zip is created with Unix permissions (sbin scripts 0755, everything else 0644),
-LF line endings for text files and generated PNG icons, so it can be built on
+LF line endings for text files, so it can be built on
 Windows and uploaded to a Linux Plesk server as-is. Every package is verified after it
 was written (see verify_package()).
 
@@ -45,7 +45,6 @@ import struct
 import subprocess
 import sys
 import zipfile
-import zlib
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
@@ -128,74 +127,6 @@ def build_frontend():
     result = subprocess.run([bun, "run", "build"], cwd=ROOT)
     if result.returncode != 0:
         raise SystemExit("The frontend build failed (exit code %d)" % result.returncode)
-
-
-# ---------------------------------------------------------------------------
-# Icon generation (pure Python PNG encoder, no third-party packages)
-# ---------------------------------------------------------------------------
-
-def _png(width, height, pixels):
-    def chunk(kind, data):
-        body = kind + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
-
-    raw = b"".join(b"\x00" + bytes(pixels[y * width * 4:(y + 1) * width * 4]) for y in range(height))
-    header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
-
-
-def _icon_color(px, py, size):
-    """Color of one sample of the icon: a runway in perspective on a rounded navy tile."""
-    background = (22, 34, 56)
-    asphalt = (62, 76, 102)
-    edge = (214, 222, 235)
-    centre = (255, 190, 40)
-    top, bottom = size * 0.16, size * 0.90
-    if py < top or py > bottom:
-        return background
-    t = (py - top) / (bottom - top)  # 0 at the horizon, 1 in front
-    half = size * (0.05 + 0.27 * t)
-    dx = abs(px - size / 2.0)
-    if dx > half:
-        return background
-    if dx > half - size * (0.012 + 0.03 * t):
-        return edge
-    # Dashes get longer towards the viewer (perspective): equal steps in sqrt(t).
-    if dx < size * (0.006 + 0.022 * t) and (t ** 0.5 * 6.0) % 1.0 < 0.55:
-        return centre
-    return asphalt
-
-
-def make_icon(size):
-    """Rounded tile with a runway, anti-aliased by supersampling."""
-    ss = 4
-    pixels = bytearray(size * size * 4)
-    radius = size * 0.22
-    for y in range(size):
-        for x in range(size):
-            acc = [0.0, 0.0, 0.0, 0]  # summed r, g, b and number of covered samples
-            for sy in range(ss):
-                for sx in range(ss):
-                    px = x + (sx + 0.5) / ss
-                    py = y + (sy + 0.5) / ss
-                    # rounded square mask
-                    dx = max(radius - px, 0, px - (size - radius))
-                    dy = max(radius - py, 0, py - (size - radius))
-                    if dx * dx + dy * dy > radius * radius:
-                        continue
-                    color = _icon_color(px, py, size)
-                    acc[0] += color[0]
-                    acc[1] += color[1]
-                    acc[2] += color[2]
-                    acc[3] += 1
-            covered = acc[3]
-            offset = (y * size + x) * 4
-            if covered:
-                pixels[offset] = int(round(acc[0] / covered))
-                pixels[offset + 1] = int(round(acc[1] / covered))
-                pixels[offset + 2] = int(round(acc[2] / covered))
-                pixels[offset + 3] = int(round(255.0 * covered / (ss * ss)))
-    return _png(size, size, pixels)
 
 
 # ---------------------------------------------------------------------------
@@ -364,12 +295,10 @@ def build(meta):
                 data = patch_index_php(data, tag)
             add(rel, data, 0o755 if is_exec else 0o644)
 
-        for size in ICON_SIZES:
-            rel = "_meta/icons/%dx%d.png" % (size, size)
+        # Icons are rendered from assets/logo*.svg by "bun run assets" and committed.
+        for rel in ["_meta/icons/%dx%d.png" % (size, size) for size in ICON_SIZES] + ["htdocs/images/logo.png", "htdocs/images/nav.png"]:
             if not os.path.isfile(os.path.join(SRC, rel)):
-                add(rel, make_icon(size), 0o644)
-        if not os.path.isfile(os.path.join(SRC, "htdocs/images/logo.png")):
-            add("htdocs/images/logo.png", make_icon(64), 0o644)
+                raise SystemExit("src/%s is missing: run 'bun run assets' (scripts/render-assets.ts)" % rel)
     return target
 
 

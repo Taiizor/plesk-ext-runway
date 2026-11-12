@@ -20,7 +20,7 @@ locales:
 
 packaging:
   - changed-files:
-      - any-glob-to-any-file: ["build.py", "src/meta.xml", "src/DESCRIPTION.md", "src/CHANGES.md", "src/_meta/**"]
+      - any-glob-to-any-file: ["build.py", "src/meta.xml", "src/DESCRIPTION.md", "src/CHANGES.md", "src/_meta/**", "assets/**", "scripts/render-assets.ts"]
 
 tests:
   - changed-files:

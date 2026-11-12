@@ -10,7 +10,10 @@ class Modules_Runway_CustomButtons extends pm_Hook_CustomButtons
 {
     public function getButtons()
     {
+        // logo.png: the mark on its navy tile (light backgrounds). nav.png: the mark in white,
+        // because Plesk draws navigation icons as they are on its dark sidebar.
         $icon = pm_Context::getBaseUrl() . 'images/logo.png';
+        $navIcon = pm_Context::getBaseUrl() . 'images/nav.png';
         $domainButton = [
             'title' => pm_Locale::lmsg('buttonDomainTitle'),
             'description' => pm_Locale::lmsg('buttonDomainDescription'),
@@ -27,7 +30,7 @@ class Modules_Runway_CustomButtons extends pm_Hook_CustomButtons
                 'section' => self::SECTION_NAV_SERVER_MANAGEMENT,
                 'title' => pm_Locale::lmsg('buttonAdminTitle'),
                 'description' => pm_Locale::lmsg('buttonAdminDescription'),
-                'icon' => $icon,
+                'icon' => $navIcon,
                 'link' => pm_Context::getBaseUrl() . 'index.php/overview',
             ],
             array_merge($domainButton, ['place' => self::PLACE_DOMAIN_PROPERTIES]),
