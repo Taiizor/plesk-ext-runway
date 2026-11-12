@@ -10,7 +10,7 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-11-11
+## [1.0.0] - 2026-11-12
 
 First public release. Runway evolves from the private "Go & Rust Toolkit" extension; everything
 was renamed to Runway (extension id `runway`, units `runway-*`, paths under `/opt/runway`,

@@ -1,4 +1,4 @@
-# 1.0.0-1 (11 November 2026)
+# 1.0.0-1 (12 November 2026)
 
 * [+] First public release.
 * [+] Runtimes: Go, Rust, Bun, Java (Eclipse Temurin), .NET, Python (uv-managed CPython), Ruby (Plesk Ruby or system Ruby), PHP (Plesk PHP handlers and FrankenPHP) and prebuilt binaries.
