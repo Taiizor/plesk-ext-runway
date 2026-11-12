@@ -1068,6 +1068,9 @@ if [ "${RUNWAY_SMOKE_SELF_UPDATE:-0}" = "1" ]; then
     # Irreversible: the container keeps the repackaged release (Plesk refuses downgrades).
     TARGET=$V_MAJ.$V_MIN.$V_PATCH-$((V_REL + 1))
     echo "== self-update: real upgrade $INSTALLED -> $TARGET (RUNWAY_SMOKE_SELF_UPDATE=1)"
+    # A running application has to survive the upgrade; the zero-downtime section removed the
+    # one of the earlier sections, so deploy the tcp sample again (sets PORT).
+    sample_app binary "" tcp
     mkdir -p "$UPD_DIR/pack"
     plesk bin extension --pack runway -destination "$UPD_DIR/pack" >/dev/null
     PACKED=$(ls "$UPD_DIR"/pack/*.zip 2>/dev/null | head -n 1)
