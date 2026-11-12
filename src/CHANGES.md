@@ -1,3 +1,12 @@
+# 1.1.0-1 (13 November 2026)
+
+* [+] Zero-downtime deployments (opt-in per application, TCP and Unix socket mode): the new version starts next to the running one and gets the traffic only once it listens and its health check answers; a version that does not become ready never replaces the running one.
+* [+] "Restart in place" for applications with zero-downtime deployments (domain page, `plesk ext runway --restart <domain> -plain`); the domain page shows the live slot and the progress of a switch.
+* [+] Server settings: zero-downtime deployments for customers (off by default), maximum readiness timeout and drain period.
+* [*] The root helper connects to an application's Unix socket through a descriptor of the checked file; saving an application keeps the port its service uses.
+* [-] The installation checks that /usr/bin/python3 is 3.8 or newer and names the version it found.
+* [-] "Use the default commands of this runtime" confirms that the commands were filled in, or says why it kept them.
+
 # 1.0.0-1 (12 November 2026)
 
 * [+] First public release.

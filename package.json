@@ -1,6 +1,6 @@
 {
   "name": "runway",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Runway Plesk extension frontend (React + Plesk UI Library via @plesk/plesk-ext-sdk)",
   "license": "MIT",

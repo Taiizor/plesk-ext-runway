@@ -10,6 +10,11 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-13
+
+Opt-in zero-downtime deployments and restarts, and two fixes. Applications that do not turn the
+new setting on keep the files and the behaviour of 1.0.0.
+
 ### Added
 
 - Zero-downtime deployments (opt-in per application, TCP and Unix socket mode): a deployment, a
@@ -167,5 +172,6 @@ Hardening from the pre-release security review (no released version was affected
   release workflow fails when the tag and `src/meta.xml` differ. CI runs customer-smoke and the
   Go runtime matrix and fails on every shell syntax error.
 
-[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Taiizor/plesk-ext-runway/releases/tag/v1.0.0
