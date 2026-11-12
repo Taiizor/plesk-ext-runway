@@ -3,7 +3,8 @@
 
 /**
  * Server-wide settings of the extension (managed by the administrator): integers with an
- * allowed range, and the switches of the built-in updater (booleans).
+ * allowed range, and switches (booleans) of the built-in updater and of zero-downtime
+ * deployments for customers.
  */
 class Modules_Runway_Settings
 {
@@ -20,6 +21,10 @@ class Modules_Runway_Settings
         'buildTasks' => 4096,
         // 0 = unlimited (enforced from Phase 3b on).
         'maxAppsPerSubscription' => 0,
+        // Zero-downtime deployments (docs/DESIGN.md section 12.9): upper limits of the readiness
+        // timeout and the drain period of every application.
+        'zeroDowntimeMaxReady' => 120,
+        'zeroDowntimeMaxDrain' => 30,
     ];
 
     /** @var array key => [min, max] */
@@ -34,12 +39,18 @@ class Modules_Runway_Settings
         'buildCpuPercent' => [0, 25600],
         'buildTasks' => [0, 1000000],
         'maxAppsPerSubscription' => [0, 10000],
+        'zeroDowntimeMaxReady' => [5, 900],
+        'zeroDowntimeMaxDrain' => [0, 300],
     ];
 
-    /** @var array Boolean settings => default: the update check of the scheduled task (twice a day) and automatic installation */
+    /**
+     * @var array Boolean settings => default: the update check of the scheduled task (twice a day),
+     *            automatic installation, and whether customers may turn zero-downtime deployments on
+     */
     private static $switches = [
         'updateCheck' => true,
         'updateAuto' => false,
+        'zeroDowntimeCustomers' => false,
     ];
 
     /**

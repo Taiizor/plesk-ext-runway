@@ -7,6 +7,9 @@
  */
 class Modules_Runway_WebConfig
 {
+    /** Root-owned include files of switchable tcp applications (must match WEB_DIR of the helper). */
+    const WEB_DIR = '/etc/runway/web';
+
     /** Plesk paths excluded from the proxy in "web" mode (nginx regex alternatives). */
     const NGINX_RESERVED = '(plesk-stat|webstat|webstat-ssl|ftpstat|anon_ftpstat|awstats-icon)(/|$)|\.well-known/acme-challenge/';
 
@@ -32,16 +35,22 @@ class Modules_Runway_WebConfig
      * Timeouts and client_max_body_size are inherited from the domain's
      * server block (Plesk hosting settings).
      *
+     * Zero-downtime deployments (docs/DESIGN.md section 12.6): a switchable application carries
+     * the marker line and proxies through the helper's pointer: unix to the root link
+     * /run/runway/<id>.sock, tcp to $runway_upstream from the root-owned include file (a fail-closed
+     * fallback when the file is missing: a path nobody but root can create, 502).
+     *
      * @param array $target ['port' => int] or ['socket' => '/run/runway/<id>/app.sock'], plus
-     *                      'mode' (web|path), 'mountPath', 'staticPaths' (see App::proxyTarget())
+     *                      'mode' (web|path), 'mountPath', 'staticPaths', 'switchable', 'domainId'
+     *                      (see App::proxyTarget())
      * @return string Empty when the target is not usable
      */
     public static function nginx(array $target)
     {
         $template = <<<'NGINX'
 # Runway: reverse proxy {SCOPE} to the application on {TARGET}
-location ~ {REGEX} {
-    proxy_pass {UPSTREAM};
+{MARKER}location ~ {REGEX} {
+{PROXY}
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
@@ -67,15 +76,26 @@ NGINX;
             $regex = '^/(?!' . self::NGINX_RESERVED . ($static ? '|(' . $alternatives . ')(/|$)' : '') . ')';
             $scope = 'of the site';
         }
+        $id = self::switchableId($target);
+        $marker = $id !== null ? self::marker($id) . "\n" : '';
         if (isset($target['socket'])) {
-            $socket = self::socket($target['socket']);
-            $upstream = 'http://unix:' . $socket . ':';
+            $socket = self::socket($target['socket'], $id);
             $label = 'unix:' . $socket;
+            $proxy = '    proxy_pass http://unix:' . $socket . ':;';
+        } elseif ($id !== null) {
+            self::port($target);
+            $label = '127.0.0.1 (port from ' . self::WEB_DIR . '/' . $id . '.nginx.conf)';
+            $proxy = implode("\n", [
+                '    set $runway_upstream "unix:/run/runway/' . $id . '.none:";',
+                '    include ' . self::WEB_DIR . '/' . $id . '.nginx[.]conf;',
+                '    proxy_pass http://$runway_upstream;',
+                '    proxy_redirect http://$runway_upstream/ /;',
+            ]);
         } else {
             $label = '127.0.0.1:' . self::port($target);
-            $upstream = 'http://' . $label;
+            $proxy = '    proxy_pass http://' . $label . ';';
         }
-        return str_replace(['{SCOPE}', '{TARGET}', '{REGEX}', '{UPSTREAM}'], [$scope, $label, $regex, $upstream], $template);
+        return str_replace(['{SCOPE}', '{TARGET}', '{MARKER}', '{REGEX}', '{PROXY}'], [$scope, $label, $marker, $regex, $proxy], $template);
     }
 
     /**
@@ -93,6 +113,10 @@ NGINX;
      * parameter upgrade=websocket; older versions reject unknown ProxyPass parameters (a fatal
      * configuration error), so the parameter is only emitted inside <IfVersion >= 2.4.47>.
      *
+     * Zero-downtime deployments: the marker line, disablereuse=On (mod_proxy would reuse pooled
+     * connections to the old version) and the pointer: the root link (unix), or the URL that the
+     * root-owned include defines (tcp, with the same fail-closed fallback as nginx).
+     *
      * @param array $target Same as for nginx()
      * @return string Empty when the target is not usable
      */
@@ -100,7 +124,7 @@ NGINX;
     {
         $template = <<<'APACHE'
 # Runway: reverse proxy {SCOPE} to the application on {TARGET}
-<IfModule mod_proxy.c>
+{MARKER}<IfModule mod_proxy.c>
 <IfModule mod_proxy_http.c>
     ProxyPreserveHost On
 {EXCLUSIONS}
@@ -149,21 +173,72 @@ APACHE;
         }
         // The backend URL keeps the prefix: the application sees the original path.
         $suffix = $mode === Modules_Runway_App::MODE_PATH ? $mount : '/';
+        $id = self::switchableId($target);
+        $marker = '';
         if (isset($target['socket'])) {
-            $socket = self::socket($target['socket']);
+            $socket = self::socket($target['socket'], $id);
             $label = 'unix:' . $socket;
             $upstream = '"unix:' . $socket . '|http://localhost' . $suffix . '"';
             $reverse = 'http://localhost' . $suffix;
+            if ($id !== null) {
+                $marker = self::marker($id) . "\n";
+            }
+        } elseif ($id !== null) {
+            self::port($target);
+            $label = '127.0.0.1 (port from ' . self::WEB_DIR . '/' . $id . '.apache.conf)';
+            $upstream = '${RUNWAY_UPSTREAM_' . $id . '}' . $suffix;
+            $reverse = 'http://127.0.0.1:${RUNWAY_PORT_' . $id . '}' . $suffix;
+            $marker = implode("\n", [
+                self::marker($id),
+                'IncludeOptional ' . self::WEB_DIR . '/' . $id . '.apache[.]conf',
+                '<IfDefine !RUNWAY_UPSTREAM_' . $id . '>',
+                '    Define RUNWAY_UPSTREAM_' . $id . ' unix:/run/runway/' . $id . '.none|http://localhost',
+                '</IfDefine>',
+                '<IfDefine !RUNWAY_PORT_' . $id . '>',
+                '    Define RUNWAY_PORT_' . $id . ' 1',
+                '</IfDefine>',
+            ]) . "\n";
         } else {
             $label = '127.0.0.1:' . self::port($target);
             $upstream = 'http://' . $label . $suffix;
             $reverse = $upstream;
         }
+        if ($id !== null) {
+            // Pooled backend connections would keep reaching the old version after a switch.
+            $template = str_replace(' retry=0', ' retry=0 disablereuse=On', $template);
+        }
         return str_replace(
-            ['{SCOPE}', '{TARGET}', '{EXCLUSIONS}', '{PREFIX}', '{UPSTREAM}', '{REVERSE}'],
-            [$scope, $label, implode("\n", $lines), $prefix, $upstream, $reverse],
+            ['{SCOPE}', '{TARGET}', '{MARKER}', '{EXCLUSIONS}', '{PREFIX}', '{UPSTREAM}', '{REVERSE}'],
+            [$scope, $label, $marker, implode("\n", $lines), $prefix, $upstream, $reverse],
             $template
         );
+    }
+
+    /**
+     * @param array $target
+     * @return int|null The domain id when the target is switchable (zero-downtime), else null
+     */
+    private static function switchableId(array $target)
+    {
+        if (empty($target['switchable'])) {
+            return null;
+        }
+        $id = isset($target['domainId']) ? (int)$target['domainId'] : 0;
+        if ($id < 1) {
+            throw new InvalidArgumentException('Invalid domain id');
+        }
+        return $id;
+    }
+
+    /**
+     * The marker the deploy job looks for in the generated configuration (docs/DESIGN.md 12.6).
+     *
+     * @param int $id
+     * @return string
+     */
+    private static function marker($id)
+    {
+        return '# Runway: zero-downtime #' . (int)$id;
     }
 
     /**
@@ -232,11 +307,13 @@ APACHE;
 
     /**
      * @param string $path
+     * @param int|null $id Domain id of a switchable application: its path is the root link
      * @return string
      */
-    private static function socket($path)
+    private static function socket($path, $id = null)
     {
-        if (!preg_match('#^/run/runway/\d{1,10}/app\.sock$#', (string)$path)) {
+        $pattern = $id !== null ? '#^/run/runway/' . (int)$id . '\.sock$#' : '#^/run/runway/\d{1,10}/app\.sock$#';
+        if (!preg_match($pattern, (string)$path)) {
             throw new InvalidArgumentException('Invalid socket path');
         }
         return $path;

@@ -136,10 +136,13 @@ const Domain = ({ baseUrl, statusMessages }) => {
         poke();
         setConfirm(null);
         setBusyOp(op);
-        api.post('app/control', { site_id: siteId, op }).then(result => {
+        // "Restart in place" of a zero-downtime application: a restart without a switch.
+        const body = op === 'restartPlain' ? { site_id: siteId, op: 'restart', plain: true } : { site_id: siteId, op };
+        api.post('app/control', body).then(result => {
             setBusyOp(null);
             toast('success', (result && result.message) || translate('Domain.messages.done'));
-            if (op === 'deploy') {
+            // A zero-downtime restart runs as a deploy job (the switch) like "Build & restart".
+            if (op === 'deploy' || (result && result.job)) {
                 if (result && isObject(result.job)) {
                     setStatus(prev => ({ ...(prev || {}), deploy: result.job }));
                 }
@@ -156,7 +159,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
     /** Toast of a save or a sample: a warning when the build could not start; follow a started build. */
     const reportApplied = (result, fallback) => {
         toast(result && result.buildError ? 'warning' : 'success', (result && result.message) || fallback);
-        if (result && result.build) {
+        if (result && (result.build || result.job)) {
             showDeployLog();
         }
     };
@@ -299,6 +302,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
             {configured && (
                 <LogsPanel
                     kind={logKind}
+                    switchable={Boolean(status && status.switchable)}
                     text={log.text}
                     error={log.error}
                     loading={log.loading}

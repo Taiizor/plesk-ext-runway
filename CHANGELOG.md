@@ -10,6 +10,37 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Added
+
+- Zero-downtime deployments (opt-in per application, TCP and Unix socket mode): a deployment, a
+  restart, a trigger file or a save starts the new version in a second slot
+  (`runway-app-<id>-a`/`-b`) next to the running one, waits until it listens and its health check
+  path answers (readiness timeout), switches the web server's traffic to it (Unix socket: a
+  root-owned link `/run/runway/<id>.sock` is re-pointed atomically; TCP: a root-owned include file
+  and a confirmed graceful reload of nginx or Apache), lets requests on the old version finish
+  (drain period) and stops it. A new version that does not become ready never gets traffic: it is
+  stopped, the old one keeps serving and the deployment fails with the reason. Interrupted switches
+  (job stopped, crash, reboot) are completed or rolled back from where the traffic points, by the
+  scheduled reconcile and by `runway-converge.service` at boot. Applications without the setting
+  keep the files and the behaviour of 1.0.0.
+- "Restart in place" (domain page, `api/app/control {op: restart, plain: true}`,
+  `plesk ext runway --restart <domain> -plain`) for applications with zero-downtime deployments;
+  `--restart` waits for the switch and `--status` shows the slots and a running switch.
+- Server settings: *Zero-downtime deployments for customers* (off by default: customers cannot
+  turn the setting on until the administrator allows it) and the maximum readiness timeout and
+  drain period (120 and 30 seconds by default).
+- The domain page shows whether zero-downtime deployments are on, the progress of a running switch
+  and both versions during it; the application log merges the journals of both slots.
+
+### Changed
+
+- The root helper connects to a Unix socket in the customer's socket directory (listener and health
+  checks) through an `O_PATH` descriptor of the checked file, so a symbolic link swapped in after
+  the check can never make it talk to another socket.
+- Saving or re-applying an application keeps the port its service uses; the panel's stored copy
+  only counts for a new application. The scheduled reconcile stores the helper's port when the two
+  differ, so the web server configuration follows the running service.
+
 ### Fixed
 
 - The installation checks that `/usr/bin/python3` is 3.8 or newer, the version the root helper

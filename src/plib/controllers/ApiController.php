@@ -103,11 +103,15 @@ class ApiController extends pm_Controller_Action
                     'toolchain' => $config && isset($config['toolchain']) ? (string)$config['toolchain'] : null,
                     'listen' => $config && isset($config['listen']) ? (string)$config['listen'] : null,
                     'mode' => $config ? (isset($config['mode']) ? (string)$config['mode'] : Modules_Runway_App::MODE_WEB) : null,
-                    // Only TCP applications have a port worth showing.
+                    // Only TCP applications have a port worth showing: the live one (zero-downtime slots
+                    // switch between two ports).
                     'port' => $config && !empty($config['port'])
                         && (!isset($config['listen']) || $config['listen'] === Modules_Runway_App::LISTEN_TCP)
-                        ? (int)$config['port'] : null,
+                        ? (int)($state && !empty($state['live_port']) ? $state['live_port'] : $config['port']) : null,
                     'enabled' => $config && !empty($config['enabled']),
+                    'zeroDowntime' => $config && !empty($config['zeroDowntime'])
+                        && (!isset($config['listen']) || $config['listen'] !== Modules_Runway_App::LISTEN_NONE),
+                    'switching' => $state && !empty($state['switching']),
                     'state' => self::appState($config, $state),
                     'memoryBytes' => $state && isset($state['memory_bytes']) ? $state['memory_bytes'] : null,
                     'url' => Modules_Runway_App::siteUrl($domain),
@@ -376,6 +380,9 @@ class ApiController extends pm_Controller_Action
             'buildDeps' => isset($page['build_deps']) ? (object)$page['build_deps'] : null,
             'appUrl' => Modules_Runway_App::appUrl($domain, $app->isConfigured() ? $app->config() : null),
             'isAdmin' => $isAdmin,
+            // Zero-downtime deployments: whether this user may turn them on, and the caps of the timeouts.
+            'zeroDowntimeAllowed' => Modules_Runway_App::zeroDowntimeAllowed($isAdmin),
+            'zeroDowntimeCaps' => Modules_Runway_App::zeroDowntimeCaps(),
             'pageError' => $pageError,
         ];
     }
@@ -609,6 +616,9 @@ class ApiController extends pm_Controller_Action
             $message = pm_Locale::lmsg('messageSavedBuildNotStarted', ['details' => $result['buildError']]);
         } elseif ($result['build']) {
             $message = pm_Locale::lmsg('messageSavedBuilding');
+        } elseif ($result['job'] !== null) {
+            // Zero-downtime: the new version starts next to the running one (deploy job).
+            $message = pm_Locale::lmsg('messageSavedSwitching');
         } else {
             $message = pm_Locale::lmsg($app->isEnabled() ? 'messageSavedEnabled' : 'messageSavedDisabled');
         }
@@ -617,12 +627,14 @@ class ApiController extends pm_Controller_Action
             'limits' => $app->limits(),
             'build' => $result['build'],
             'buildError' => $result['buildError'],
+            'job' => $result['job'],
             'message' => $message,
         ];
     }
 
     /**
-     * POST api/app/control {op: start|stop|restart|deploy}
+     * POST api/app/control {op: start|stop|restart|deploy, plain?: bool}. A restart of a running
+     * zero-downtime application is a switch (deploy job); plain: true restarts it in place.
      *
      * @return array
      */
@@ -636,11 +648,22 @@ class ApiController extends pm_Controller_Action
         $body = $this->body();
         $op = isset($body['op']) && is_string($body['op']) ? $body['op'] : '';
         $domainId = (int)$app->getDomain()->getId();
+        $plain = isset($body['plain']) && in_array($body['plain'], [true, 1, '1', 'true', 'on', 'yes'], true);
         switch ($op) {
             case 'start':
             case 'stop':
             case 'restart':
-                Modules_Runway_Helper::call('app-action', ['domain_id' => $domainId, 'action' => $op]);
+                $payload = ['domain_id' => $domainId, 'action' => $op];
+                if ($op === 'restart' && $plain) {
+                    $payload['plain'] = true;
+                }
+                $result = Modules_Runway_Helper::call('app-action', $payload);
+                if (!empty($result['job'])) {
+                    return ['message' => pm_Locale::lmsg('messageSwitchStarted'), 'job' => (string)$result['job']];
+                }
+                if ($op === 'restart' && $plain) {
+                    return ['message' => pm_Locale::lmsg('messageAction_restartPlain')];
+                }
                 return ['message' => pm_Locale::lmsg('messageAction_' . $op)];
             case 'deploy':
                 // "Build & restart" is an explicit start: a stopped application runs again afterwards.

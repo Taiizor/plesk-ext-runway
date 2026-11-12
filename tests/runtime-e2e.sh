@@ -14,8 +14,10 @@
 # the previous configuration of the domain (the samples live in APP_ROOT, not in the domain's
 # own application directory). With FEATURES=1 (default) it then checks path mode, static paths,
 # trigger files, worker mode, suspension of the subscription, the CLI (including Stop
-# persistence) with the Go sample, and a WebSocket handshake through nginx and through Apache
-# (ProxyPass upgrade=websocket). RUNWAY_E2E_OCTANE_ROOT=<path in the subscription> additionally
+# persistence) with the Go sample, zero-downtime deployments (tcp and unix: a request loop inside
+# the container counts every non-2xx answer of nginx while the setting is turned on, during Build &
+# restart and Restart, and while it is turned off), and a WebSocket handshake through nginx and
+# through Apache (ProxyPass upgrade=websocket). RUNWAY_E2E_OCTANE_ROOT=<path in the subscription> additionally
 # runs a prepared Laravel project with Octane (composer create-project laravel/laravel + composer
 # require laravel/octane + php artisan octane:install --server=frankenphp) with the suggested
 # commands in tcp and unix mode (needs a FrankenPHP toolchain).
@@ -84,6 +86,61 @@ wait_listener() {
         sleep 2
     done
     echo no-listener
+}
+
+# Request loop inside the container through nginx (HTTPS to the container's address, Host =
+# the domain): loop_start, then loop_result prints "<ok> <failed> <first failures>".
+LOOP_PY=$(cat <<'PYEOF'
+import http.client, os, socket, ssl, sys, threading, time
+host, out, stop = sys.argv[1], sys.argv[2], sys.argv[3]
+addr = [a for a in socket.gethostbyname_ex(socket.gethostname())[2] if not a.startswith("127.")][0]
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+lock = threading.Lock()
+count = {"ok": 0, "bad": 0}
+bad = []
+def worker():
+    while not os.path.exists(stop):
+        try:
+            conn = http.client.HTTPSConnection(addr, 443, timeout=10, context=ctx)
+            conn.request("GET", "/", headers={"Host": host, "Connection": "close"})
+            resp = conn.getresponse()
+            resp.read()
+            code = resp.status
+            conn.close()
+        except Exception as exc:
+            code = "ERR %s" % exc
+        with lock:
+            if isinstance(code, int) and 200 <= code < 300:
+                count["ok"] += 1
+            else:
+                count["bad"] += 1
+                if len(bad) < 5:
+                    bad.append("%s %s" % (time.strftime("%H:%M:%S"), code))
+threads = [threading.Thread(target=worker) for _ in range(3)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+with open(out, "w") as fh:
+    fh.write("%d %d %s\n" % (count["ok"], count["bad"], "; ".join(bad)))
+PYEOF
+)
+LOOP_PID=""
+loop_start() {
+    dock exec "$CONTAINER" rm -f /root/runway-e2e-loop.out /root/runway-e2e-loop.stop
+    echo "$LOOP_PY" | dock exec -i "$CONTAINER" sh -c 'cat > /root/runway-e2e-loop.py'
+    dock exec "$CONTAINER" python3 /root/runway-e2e-loop.py "$DOMAIN" /root/runway-e2e-loop.out /root/runway-e2e-loop.stop &
+    LOOP_PID=$!
+    sleep 2
+}
+loop_result() {
+    dock exec "$CONTAINER" touch /root/runway-e2e-loop.stop
+    wait "$LOOP_PID" 2>/dev/null
+    LOOP_PID=""
+    dock exec "$CONTAINER" cat /root/runway-e2e-loop.out 2>/dev/null
+    dock exec "$CONTAINER" rm -f /root/runway-e2e-loop.py /root/runway-e2e-loop.out /root/runway-e2e-loop.stop
 }
 
 restore() {
@@ -301,6 +358,43 @@ if [ "${FEATURES:-1}" = "1" ] && echo " $RUNTIMES " | grep -q ' go '; then
     done
     [ -n "$running" ] && fetch_url / | grep -q "Hello from Go" && ok "CLI --start runs it again" || bad "start after stop: $(status_field "(d['data']['stopped'], d['data']['service']['active_state'])")"
     row go stop tcp "$([ -n "$running" ] && echo ok || echo failed)" "-" "--stop, --deploy keeps it stopped, --start"
+
+    echo "== zero-downtime deployments (Go sample, tcp and unix)"
+    for listen in tcp unix; do
+        dock exec "$CONTAINER" rm -rf "$HOME_DIR/$APP_ROOT"
+        since=$(( $(date +%s) - 5 ))
+        out=$(post app/sample "{\"site_id\": $SITE_ID, \"runtime\": \"go\", \"listen\": \"$listen\", \"force\": true}")
+        [ "$(echo "$out" | jexpr "d['data']['build']")" = "True" ] && wait_deploy "$since" >/dev/null
+        state=$(save_wait '"enabled": true, "mode": "web", "staticPaths": [], "healthPath": "/", "zeroDowntime": false')
+        for _ in $(seq 1 15); do [ "$(status_field "d['data'].get('listener')")" = "ok" ] && break; sleep 2; done
+        loop_start
+        since=$(( $(date +%s) - 2 ))
+        out=$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": true, \"readyTimeout\": 60, \"drainSeconds\": 2}")
+        on=$(wait_deploy "$since")
+        slot_on=$(status_field "d['data'].get('slot')")
+        since=$(( $(date +%s) - 2 ))
+        post app/control "{\"site_id\": $SITE_ID, \"op\": \"deploy\"}" >/dev/null
+        deployed=$(wait_deploy "$since")
+        slot_deploy=$(status_field "d['data'].get('slot')")
+        since=$(( $(date +%s) - 2 ))
+        post app/control "{\"site_id\": $SITE_ID, \"op\": \"restart\"}" >/dev/null
+        restarted=$(wait_deploy "$since")
+        slot_restart=$(status_field "d['data'].get('slot')")
+        since=$(( $(date +%s) - 2 ))
+        post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": false}" >/dev/null
+        off=$(wait_deploy "$since")
+        slot_off=$(status_field "d['data'].get('slot')")
+        result=$(loop_result)
+        n_bad=$(echo "$result" | awk '{print $2}')
+        n_ok=$(echo "$result" | awk '{print $1}')
+        if [ "$on/$deployed/$restarted/$off" = "succeeded/succeeded/succeeded/succeeded" ] && [ "$slot_on" = "b" ] && [ "$slot_deploy" = "a" ] \
+                && [ "$slot_restart" = "b" ] && [ -z "$slot_off" ] && [ "${n_bad:-1}" = "0" ] && [ "${n_ok:-0}" -gt 20 ]; then
+            ok "zero-downtime $listen: on, Build & restart, Restart, off: $n_ok requests through nginx, none failed"
+        else
+            bad "zero-downtime $listen: jobs $on/$deployed/$restarted/$off, slots $slot_on/$slot_deploy/$slot_restart/$slot_off, loop: $result"
+        fi
+        row go zd "$listen" "$restarted" "-" "${n_ok:-0} requests, ${n_bad:-?} failed"
+    done
 
     echo "== WebSockets through nginx and Apache"
     # A minimal backend that answers the WebSocket handshake with 101 only when the Upgrade header

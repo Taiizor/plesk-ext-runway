@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Tổng kiểm tra SHA-256 phải gồm 64 ký tự thập lục phân.',
     'errorFetchFilename' => 'Tên tệp chỉ được chứa chữ cái, chữ số và . _ + - (tối đa 128 ký tự).',
     'errorUpdateVersion' => 'Phiên bản phải có dạng 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Trên máy chủ này, chỉ quản trị viên mới có thể bật triển khai không gián đoạn.',
+    'errorReadyTimeout' => 'Thời gian chờ sẵn sàng phải là một số nguyên giây từ %%min%% đến %%max%%.',
+    'errorDrainSeconds' => 'Thời gian chờ hoàn tất yêu cầu phải là một số nguyên giây từ %%min%% đến %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Giới hạn bộ nhớ (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Đã ghi ứng dụng mẫu (một tệp) và cập nhật cài đặt.',
     'messageFetchStarted' => 'Đã bắt đầu tải xuống. Hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
     'messageUpdateStarted' => 'Đã bắt đầu cập nhật lên Runway %%version%%. Tiến độ được hiển thị bên dưới.',
+    'messageSavedSwitching' => 'Đã lưu cài đặt. Phiên bản mới khởi động bên cạnh phiên bản đang chạy và sẽ tiếp quản khi sẵn sàng; hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
+    'messageSwitchStarted' => 'Phiên bản mới đang khởi động bên cạnh phiên bản đang chạy và sẽ tiếp quản khi sẵn sàng. Hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
+    'messageAction_restartPlain' => 'Ứng dụng đang khởi động lại tại chỗ.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liệt kê các ứng dụng đã cấu hình và trạng thái của chúng.',
     'cli.commands.status' => 'Hiển thị trạng thái ứng dụng của một tên miền: --status <tên-miền>',
     'cli.commands.start' => 'Khởi động ứng dụng của một tên miền: --start <tên-miền>',
     'cli.commands.stop' => 'Dừng ứng dụng của một tên miền; ứng dụng giữ trạng thái dừng (kể cả sau khi khởi động lại máy chủ hoặc triển khai) cho đến khi dùng --start hoặc --restart: --stop <tên-miền>',
-    'cli.commands.restart' => 'Khởi động lại ứng dụng của một tên miền: --restart <tên-miền>',
+    'cli.commands.restart' => 'Khởi động lại ứng dụng của một tên miền; với triển khai không gián đoạn, phiên bản mới khởi động bên cạnh phiên bản đang chạy và lệnh chờ quá trình chuyển đổi (-plain khởi động lại tại chỗ): --restart <tên-miền> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Biên dịch và khởi động lại ứng dụng của một tên miền rồi chờ kết quả (ứng dụng đã dừng sẽ được biên dịch nhưng vẫn giữ trạng thái dừng): --deploy <tên-miền> [-no-wait]',
     'cli.commands.enable' => 'Bật ứng dụng đã cấu hình của một tên miền: --enable <tên-miền>',
     'cli.commands.disable' => 'Tắt ứng dụng của một tên miền: --disable <tên-miền>',

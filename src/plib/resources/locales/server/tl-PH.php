@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Ang SHA-256 checksum ay dapat binubuo ng 64 hexadecimal character.',
     'errorFetchFilename' => 'Ang pangalan ng file ay maaari lamang maglaman ng mga letra, numero at . _ + - (max. 128 character).',
     'errorUpdateVersion' => 'Ang bersyon ay dapat nasa anyong 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Sa server na ito, ang administrator lamang ang makakapag-on ng mga deployment na walang downtime.',
+    'errorReadyTimeout' => 'Ang readiness timeout ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
+    'errorDrainSeconds' => 'Ang drain period ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Naisulat ang sample application (isang file) at na-update ang mga setting.',
     'messageFetchStarted' => 'Nagsimula na ang pag-download. Subaybayan ito sa log na "Build at deploy".',
     'messageUpdateStarted' => 'Nagsimula na ang update sa Runway %%version%%. Makikita sa ibaba ang progreso nito.',
+    'messageSavedSwitching' => 'Na-save ang mga setting. Magsisimula ang bagong bersyon katabi ng tumatakbong bersyon at papalit ito kapag handa na; subaybayan ito sa log na "Build at deploy".',
+    'messageSwitchStarted' => 'Nagsisimula ang bagong bersyon katabi ng tumatakbong bersyon at papalit ito kapag handa na. Subaybayan ito sa log na "Build at deploy".',
+    'messageAction_restartPlain' => 'Nire-restart ang application sa puwesto.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Ilista ang mga naka-configure na application at ang status ng mga ito.',
     'cli.commands.status' => 'Ipakita ang status ng application ng isang domain: --status <domain>',
     'cli.commands.start' => 'Simulan ang application ng isang domain: --start <domain>',
     'cli.commands.stop' => 'Ihinto ang application ng isang domain; mananatili itong nakahinto (kahit pagkatapos ng reboot o deployment) hanggang sa --start o --restart: --stop <domain>',
-    'cli.commands.restart' => 'I-restart ang application ng isang domain: --restart <domain>',
+    'cli.commands.restart' => 'I-restart ang application ng isang domain; sa mga deployment na walang downtime, sisimulan ang bagong bersyon katabi ng tumatakbo at hihintayin ng command ang paglipat (-plain para i-restart sa puwesto): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'I-build at i-restart ang application ng isang domain at hintayin ang resulta (ang nakahintong application ay bini-build ngunit mananatiling nakahinto): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'Paganahin ang naka-configure na application ng isang domain: --enable <domain>',
     'cli.commands.disable' => 'I-disable ang application ng isang domain: --disable <domain>',

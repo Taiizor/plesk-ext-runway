@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'A soma de verificação SHA-256 deve ter 64 caracteres hexadecimais.',
     'errorFetchFilename' => 'O nome do ficheiro só pode conter letras, dígitos e . _ + - (máx. 128 caracteres).',
     'errorUpdateVersion' => 'A versão deve ter o formato 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Neste servidor, só o administrador pode ativar as implementações sem interrupção.',
+    'errorReadyTimeout' => 'O tempo limite de prontidão deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
+    'errorDrainSeconds' => 'O período de drenagem deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'A aplicação de exemplo foi criada (um ficheiro) e as definições foram atualizadas.',
     'messageFetchStarted' => 'A transferência começou. Acompanhe-a no registo "Compilação e implementação".',
     'messageUpdateStarted' => 'A atualização para o Runway %%version%% começou. O progresso é apresentado abaixo.',
+    'messageSavedSwitching' => 'As definições foram guardadas. A nova versão é iniciada ao lado da que está em execução e assume o tráfego quando estiver pronta; acompanhe-a no registo "Compilação e implementação".',
+    'messageSwitchStarted' => 'A nova versão está a ser iniciada ao lado da que está em execução e assume o tráfego quando estiver pronta. Acompanhe-a no registo "Compilação e implementação".',
+    'messageAction_restartPlain' => 'A aplicação está a reiniciar no local.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Lista as aplicações configuradas e o respetivo estado.',
     'cli.commands.status' => 'Mostra o estado da aplicação de um domínio: --status <domínio>',
     'cli.commands.start' => 'Inicia a aplicação de um domínio: --start <domínio>',
     'cli.commands.stop' => 'Para a aplicação de um domínio; permanece parada (mesmo após um reinício do sistema ou uma implementação) até --start ou --restart: --stop <domínio>',
-    'cli.commands.restart' => 'Reinicia a aplicação de um domínio: --restart <domínio>',
+    'cli.commands.restart' => 'Reinicia a aplicação de um domínio; com implementações sem interrupção, a nova versão arranca ao lado da que está em execução e o comando aguarda a comutação (-plain reinicia no local): --restart <domínio> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Compila e reinicia a aplicação de um domínio e aguarda o resultado (uma aplicação parada é compilada, mas permanece parada): --deploy <domínio> [-no-wait]',
     'cli.commands.enable' => 'Ativa a aplicação configurada de um domínio: --enable <domínio>',
     'cli.commands.disable' => 'Desativa a aplicação de um domínio: --disable <domínio>',

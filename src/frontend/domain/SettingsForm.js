@@ -9,7 +9,8 @@ import {
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
-const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks'];
+const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
+    'zeroDowntime', 'readyTimeout', 'drainSeconds'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
 // Fields the default commands depend on.
 const DEFAULTS_INPUTS = ['runtime', 'toolchain', 'listen', 'mode'];
@@ -24,10 +25,27 @@ const NOTICE_MS = 5000;
 
 const text = value => (value === null || value === undefined ? '' : String(value));
 
+/** Caps of the zero-downtime timeouts from api/app (server settings), with the defaults of the server settings. */
+const zeroDowntimeCaps = data => {
+    const caps = isObject(data.zeroDowntimeCaps) ? data.zeroDowntimeCaps : {};
+    return {
+        ready: typeof caps.ready === 'number' ? caps.ready : 120,
+        drain: typeof caps.drain === 'number' ? caps.drain : 30,
+    };
+};
+
+/** A stored timeout (or its default) within the current cap: PHP sends the stored values clamped the same way. */
+const capped = (value, fallback, cap) => {
+    const raw = value === null || value === undefined || value === '' ? fallback : value;
+    const number = Number(raw);
+    return Number.isFinite(number) && number > cap ? cap : raw;
+};
+
 /** Form values from api/app data (tolerates missing fields). */
 export const formValues = data => {
     const config = isObject(data.config) ? data.config : {};
     const limits = isObject(data.limits) ? data.limits : {};
+    const caps = zeroDowntimeCaps(data);
     const listen = config.listen || 'tcp';
     return {
         enabled: Boolean(config.enabled),
@@ -42,6 +60,11 @@ export const formValues = data => {
         buildCmd: text(config.buildCmd),
         startCmd: text(config.startCmd),
         autoDeploy: config.autoDeploy !== false,
+        zeroDowntime: Boolean(config.zeroDowntime),
+        // Defaults 60 and 10; a lowered cap of the server settings applies to them too, so that
+        // ticking the checkbox does not send a value the server refuses.
+        readyTimeout: text(capped(config.readyTimeout, 60, caps.ready)),
+        drainSeconds: text(capped(config.drainSeconds, 10, caps.drain)),
         env: typeof data.env === 'string' ? data.env : '',
         memoryMb: text(limits.memoryMb || 0),
         cpuPercent: text(limits.cpuPercent || 0),
@@ -70,6 +93,17 @@ const requestBody = (values, data, isAdmin, supportsBuild) => {
         startCmd: values.startCmd,
         autoDeploy: Boolean(values.autoDeploy),
     };
+    // Zero-downtime deployments: not for workers; the timeouts only while the setting is on (a
+    // lowered cap must not block saving an application that does not use them).
+    if (values.mode !== 'worker') {
+        body.zeroDowntime = Boolean(values.zeroDowntime);
+        if (values.zeroDowntime) {
+            ['readyTimeout', 'drainSeconds'].forEach(key => {
+                const raw = String(values[key]).trim();
+                body[key] = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+            });
+        }
+    }
     // env is omitted when the stored variables could not be loaded (the helper keeps them).
     if (typeof data.env === 'string') {
         body.env = values.env;
@@ -113,6 +147,11 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const supportsBuild = !meta || meta.supports_build !== false;
     const worker = values.mode === 'worker';
     const unixOk = unixSupported(defaults, values.runtime, values.toolchain);
+    // Zero-downtime deployments: customers may turn them on only when the administrator allows it
+    // (the setting stays editable once it is on, so it can be turned off).
+    const zeroAllowed = data.zeroDowntimeAllowed !== false || formValues(data).zeroDowntime;
+    // Upper limits of the timeouts (0 is a valid drain cap).
+    const caps = zeroDowntimeCaps(data);
     // Default commands of the chosen runtime, listen mode and toolchain (null: none known).
     const commandDefaults = runtimeDefaults(defaults, values.runtime, values.listen, values.toolchain);
     const fieldErrors = error && error.fieldErrors ? error.fieldErrors : null;
@@ -138,7 +177,8 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const visible = ['enabled', 'runtime', 'appRoot', 'mode', 'startCmd', 'env', 'autoDeploy']
         .concat(supportsBuild ? ['buildCmd'] : [])
         .concat(kind !== 'none' ? ['toolchain'] : [])
-        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath'])
+        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'zeroDowntime'])
+        .concat(!worker && values.zeroDowntime ? ['readyTimeout', 'drainSeconds'] : [])
         .concat(values.mode === 'path' ? ['mountPath'] : [])
         .concat(isAdmin ? LIMITS : []);
     const otherErrors = fieldErrors
@@ -378,6 +418,39 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         label={<Translate content="Domain.form.autoDeploy" />}
                         description={<Translate content="Domain.form.autoDeployHint" />}
                     />
+                    {!worker && (
+                        <FormFieldCheckbox
+                            name="zeroDowntime"
+                            label={<Translate content="Domain.form.zeroDowntime" />}
+                            disabled={!zeroAllowed}
+                            description={(
+                                <span>
+                                    <Translate content="Domain.form.zeroDowntimeHint" />
+                                    {' '}
+                                    <Translate content="Domain.form.zeroDowntimeCaveats" />
+                                    {!zeroAllowed ? <span>{' '}<Translate content="Domain.form.zeroDowntimeAdminOnly" /></span> : null}
+                                </span>
+                            )}
+                        />
+                    )}
+                    {!worker && values.zeroDowntime && (
+                        <FormFieldText
+                            name="readyTimeout"
+                            label={<Translate content="Domain.form.readyTimeout" />}
+                            description={<Translate content="Domain.form.readyTimeoutHint" params={{ max: String(caps.ready) }} />}
+                            size="md"
+                            inputProps={pathInput}
+                        />
+                    )}
+                    {!worker && values.zeroDowntime && (
+                        <FormFieldText
+                            name="drainSeconds"
+                            label={<Translate content="Domain.form.drainSeconds" />}
+                            description={<Translate content="Domain.form.drainSecondsHint" params={{ max: String(caps.drain) }} />}
+                            size="md"
+                            inputProps={pathInput}
+                        />
+                    )}
                     {isAdmin && (
                         <FormFieldText
                             name="memoryMb"

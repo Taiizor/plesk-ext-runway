@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256 總和檢查碼必須是 64 個十六進位字元。',
     'errorFetchFilename' => '檔案名稱只能包含字母、數字及 . _ + -（最多 128 個字元）。',
     'errorUpdateVersion' => '版本格式必須類似 1.2.3-1。',
+    'errorZeroDowntimeAdmin' => '在此伺服器上，只有管理員可以開啟零停機部署。',
+    'errorReadyTimeout' => '就緒逾時必須是介於 %%min%% 到 %%max%% 之間的整數秒數。',
+    'errorDrainSeconds' => '排空時間必須是介於 %%min%% 到 %%max%% 之間的整數秒數。',
 
     // Field names used in error messages
     'fieldMemoryMb' => '記憶體限制 (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => '範例應用程式已寫入（1 個檔案），設定已更新。',
     'messageFetchStarted' => '下載已開始。請在「建置與部署」日誌中追蹤進度。',
     'messageUpdateStarted' => '更新至 Runway %%version%% 的作業已開始。進度顯示於下方。',
+    'messageSavedSwitching' => '設定已儲存。新版本會與目前執行中的版本並行啟動，就緒後接手流量；請在「建置與部署」日誌中追蹤進度。',
+    'messageSwitchStarted' => '新版本正在與目前執行中的版本並行啟動，就緒後將接手流量。請在「建置與部署」日誌中追蹤進度。',
+    'messageAction_restartPlain' => '應用程式正在原地重新啟動。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '列出已設定的應用程式及其狀態。',
     'cli.commands.status' => '顯示指定域名的應用程式狀態：--status <域名>',
     'cli.commands.start' => '啟動指定域名的應用程式：--start <域名>',
     'cli.commands.stop' => '停止指定域名的應用程式；即使重新開機或部署後，仍會保持停止狀態，直到執行 --start 或 --restart 為止：--stop <域名>',
-    'cli.commands.restart' => '重新啟動指定域名的應用程式：--restart <域名>',
+    'cli.commands.restart' => '重新啟動指定域名的應用程式；啟用零停機部署時，新版本會在執行中的版本旁啟動，指令會等待切換完成（-plain 表示原地重新啟動）：--restart <域名> [-plain] [-no-wait]',
     'cli.commands.deploy' => '建置並重新啟動指定域名的應用程式，然後等待結果（已停止的應用程式會建置，但仍保持停止狀態）：--deploy <域名> [-no-wait]',
     'cli.commands.enable' => '啟用指定域名中已設定的應用程式：--enable <域名>',
     'cli.commands.disable' => '停用指定域名的應用程式：--disable <域名>',

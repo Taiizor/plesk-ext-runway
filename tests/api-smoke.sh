@@ -13,6 +13,12 @@
 # The updater checks (api/update, the settings updateCheck/updateAuto, CLI --check-update) ask
 # GitHub once; they never install anything (helper-smoke covers the update job).
 #
+# Zero-downtime deployments (docs/DESIGN.md section 12): validation and caps of the new fields and
+# settings; with RUNWAY_SMOKE_DEPLOY=1 the Go app of SITE_ID also turns the setting on, deploys,
+# restarts (panel and CLI) and turns it off again from slot a, followed by a Reconcile, while a
+# request loop inside the container counts every non-2xx answer of nginx (Restart in place, which
+# interrupts by design, runs outside the loop).
+#
 # The sample, fetch, path mode, worker and maxAppsPerSubscription tests use a scratch subdomain
 # SUB.DOMAIN (created when missing, deleted at the end unless KEEP_SUB=1), so the application
 # of SITE_ID is never modified unless RUNWAY_SMOKE_DEPLOY=1. The fetch test serves a copy of
@@ -50,6 +56,7 @@ SUB_ID=""
 CREATED_SUB=0
 MAX_APPS_BEFORE=""
 SWITCHES_BEFORE=""
+ZD_BEFORE=""
 
 # Git Bash on Windows: no path conversion for docker arguments (but keep it for curl's
 # cookie jar path, which is a POSIX path there).
@@ -108,9 +115,68 @@ wait_conf_gone() {
     done
     return 1
 }
+# A request loop inside the container through nginx (HTTPS to the container's address, Host =
+# the domain), counting every answer that is not 2xx: loop_start DOMAIN, loop_stop NAME.
+LOOP_PY=$(cat <<'PYEOF'
+import http.client, os, socket, ssl, sys, threading, time
+host, out, stop = sys.argv[1], sys.argv[2], sys.argv[3]
+addr = [a for a in socket.gethostbyname_ex(socket.gethostname())[2] if not a.startswith("127.")][0]
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+lock = threading.Lock()
+count = {"ok": 0, "bad": 0}
+bad = []
+def worker():
+    while not os.path.exists(stop):
+        try:
+            conn = http.client.HTTPSConnection(addr, 443, timeout=10, context=ctx)
+            conn.request("GET", "/", headers={"Host": host, "Connection": "close"})
+            resp = conn.getresponse()
+            resp.read()
+            code = resp.status
+            conn.close()
+        except Exception as exc:
+            code = "ERR %s" % exc
+        with lock:
+            if isinstance(code, int) and 200 <= code < 300:
+                count["ok"] += 1
+            else:
+                count["bad"] += 1
+                if len(bad) < 5:
+                    bad.append("%s %s" % (time.strftime("%H:%M:%S"), code))
+threads = [threading.Thread(target=worker) for _ in range(3)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+with open(out, "w") as fh:
+    fh.write("%d %d %s\n" % (count["ok"], count["bad"], "; ".join(bad)))
+PYEOF
+)
+LOOP_PID=""
+loop_start() {
+    dock exec "$CONTAINER" rm -f /root/runway-smoke-loop.out /root/runway-smoke-loop.stop
+    echo "$LOOP_PY" | dock exec -i "$CONTAINER" sh -c 'cat > /root/runway-smoke-loop.py'
+    dock exec "$CONTAINER" python3 /root/runway-smoke-loop.py "$1" /root/runway-smoke-loop.out /root/runway-smoke-loop.stop &
+    LOOP_PID=$!
+    sleep 2
+}
+loop_stop() {
+    local result n_ok n_bad
+    dock exec "$CONTAINER" touch /root/runway-smoke-loop.stop
+    wait "$LOOP_PID" 2>/dev/null
+    LOOP_PID=""
+    result=$(dock exec "$CONTAINER" cat /root/runway-smoke-loop.out 2>/dev/null)
+    n_ok=$(echo "$result" | awk '{print $1}')
+    n_bad=$(echo "$result" | awk '{print $2}')
+    [ "${n_bad:-1}" = "0" ] && [ "${n_ok:-0}" -gt 20 ] && ok "$1: $n_ok requests through nginx, none failed" || bad "$1: ${result:-no result}"
+}
 cleanup() {
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
     if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
+    if [ -n "$ZD_BEFORE" ]; then post settings "$ZD_BEFORE" >/dev/null; fi
+    dock exec "$CONTAINER" rm -f /root/runway-smoke-loop.py /root/runway-smoke-loop.out /root/runway-smoke-loop.stop >/dev/null 2>&1
     # "[.]" keeps pkill from matching (and killing) this very shell.
     dock exec "$CONTAINER" sh -c "rm -rf /root/runway-smoke-www /etc/runway/allow-insecure-fetch; pkill -f 'http[.]server $FETCH_PORT'" >/dev/null 2>&1
     if [ -n "$SUB_ID" ]; then
@@ -150,6 +216,53 @@ if [ "${RUNWAY_SMOKE_DEPLOY:-0}" = "1" ]; then
     [ "$acme" = "404" ] && ok "ACME challenges stay on Plesk" || bad "ACME path answered HTTP $acme"
     out=$(cli --deploy "$DOMAIN"); code=$?
     [ $code -eq 0 ] && echo "$out" | grep -q "Job deploy-$SITE_ID: succeeded" && ok "CLI --deploy waits for the build" || bad "CLI --deploy ($code): $out"
+
+    echo "== zero-downtime deployment through nginx (Go $GO_VERSION, $DOMAIN)"
+    loop_start "$DOMAIN"
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": true, \"readyTimeout\": 30, \"drainSeconds\": 2}")
+    check "app/save turns zero-downtime on (switchable, a job)" \
+        "d['status'] == 'success' and d['data']['config']['zeroDowntime'] is True and d['data']['config']['switchable'] is True and d['data']['job'] == 'deploy-$SITE_ID'" "$out"
+    state=$(wait_deploy "$SITE_ID")
+    st=$(get "app/status?site_id=$SITE_ID")
+    [ "$state" = "succeeded" ] && check "status: zero-downtime on, slot b live, both slots reported" \
+        "d['data']['zero_downtime'] is True and d['data']['switchable'] is True and d['data']['slot'] == 'b' and 'b' in d['data']['slots'] and d['data']['listener'] == 'ok'" "$st" \
+        || bad "first switch: $state $(get "app/logs?site_id=$SITE_ID&kind=deploy&lines=15" | jexpr "d['data']['log']" | tail -n 5)"
+    out=$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"deploy\"}")
+    state=$(wait_deploy "$SITE_ID")
+    [ "$state" = "succeeded" ] && ok "Build & restart with zero-downtime (job $state)" || bad "zero-downtime deploy: $state $out"
+    out=$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"restart\"}")
+    check "app/control restart of a switchable app answers with the switch job" "d['status'] == 'success' and d['data']['job'] == 'deploy-$SITE_ID'" "$out"
+    state=$(wait_deploy "$SITE_ID")
+    [ "$state" = "succeeded" ] && ok "zero-downtime restart (job $state)" || bad "zero-downtime restart: $state"
+    loop_stop "requests during turning it on, Build & restart and Restart"
+    # Restart in place interrupts the application by design: outside the request loop.
+    check "app/control restart with plain: true restarts in place (no job)" "d['status'] == 'success' and 'job' not in d['data'] and 'in place' in d['data']['message']" \
+        "$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"restart\", \"plain\": true}")"
+    out=$(cli --status "$DOMAIN")
+    echo "$out" | grep -q '^Zero-downtime: *on (slot ' && echo "$out" | grep -q '^Slots:' && ok "CLI --status shows the zero-downtime state and the slots" || bad "CLI --status: $out"
+    for _ in $(seq 1 15); do [ "$(get "app/status?site_id=$SITE_ID" | jexpr "d['data']['listener']")" = "ok" ] && break; sleep 2; done
+    loop_start "$DOMAIN"
+    out=$(cli --restart "$DOMAIN"); code=$?
+    [ $code -eq 0 ] && echo "$out" | grep -q "Job deploy-$SITE_ID: succeeded" && ok "CLI --restart waits for the switch" || bad "CLI --restart ($code): $out"
+    check "overview: zeroDowntime and the live port" "[(a['zeroDowntime'], a['port'] == $(get "app/status?site_id=$SITE_ID" | jexpr "d['data']['port']")) for a in d['data']['apps'] if a['domainId'] == $SITE_ID] == [(True, True)]" "$(get overview)"
+    # The fourth switch made slot a live, whose port is the classic unit's: turning it off gives the
+    # classic unit a new port, which the Reconcile that follows stores in the panel (docs/DESIGN.md
+    # section 12.8) before Plesk renders the classic snippet again.
+    SLOT_OFF=$(get "app/status?site_id=$SITE_ID" | jexpr "d['data']['slot']")
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": false}")
+    state=$(wait_deploy "$SITE_ID")
+    check "turning it off switches back to the classic unit (from slot $SLOT_OFF)" "d['data']['zero_downtime'] is False and d['data']['slot'] == '' and d['data']['listener'] == 'ok'" "$(get "app/status?site_id=$SITE_ID")"
+    # (The scheduled Reconcile may have come first: then nothing is left to re-apply.)
+    out=$(cli --reconcile); code=$?
+    [ $code -eq 0 ] && ok "CLI --reconcile ($(echo "$out" | grep '^Re-applied:' | tr -d '\r'))" || bad "CLI --reconcile ($code): $out"
+    wait_conf_gone -q "Runway: zero-downtime #$SITE_ID" "/var/www/vhosts/system/$DOMAIN/conf/nginx.conf" \
+        && check "after the Reconcile the panel has the helper's port and the classic snippet" \
+            "d['data']['config']['switchable'] is False and d['data']['config']['port'] == $(get "app/status?site_id=$SITE_ID" | jexpr "d['data']['port']")" "$(get "app?site_id=$SITE_ID")" \
+        || bad "the generated configuration of $DOMAIN still uses the zero-downtime snippet"
+    sleep 3
+    loop_stop "requests during CLI --restart, turning it off and the Reconcile"
+    code=$(dock exec "$CONTAINER" curl -s -k -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:$IP" "https://$DOMAIN/")
+    [ "$code" = "200" ] && ok "nginx serves $DOMAIN after turning it off" || bad "nginx answered HTTP $code after turning it off"
 fi
 
 # Checks below that need a configured application of SITE_ID are skipped when it has none.
@@ -228,6 +341,21 @@ check "app/save: invalid mode" "d['status'] == 'error' and list(d['errors']) == 
 check "app/save: invalid health path" "d['status'] == 'error' and list(d['errors']) == ['healthPath']" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/h x\"}")"
 check "app/control: invalid op" "d['status'] == 'error'" "$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"explode\"}")"
+check "app/save: zeroDowntime must be a boolean" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntime']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": \"maybe\"}")"
+check "app/save: readyTimeout below 5 s is refused" "d['status'] == 'error' and list(d['errors']) == ['readyTimeout']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"readyTimeout\": 4}")"
+check "app/save: drainSeconds above the server cap is refused" "d['status'] == 'error' and list(d['errors']) == ['drainSeconds'] and '30' in d['errors']['drainSeconds'][0]" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"drainSeconds\": 31}")"
+check "app: zero-downtime may be turned on by an administrator; caps of the timeouts" \
+    "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is True and d['data']['zeroDowntimeCaps'] == {'ready': 120, 'drain': 30} and 'zeroDowntime' in d['data']['config']" \
+    "$(get "app?site_id=$SITE_ID")"
+ZD_BEFORE=$(get settings | jexpr "json.dumps({'zeroDowntimeCustomers': d['data']['zeroDowntimeCustomers'], 'zeroDowntimeMaxReady': d['data']['zeroDowntimeMaxReady'], 'zeroDowntimeMaxDrain': d['data']['zeroDowntimeMaxDrain']})")
+check "settings: zero-downtime defaults (customers off, caps 120 and 30)" "d['data']['zeroDowntimeCustomers'] is False and d['data']['zeroDowntimeMaxReady'] == 120 and d['data']['zeroDowntimeMaxDrain'] == 30" "$(get settings)"
+check "settings: zero-downtime settings round-trip" "d['status'] == 'success' and d['data']['zeroDowntimeCustomers'] is True and d['data']['zeroDowntimeMaxReady'] == 300 and d['data']['zeroDowntimeMaxDrain'] == 60" \
+    "$(post settings '{"zeroDowntimeCustomers": true, "zeroDowntimeMaxReady": 300, "zeroDowntimeMaxDrain": 60}')"
+check "settings: zeroDowntimeMaxReady above 900 is refused" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntimeMaxReady']" "$(post settings '{"zeroDowntimeMaxReady": 901}')"
+check "settings: zero-downtime settings restored" "d['status'] == 'success'" "$(post settings "$ZD_BEFORE")"
 check "app/save: LD_PRELOAD is refused with a hint to the start command" "d['status'] == 'error' and list(d['errors']) == ['env'] and 'start command' in d['errors']['env'][0]" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"env\": \"LD_PRELOAD=/var/www/vhosts/x/evil.so\"}")"
 check "app/save: LD_AUDIT, GCONV_PATH and GLIBC_TUNABLES are refused" "d['status'] == 'error' and len(d['errors']['env']) == 3" \
@@ -407,6 +535,9 @@ if [ -n "$SUB_ID" ]; then
     if [ "$(echo "$out" | jexpr "d['status']")" = "success" ]; then
         wait_conf_gone -q 'Runway' "$CONF/nginx.conf" && ok "nginx: no proxy for a worker" || bad "nginx config of a worker still proxies"
         check "overview: a worker has no port and no app URL" "[(a['port'], a['appUrl'], a['mode']) for a in d['data']['apps'] if a['domainId'] == $SUB_ID] == [(None, None, 'worker')]" "$(get overview)"
+        check "a worker ignores zero-downtime deployments (never switchable)" "d['status'] == 'success' and d['data']['config']['switchable'] is False and d['data']['job'] is None" \
+            "$(post app/save "{\"site_id\": $SUB_ID, \"zeroDowntime\": true}")"
+        post app/save "{\"site_id\": $SUB_ID, \"zeroDowntime\": false}" >/dev/null
         check "app/save: mode web gives the worker a listener again" "d['status'] == 'success' and d['data']['config']['listen'] in ('tcp', 'unix') and d['data']['config']['mode'] == 'web'" \
             "$(post app/save "{\"site_id\": $SUB_ID, \"mode\": \"web\", \"listen\": \"none\"}")"
     fi

@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'סכום הביקורת SHA-256 חייב להכיל 64 תווים הקסדצימליים.',
     'errorFetchFilename' => 'שם הקובץ יכול להכיל רק אותיות, ספרות והתווים . _ + - (עד 128 תווים).',
     'errorUpdateVersion' => 'הגרסה צריכה להיות בתבנית 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'רק מנהל המערכת יכול להפעיל פריסות ללא השבתה בשרת זה.',
+    'errorReadyTimeout' => 'הזמן הקצוב למוכנות חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
+    'errorDrainSeconds' => 'זמן הריקון חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'היישום לדוגמה נכתב (קובץ אחד) וההגדרות עודכנו.',
     'messageFetchStarted' => 'ההורדה החלה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
     'messageUpdateStarted' => 'העדכון ל-Runway %%version%% החל. ההתקדמות שלו מוצגת למטה.',
+    'messageSavedSwitching' => 'ההגדרות נשמרו. הגרסה החדשה מופעלת לצד הגרסה הפועלת ומקבלת את התעבורה כשהיא מוכנה; ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+    'messageSwitchStarted' => 'הגרסה החדשה מופעלת לצד הגרסה הפועלת ומקבלת את התעבורה כשהיא מוכנה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+    'messageAction_restartPlain' => 'היישום מופעל מחדש במקום.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'מציג את היישומים המוגדרים ואת מצבם.',
     'cli.commands.status' => 'מציג את מצב היישום של דומיין: --status <domain>',
     'cli.commands.start' => 'מפעיל את היישום של דומיין: --start <domain>',
     'cli.commands.stop' => 'עוצר את היישום של דומיין; הוא נשאר עצור (גם לאחר אתחול מחדש או פריסה) עד --start או --restart: --stop <domain>',
-    'cli.commands.restart' => 'מפעיל מחדש את היישום של דומיין: --restart <domain>',
+    'cli.commands.restart' => 'מפעיל מחדש את היישום של דומיין; בפריסות ללא השבתה הגרסה החדשה מופעלת לצד הגרסה הפועלת והפקודה ממתינה להחלפה (-plain מפעיל מחדש במקום): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'בונה ומפעיל מחדש את היישום של דומיין וממתין לתוצאה (יישום עצור נבנה אך נשאר עצור): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'מעביר את היישום המוגדר של דומיין למצב מופעל: --enable <domain>',
     'cli.commands.disable' => 'משבית את היישום של דומיין: --disable <domain>',

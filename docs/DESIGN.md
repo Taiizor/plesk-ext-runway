@@ -61,10 +61,11 @@ Runway/
 | Toolchains | `/opt/runway/<runtime>/...` (e.g. `/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/bun/1.3.2`, `/opt/runway/java/21.0.5`, `/opt/runway/dotnet` (shared root, versions inside), `/opt/runway/python/3.13.1` (uv-managed), `/opt/runway/uv/uv`) |
 | State | `/var/lib/runway/{apps,jobs,locks,cache}` (root 0700) |
 | Env files | `/etc/runway/env/<domainId>.env` (root 0600) |
-| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service` and `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left) |
-| Sockets | `/run/runway/<id>/app.sock` (dir `sysuser:psaserv` 2750, created by the helper as root; at boot by `systemd-tmpfiles` from `/etc/tmpfiles.d/runway-<id>.conf`, plus `runway.conf` for `/run/runway` itself) |
+| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service` and `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left); zero-downtime slots `runway-app-<id>-a.service`, `-b.service` and the boot unit `runway-converge.service` (§12.3) |
+| Sockets | `/run/runway/<id>/app.sock` (dir `sysuser:psaserv` 2750, created by the helper as root; at boot by `systemd-tmpfiles` from `/etc/tmpfiles.d/runway-<id>.conf`, plus `runway.conf` for `/run/runway` itself); zero-downtime: `a.sock`, `b.sock` and the root link `/run/runway/<id>.sock` (§12.3) |
+| Web include files | zero-downtime tcp applications: `/etc/runway/web/<id>.nginx.conf`, `<id>.apache.conf` (root 0644, the live port) |
 | Per-user caches | `~/.runway/` in the subscription (GOPATH, GOCACHE, CARGO_HOME, BUN_INSTALL cache, Maven/Gradle caches, NUGET_PACKAGES, pip/uv cache, GEM_HOME, Composer cache) |
-| App env vars | tcp and none: `PORT`, `HOST=127.0.0.1`, `LISTEN_ADDR`; unix: `RUNWAY_SOCKET` only (no `PORT`/`HOST`/`LISTEN_ADDR`; the port stays reserved in the state); always `RUNWAY_LISTEN` (tcp\|unix\|none), `RUNWAY_APP_ROOT`, `RUNWAY_START_CMD` (internal). Reserved for users: these plus `HOME`, `USER`, `LOGNAME`; refused: `LD_PRELOAD`, `LD_AUDIT`, `GCONV_PATH`, `GLIBC_TUNABLES` ("put it in the start command") |
+| App env vars | tcp and none: `PORT`, `HOST=127.0.0.1`, `LISTEN_ADDR`; unix: `RUNWAY_SOCKET` only (no `PORT`/`HOST`/`LISTEN_ADDR`; the port stays reserved in the state); always `RUNWAY_LISTEN` (tcp\|unix\|none), `RUNWAY_APP_ROOT`, `RUNWAY_START_CMD` (internal); zero-downtime slots also `RUNWAY_SLOT` (a\|b) and their own port or socket. Reserved for users: these plus `HOME`, `USER`, `LOGNAME`; refused: `LD_PRELOAD`, `LD_AUDIT`, `GCONV_PATH`, `GLIBC_TUNABLES` ("put it in the start command") |
 | Trigger files | `<app root>/tmp/deploy.txt` (build + restart), `<app root>/tmp/restart.txt` (restart) |
 | Domain settings keys | `runwayApp` (JSON config without env), `runwayLimits` (admin-only limits) |
 | Permission | `manage_runway_apps` (plan/subscription) |
@@ -195,13 +196,13 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/toolchain` | POST | admin | body `{runtime, op: install\|remove\|update, version}` → `{job}` or `{removed}` |
 | `api/build-deps` | POST | admin | → `{job}` |
 | `api/job` | GET | admin | `?job=admin\|deploy-<id>` → `{state,title,message,log,...}` |
-| `api/settings` | GET/POST | admin | all server settings (`portMin, portMax, buildTimeout, memoryMb, cpuPercent, tasks, buildMemoryMb, buildCpuPercent, buildTasks, maxAppsPerSubscription` integers, `updateCheck` (default true) and `updateAuto` (default false) booleans: JSON booleans, 0/1 or "true"/"false", else field error); `maxAppsPerSubscription` limits the **enabled** apps of one system user and is checked when an app is enabled (field error `enabled`) |
+| `api/settings` | GET/POST | admin | all server settings (`portMin, portMax, buildTimeout, memoryMb, cpuPercent, tasks, buildMemoryMb, buildCpuPercent, buildTasks, maxAppsPerSubscription, zeroDowntimeMaxReady` (5–900, default 120), `zeroDowntimeMaxDrain` (0–300, default 30) integers, `updateCheck` (default true), `updateAuto` (default false) and `zeroDowntimeCustomers` (default false) booleans: JSON booleans, 0/1 or "true"/"false", else field error); `maxAppsPerSubscription` limits the **enabled** apps of one system user and is checked when an app is enabled (field error `enabled`) |
 | `api/update` | GET | admin | built-in updater, no network: `{installed: "X.Y.Z-R", latest: {version, release, full, tag, htmlUrl, publishedAt} \| null, available, checkedAt, error, updateSource, lastFailedVersion, job: {admin job status}, updateCheck, updateAuto}` (helper `update-status` plus the two settings) |
 | `api/update/check` | POST | admin | forced check (helper `update-check {force: true}`; within 60 s of the previous check the cache answers) → `api/update` shape plus `checked`; a failed check is `error`, not an API error; HTTP 404 of GitHub (nothing published) is `latest: null` |
 | `api/update/install` | POST | admin | `{version: "X.Y.Z-R"}` (the version the administrator saw; field error `version` when malformed) → helper `update-install` → `{job, version, message}`; refused unless it is the cached available update, newer than the installed one, and no admin job runs |
 | `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active}, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}` |
 | `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, static paths 1000 in total. A save is an explicit start (helper `resume`) |
-| `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again |
+| `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy, plain?: bool}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again. Zero-downtime: `restart` of a running switchable application answers with the switch job; `plain: true` restarts in place (§12.10) |
 | `api/app/status` | GET | domain | helper `app-status` |
 | `api/app/logs` | GET | domain | `?kind=app\|deploy&lines=N` → `{log, kind}` |
 | `api/app/remove` | POST | domain | → `{message}` |
@@ -209,7 +210,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/app/fetch` | POST | domain | `{url (https:// only; http:// only with the helper's test flag), sha256?, extract?: bool, filename?, build?: bool}` → starts a deploy job in `fetch` mode (download as the user into the app root, verify, chmod +x / extract, optional build, restart unless stopped) → `{job, message}`; needs a configured app (the UI disables the button until the settings are saved) |
 
 Config fields (JSON, camelCase on the API, snake_case toward the helper):
-`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, buildCmd, startCmd, autoDeploy, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`.
+`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10).
 
 ## 7. Helper command contract (`runway-helper <command>`, JSON payload on stdin)
 
@@ -224,19 +225,20 @@ their code.
 | `toolchains` | — | `{runtimes:{key:{installed:[{id,label,path,version?,kind?}], in_use:{id:[domains]}, toolchain, build_deps}}, build_deps, job}`; `kind` (`detected\|managed`) marks PHP entries (`plesk-<x.y>` vs `frankenphp-<ver>`), `version` the resolved version of channels (rust `stable` → `1.x.y`) |
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
-| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, build_limits, start, restart, resume` | `{port, state}`; keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`) |
+| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
 | `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
-| `app-action` | `{domain_id, action: start\|restart\|stop\|recover}` | `{action}`; start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
+| `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
 | `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params`, and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
-| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes}], reconcile_paused}`; `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes) |
+| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes}], reconcile_paused}`; `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
 | `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
 | `update-install` | `{version: "X.Y.Z-R"}` | `{job: "admin", version}`; refuses a malformed version, one that is not newer than the installed one, one that is not the cached available update, and a running admin job |
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
-| `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`) | |
+| `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
+| `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
 
 Codes for translation: `listener_code` ∈ `ok, none, foreign, tampered, socket_symlink,
 socket_not_socket, socket_owner, worker`, `health_code` ∈ `no_path, not_listening, failed, no_http,
@@ -340,8 +342,10 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 
 ## 9. CLI (`pm_Hook_ApiCli`, `plesk ext runway ...`)
 
-`--list`, `--status <domain>`, `--start|--stop|--restart|--deploy <domain> [-no-wait]` (`--stop`
-persists until `--start`/`--restart`; `--deploy` builds a stopped application without starting it),
+`--list`, `--status <domain>`, `--start|--stop <domain>`, `--restart <domain> [-plain] [-no-wait]`,
+`--deploy <domain> [-no-wait]` (`--stop` persists until `--start`/`--restart`; `--deploy` builds a
+stopped application without starting it; `--restart` of a zero-downtime application waits for the
+switch, `-plain` restarts in place, §12.10),
 `--enable|--disable <domain>`, `--toolchains`, `--install-toolchain <runtime> <version> [-no-wait]`,
 `--reconcile`, `--check-update` (forced check; prints the installed and the latest version; exit 1
 when the check failed), `--update [-no-wait]` (forced check, then the self-update job for the
@@ -381,4 +385,603 @@ error (unknown command, domain or runtime). Admin context.
 ## 11. Non-goals for 1.0
 
 Windows, zero-downtime deploys, multiple processes per app, resource graphs, automatic restart on
-failed health checks, Plesk catalog submission.
+failed health checks, Plesk catalog submission. Zero-downtime deployments followed in 1.1 (§12).
+
+## 12. Zero-downtime deployments (1.1)
+
+Status: implemented for 1.1.0. With the setting off, every contract of §3–§10 stays exactly as in
+1.0.0; this section describes what changes for applications that turn it on.
+
+### 12.1 Behaviour
+
+- Opt-in per application: `zeroDowntime` (default off), effective for the listen modes `tcp` and
+  `unix` only. Workers (listen `none`) do not show the field and the helper forces it off.
+- The administrator grants it: administrators can turn it on for any application; customers only
+  while the server setting *Zero-downtime deployments for customers* (`zeroDowntimeCustomers`,
+  default off) is on. Anybody who may save the application can turn it off. Both timeouts are
+  capped by server settings (§12.9).
+- Setting off: units, environment files, sockets, web server snippets and behaviour are byte for
+  byte those of 1.0.0, so existing installations upgrade without any change (tested against the
+  1.0.0 helper, §12.11).
+- Setting on: "Build & restart", fetch and `tmp/deploy.txt` (build first, as today), Restart
+  (button, `api/app/control`, CLI `--restart`), `tmp/restart.txt` and saving the settings (a 1.0
+  save restarts the application) replace the running version without a gap. The new version
+  starts in the other **slot** next to the running one; Runway waits until it listens and, when a
+  health path is set, until that path answers 2xx/3xx, bounded by `readyTimeout`; then it switches
+  the web server's traffic to the new slot, waits up to `drainSeconds` for the requests in flight on
+  the old version and stops the old version. A new version that does not become ready is stopped,
+  the old version keeps serving and the deployment fails with the reason.
+- **Restart in place** (`api/app/control {op: restart, plain: true}`, a button next to Restart,
+  CLI `--restart <domain> -plain`) restarts the running version as 1.0 does (short interruption):
+  for applications that cannot run twice, to replace a running but broken instance, or to activate
+  a build whose switch failed. Failure messages of a switch name it.
+- Start and Stop stay plain actions (one instance, no switch). Stop persists as in 1.0 (switches,
+  deployments, trigger files, reconciles and reboots do not start the application); deployments of
+  a stopped application build but do not start it.
+- Both versions run side by side for up to `readyTimeout + drainSeconds` plus the old version's
+  stop: the resource limits (`MemoryMax`, `CPUQuota`, `TasksMax`) apply per instance, so the
+  application's usage can double for that time. Two JVMs started with the default
+  `-XX:MaxRAMPercentage=75` and no memory limit both size their heap against the host's memory: set
+  a memory limit for Java applications that use the setting.
+- The application must tolerate two instances briefly: database migrations at startup, schedulers
+  or cron jobs inside the application, SQLite databases and file locks, single-instance
+  assumptions. Applications with an embedded single-writer database or a lock file (bbolt, Badger,
+  LevelDB, Prometheus TSDB, SQLite in exclusive mode, pid-file locks) cannot start a second
+  instance while the first runs: every switch fails after `readyTimeout`; they keep the setting off.
+- Builds replace files in the application root in place before the switch, as in 1.0, while the
+  old version keeps serving for up to `readyTimeout + drainSeconds` (there are no release
+  directories). Builds that replace files by rename (Go, Rust/Cargo) are safe; builds that
+  overwrite files a running process maps or loads lazily (`dotnet publish -o publish` over mapped
+  assemblies, jars rewritten in place, `uv pip install`, `bundle install` or `bun install` changing
+  modules the old version imports later, PHP files) can disturb the old version during that
+  window: publish into a new directory and rename it (the README lists safe commands). Release
+  directories are a follow-up.
+- WebSocket, SSE and other long connections to the old version are closed when it stops (after the
+  drain); clients reconnect to the new version.
+- `unix` is the recommended listen mode: its switch is an atomic rename without any web server
+  reload. `tcp` switches with a graceful reload of the web server (§12.6); in tcp mode a request
+  whose body is still being uploaded when the drain ends can fail.
+
+### 12.2 Verified assumptions
+
+Probed on 2026-11-12 in a throwaway `plesk/plesk` container (Plesk 18.0.82.2, Ubuntu 24.04, nginx
+1.30.6, Apache 2.4.58 event MPM, systemd 255) with stub HTTP servers running as an unprivileged
+user in a `2750 user:psaserv` directory:
+
+| # | Assumption | Result |
+|---|---|---|
+| 1 | nginx follows a root-owned relative symlink to a socket for `proxy_pass http://unix:...:` | yes; after an atomic rename of the link the next requests reached the new target (20 of 20); nginx keeps no upstream connections (no `upstream` block) |
+| 2 | Apache (`ProxyPass ... "unix:...\|http://localhost/"`) follows it | for new connections only: mod_proxy reuses pooled backend connections, 40 of 40 requests after the switch still reached the old instance; with `disablereuse=On` 20 of 20 reached the new one |
+| 3 | an instance bound to a slot socket unlinks only its own path when it stops | yes |
+| 4 | an instance that bound a path itself deletes whatever is at that path when it stops (Go's `UnixListener.Close`, gunicorn and uvicorn unlink their path; gunicorn and asyncio also remove an existing socket before they bind) | yes, a root symlink in the user's directory was deleted and the site answered 502: the web server's path must not live in the user's directory (§12.6) |
+| 5 | systemd-tmpfiles `L` line | creates the root-owned relative link; without `+` it keeps an existing link |
+| 6 | connections per endpoint can be counted | `/proc/net/unix` lists accepted connections with the listener's path in state `03` and connections still in the accept queue in state `02` (inode 0); the listener is state `01`, flags `00010000`. `/proc/net/tcp{,6}` rows in state `01` (accepted or queued) carry the local port |
+| 7 | Plesk regeneration of one domain | `plesk sbin httpdmng --reconfigure-domain` took 4.5–7.0 s on an idle one-domain server; it returns after writing `/var/www/vhosts/system/<domain>/conf/{nginx,httpd}.conf` (`last_*.conf` are symlinks to them) and a graceful Apache restart, the nginx reload lands just after it returns. `pm_WebServer::updateDomainConfiguration()` (`WebConfig::reconfigure`) returned after 0.04 s with nothing written (written 0.6 s later, nginx reloaded 0.3 s after that): asynchronous, seconds, no completion signal |
+| 8 | nginx include and variable upstream | a glob include that matches nothing (`include /etc/runway/web/<id>.nginx[.]conf;`) passes `nginx -t`; `set $runway_upstream 127.0.0.1:<port>;` with `proxy_pass http://$runway_upstream;` works without a resolver, and so does a value `unix:/path:` (a missing path answers 502); `proxy_redirect http://$runway_upstream/ /;` is accepted. Plesk's `systemctl reload nginx` runs `nginx -t` first (exit 1 on a broken include, the old configuration keeps serving); the reload returned after 0.03 s and the new worker generation existed 0.1 s later (old workers are titled "nginx: worker process is shutting down") |
+| 9 | Apache include and variable | `IncludeOptional /etc/runway/web/<id>.apache[.]conf`, `<IfDefine !RUNWAY_PORT_<id>> Define ... </IfDefine>` and `${RUNWAY_PORT_<id>}` in `ProxyPass` work, also with the same `Define` in two vhosts; `systemctl reload apache2` (`apachectl graceful`) returned after 0.5 s, the new children existed 3.1 s after the reload |
+| 10 | nginx shutdown of old workers | Plesk's nginx configuration sets no `worker_shutdown_timeout`: old workers holding long connections stay until those close (as after every Plesk regeneration) |
+| 11 | root connects without following a customer's symlink | `open(path, O_PATH\|O_NOFOLLOW)`, `fstat` (a symlink shows `S_ISLNK`), then `connect("/proc/self/fd/<n>")` reaches exactly that socket |
+| 12 | unprivileged ports | `net.ipv4.ip_unprivileged_port_start` is 0 in the container: no port, not even a low one, can serve as a target nobody can listen on |
+
+### 12.3 Names, files and state
+
+| Item | Setting off (= 1.0) | Setting on |
+|---|---|---|
+| App units | `runway-app-<id>.service` | `runway-app-<id>-a.service` and `runway-app-<id>-b.service` (slots); only the live one is enabled. `runway-app-<id>.service` stays the live instance after the setting was turned on until the first successful switch (slot `""`) and becomes it again when the setting is turned off |
+| Env files | `/etc/runway/env/<id>.env` | `/etc/runway/env/<id>-a.env`, `<id>-b.env` (equal except the listen variables of the slot and `RUNWAY_SLOT`) |
+| Journal identifier | `runway-app-<id>` | `runway-app-<id>-a`, `runway-app-<id>-b` |
+| Unix endpoint | the application binds `/run/runway/<id>/app.sock`, the web server uses it | slot `x` binds `/run/runway/<id>/x.sock` (`RUNWAY_SOCKET`, also in `ASPNETCORE_URLS`); the web server uses the **root link** `/run/runway/<id>.sock` in the root-owned 0755 `/run/runway`, a symlink with the relative target `<id>/a.sock`, `<id>/b.sock` or `<id>/app.sock` (the 1.0 instance while it is live) that only root can create or replace |
+| tmpfiles entry | `d /run/runway/<id> 2750 <user> psaserv -` | the same plus `L /run/runway/<id>.sock - - - - <id>/<live>.sock` |
+| TCP endpoint | `127.0.0.1:<port>` | slot `a`: `port_a`, slot `b`: `port_b`, both reserved from the server range while the application is switchable (`port_a` starts as the 1.0 `port`; a standby port that another process holds is replaced, §12.7); each slot unit may bind only its own port |
+| Web include (tcp) | — | `/etc/runway/web/<id>.nginx.conf` (`set $runway_upstream 127.0.0.1:<live port>;`) and `/etc/runway/web/<id>.apache.conf` (`Define RUNWAY_UPSTREAM_<id> http://127.0.0.1:<live port>` and `Define RUNWAY_PORT_<id> <live port>`), root-owned 0644 in the root-owned 0755 directory `/etc/runway/web` |
+| Deploy units | `runway-deploy-<id>.service`, `.path` | the same; `TimeoutStartSec` grows by the switch allowance `readyTimeout + drainSeconds + 300` and `TimeoutStopSec=300` covers the end of an interrupted switch |
+| Boot unit | — | `runway-converge.service` (root oneshot, `After=systemd-tmpfiles-setup.service`, `Before=nginx.service apache2.service httpd.service`; installed with the first switchable application, removed by `uninstall`); slot units are ordered after it |
+| App variables | §3 | plus `RUNWAY_SLOT=a\|b` in slot units (not reserved: it overrides a user variable of that name) |
+
+State file `/var/lib/runway/apps/<id>.json`:
+
+- Configuration from the panel payload (validated by `validate_app`): `zero_downtime` (bool, forced
+  false for listen `none`), `ready_timeout` (int 5–900, default 60), `drain_seconds` (int 0–300,
+  default 10).
+- Helper-owned, never taken from a payload: `slot` (`""`: the 1.0 unit is the live instance, `"a"`,
+  `"b"`), `port_a`, `port_b` (0: none), `switched_at` (ISO time of the last switch or `""`),
+  `restart_plain` (bool: the next restart is a plain one because the listen mode, the system user
+  or the application root changed while the application has or gets slots, also while the 1.0
+  unit is the live instance) and `switch` (the intent record of a running switch, §12.4, or
+  null). `app-apply` carries them over from the stored state like the `stopped`/`tampered` flags;
+  `load_app_state`, `reapply-all` and `rerender_runtime_apps` copy them from the stored state like
+  `port`. The application **has slots** (`zd_has_slots`) while the setting is on, `slot` is `a` or
+  `b`, or an intent record exists: an interrupted switch back to the 1.0 unit has already
+  committed `slot` `""`, and its old slot may still run until the convergence settles it.
+- `port` is helper-owned once a state exists: `app-apply` keeps the stored port over the payload's
+  (the panel's copy, which lags behind after a switch back to the 1.0 unit gave it a new port).
+- A 1.0 state has none of these fields: setting off, `slot` `""`, no slot ports, so `write_units`
+  renders exactly the 1.0 files.
+- PHP domain setting `runwayApp`: `zeroDowntime`, `readyTimeout`, `drainSeconds` (defaults false,
+  60, 10) and the helper-owned `switchable` (app-apply's result: the application has slots and
+  listens, see above; stored like `port`, §12.6).
+
+Invariants: the instance the **pointer** names (the root link's target, the include's port) is the
+one that carries the traffic; outside a switch only the live unit may be active or enabled; the
+pointer files (include files, root link, tmpfiles `L` line) are written only under the
+application's deploy lock (§12.8); `port`, `port_a` and `port_b` of every application count as taken
+for every port allocation.
+
+### 12.4 The switch (deploy job)
+
+The switch runs in `runway-deploy-<id>.service` under the deploy lock, after the fetch and build
+steps (unchanged), when the application is enabled, not suspended, not stopped, switchable,
+`restart_plain` is false and the live unit is active; otherwise the job restarts plainly (§12.5).
+L is the live instance (`slot`), N the target: the other slot while the setting is on (`b` when L
+is `""` or `a`, else `a`), the 1.0 unit (`""`) when the setting is off and a slot is live (turning
+it off, §12.5).
+
+**Intent and truth.** Before the pointer changes, the job writes the intent record `switch: {from:
+L, to: N, phase, started_epoch}` into the state (state lock) and clears it at the end. Whoever
+finds an intent record afterwards (convergence §12.8, the next switch, the boot unit) takes the live
+instance from the pointer and the units, not from `slot`, and stops an instance only after the
+pointer was confirmed elsewhere. The job status gains `phase` (`prepare`, `starting`, `waiting`,
+`switching`, `draining`, `stopping`; `""` outside a switch), `phase_started_epoch`, `phase_limit`
+(seconds), `slot_from` and `slot_to`; `app-status` adds `phase_elapsed`, so the panel needs no
+clock of its own.
+
+1. **prepare**: re-read the state; settle a left-over intent record (convergence); N's unit must be
+   inactive afterwards (else fail: "a previous switch is still being cleaned up"). Unix:
+   `ensure_socket_dir`, the socket check of §12.7 (tampering: containment, fail), root-unlink a
+   stale N socket. TCP: N's port must be free; when another uid or another process of the user
+   holds it, N gets a newly allocated port (`port_a`/`port_b`, or the 1.0 `port` when N is `""`);
+   when N is `""` and L listens on `port`, the 1.0 unit gets a new `port`. Web server: the
+   generated configuration of the server that carries the traffic
+   (`<HTTPD_VHOSTS_D>/system/<domain>/conf/nginx.conf`, `httpd.conf` without nginx;
+   `HTTPD_VHOSTS_D` from `/etc/psa/psa.conf`, default `/var/www/vhosts`) must contain the marker of
+   §12.6 and be effective (`web_effective`: a reload that the helper confirmed was issued after
+   the file's modification time, the server's main process started after it, or, nginx only, every
+   worker that is not shutting down started after it; Apache children of an old generation that
+   still finish long requests look like new ones, so only the first two count for Apache;
+   otherwise a reload with confirmation); when the marker is missing (the regeneration of the save
+   that turned the setting on is asynchronous), wait up to 60 s, then run `plesk sbin httpdmng
+   --reconfigure-domain <domain>` once (120 s) and check again; still missing: fail with
+   httpdmng's output. TCP: the include files must name L's port and be effective (rewrite, reload
+   and confirm when not).
+2. **starting**: render N's env file and unit (`daemon-reload` when changed); under the state lock
+   re-check enabled, suspended, stopped and tampered; `prepare_start(state, slot=N)` (socket
+   directory, the runtime's hook such as Octane's Caddyfile, which reads the slot's variables at
+   runtime), `reset-failed`, `systemctl start --no-block` N's unit.
+3. **waiting** (limit `ready_timeout`), every 0.5 s: the state became stopped, disabled or suspended:
+   stop N and end without error ("The application was stopped during the switch; the new version was
+   not started"). N's unit is `failed`, `inactive` after it had been activating, or has
+   `NRestarts` > 0: fail ("The new version exited during startup (status=1/FAILURE); it must listen
+   on $RUNWAY_SOCKET (/run/runway/12/b.sock)", tcp: "on 127.0.0.1:$PORT (20031)"). Unix: a second
+   listener appears on L's socket path (`app.sock` of the 1.0 instance or L's slot socket) while L's
+   own listener is still open, or, after L restarted, one of N's processes holds it (reading
+   `/proc/<pid>/fd` needs `CAP_SYS_PTRACE`, which containers often lack): fail at once ("The new
+   version listens on /run/runway/12/app.sock instead of $RUNWAY_SOCKET"); when that took L's
+   socket file (after N stopped, the file at L's path is missing or another file than the one
+   recorded in step 1), L is restarted in place; a connection to L that merely fails (a busy
+   instance with a full accept queue) is no reason. Listener:
+   unix: N's socket, checked through an `O_PATH` descriptor (§12.7), is a socket owned by the
+   application's user that accepts a connection; anything else at that path is tampering
+   (containment); tcp: the listeners of N's port are exactly the application's uid (another uid
+   fails the switch with the hijack detail). With a health path: one GET through N's endpoint (2 s,
+   `Host` = domain) must answer 2xx/3xx. Ready = listener ok and (no health path or healthy); the
+   limit fails it with the last listener or health detail.
+4. **switching** (the commit point; a SIGTERM only sets a flag from here to the end of the switch,
+   and the helper's child processes, e.g. `systemctl reload`, run with SIGTERM ignored: systemd
+   sends it to every process of the deploy unit). Under the state lock re-check enabled,
+   suspended, stopped and tampered (any set: stop N, end as in step 3) and write the intent phase
+   `switching`. Unix: re-check N's socket (`O_PATH`, owner), create a symlink to `<id>/N.sock`
+   under a random temporary name in `/run/runway` (through a directory descriptor) and `rename` it
+   over `<id>.sock`, then rewrite the tmpfiles `L` line at once (a reboot recreates the link from
+   it). TCP, under the server-wide `web-reload` lock: write both include files with N's port
+   (atomic replace), reload the web server that carries the traffic (`systemctl reload nginx` when
+   nginx is active, else `apache2`/`httpd`) and wait up to 60 s until a worker generation that
+   started after the reload exists, every older worker is gone or shutting down (nginx; Apache: a
+   child started after the reload) and the worker set did not change for 1 s (a later generation
+   is adopted); a confirmed reload is remembered per web server unit
+   (`/var/lib/runway/web-reloads.json`: the modification time of a stamp file touched before the
+   reload, i.e. the clock of the configuration files; `web_effective`). A reload the server
+   refused (configuration test): restore the include files to L's port, stop N, fail with the
+   output of the configuration test (the old configuration keeps serving). No new
+   generation in time, or an outcome that is unknown (a `systemctl` call that timed out, a reload
+   client ended by a signal, an error while writing): restore the include files, reload and
+   confirm again; confirmed: stop N and fail; not confirmed: keep both running and fail ("the web
+   server did not confirm the configuration; both versions keep running until the next check"),
+   the intent record stays for the convergence. N is never stopped while the running
+   configuration may still name its port. **Commit**, under the state lock: `slot = N`,
+   `switched_at`, intent phase `draining`; enable N's unit, disable L's unit without stopping it.
+   After the commit re-read the state: any of enabled off, suspended, stopped or tampered:
+   `disable --now` every app unit and end with "The application was stopped during the switch".
+5. **draining** (at most `drain_seconds`, skipped at 0), every 0.5 s: unix: until no
+   `/proc/net/unix` row in state `02` or `03` carries L's socket path (`app.sock` for the 1.0
+   instance, else `L.sock`); tcp: until no `/proc/net/tcp{,6}` row in state `01` has L's port as
+   local port **and** no worker (nginx) or child (Apache) of the traffic web server that started
+   before the reload is still alive (old workers finish requests whose upstream connection starts
+   after the switch, e.g. buffered uploads).
+6. **stopping**: stop L's unit (`TimeoutStopSec=30` as today) and `reset-failed` it; unix: root-unlink
+   L's socket file. L is `""` (first switch): `retire_legacy()` disables the 1.0 unit and removes its
+   unit and env file. N is `""` (turning it off): `retire_slots()` removes the slot units and env
+   files, releases `port_a` and `port_b`, sets `slot` `""` and clears the intent record with them.
+   Clear the intent record. Failures in this step (a `systemctl` call that times out, a file
+   error) are warnings: the new version serves, the job succeeds with "Switched from slot a to
+   slot b; stopping slot a failed, the next check retries it", and the intent record stays, so the
+   convergence stops the old version and retires the slots (§12.8).
+7. Result: "Switched from slot a to slot b" (job succeeded, journal note in the application's log).
+
+A SIGTERM of the job (unit timeout, deploy unit stopped because the application was disabled or
+its domain suspended) before step 4 stops N, clears the intent record and fails with the reason.
+During step 4 it is deferred; after the commit the job skips the rest of the drain, stops L and ends
+(roll forward: N is ready and carries the traffic). A SIGKILL, OOM kill or power loss leaves the
+intent record, which the convergence or the boot unit settles from the pointer (§12.8).
+
+| Failure | Traffic afterwards | Job message (examples) |
+|---|---|---|
+| build fails | old version | as in 1.0 ("Build failed with exit code 2; the running application was left untouched.") |
+| N exits or crash-loops | old version | "The new version exited during startup (status=1/FAILURE); it must listen on $RUNWAY_SOCKET (/run/runway/12/b.sock). The running version keeps serving; Restart in place runs the new version with an interruption." |
+| N binds L's socket path | old version (restarted in place when its socket was removed) | "The new version listens on /run/runway/12/app.sock instead of $RUNWAY_SOCKET (...)" |
+| no listener or health in time | old version | "The new version was not ready within 60 s (HTTP 503 from /healthz); the running version keeps serving." |
+| N's port held by another uid | old version | "Port 20031 is held by uid 1005" (only during the wait: the prepare step moves N to another port) |
+| tampered socket path | none (contained, as 1.0) | "The socket path was tampered with (...); the application was stopped." |
+| reload fails (tcp) | old version | "The web server could not be reloaded: nginx: [emerg] ...; the running version keeps serving." |
+| marker missing | old version | "The web server configuration of example.com does not use Runway's zero-downtime snippet: <httpdmng output>" |
+| Stop during the switch | stopped (user's choice) | "The application was stopped during the switch; the new version was not started." |
+
+### 12.5 Operations
+
+| Operation | Setting on |
+|---|---|
+| Build & restart, fetch, `deploy.txt` | build or fetch, then the switch |
+| Restart (panel, API, CLI), `restart.txt` | `app-action restart` starts the deploy job in restart mode (as `app-deploy {build: false, start: true}`, clearing `stopped`) and returns `{action, job}`; refused while a deployment runs; when the live unit is not active: plain restart, no job |
+| Restart in place | `app-action {action: restart, plain: true}`: plain restart (below) |
+| Save | `app-apply` renders the units and env files of both slots (and of the 1.0 unit while it is live) without touching the live instance; with a build command the deploy job builds and switches (as in 1.0); without one, `app-apply` (restart requested, live unit active, `restart_plain` false) starts the switch job and returns `job` |
+| Start | plain start of the live unit (an intent record left by an interrupted switch is settled first, §12.8) |
+| Stop | sets `stopped`, stops and disables every app unit (`runway-app-<id>.service`, `-a`, `-b`); the pointer stays (502, as for a stopped 1.0 application) |
+| Recover (Reconcile, start limit hit) | plain start of the live unit |
+| Suspend, disable | as in 1.0 for all three app units (stopping the deploy unit first ends a running switch, §12.4) |
+| Re-activation | plain start of the live unit |
+
+**Plain restart** (setting off, `restart_plain`, Restart in place, a worker, or nothing running to
+keep serving): stop every app unit but the live one; with the setting off and a slot live (or slot
+files left), `retire_slots()` first (the 1.0 unit becomes live on `port`); write the pointer for
+the live unit while it is in use (under the deploy lock); `prepare_start`, enable and restart the
+live unit with the 1.0 listener check. It clears `restart_plain`. The deploy job of every
+application with slots decides between the switch and the plain restart, also of one that became
+a worker while a slot runs (its build restarts the 1.0 unit in place; the 1.0 unit file no longer
+exists before that).
+
+**Turning it on** (a save) has no interruption: `app-apply` allocates `port_b` (tcp), renders the
+slot units and env files, writes the pointer for the live 1.0 unit (tcp: the include files with
+`port`; unix: the root link to `<id>/app.sock` and its tmpfiles line), installs the boot unit and
+returns `switchable: true`; PHP stores it and regenerates the domain's configuration (the switchable
+snippet now reaches the same 1.0 instance through the pointer). The save's restart (or its build) is
+the first switch, from the 1.0 unit to slot `b`, after step 1 has seen the regenerated snippet
+active. If that switch fails, the 1.0 unit keeps serving and the status says "takes effect with the
+next successful restart".
+
+**Turning it off** (a save): with a slot live, `app-apply` keeps `switchable: true` (the pointer
+stays in use) and the save's restart or build switches to the 1.0 unit like any other switch (tcp:
+on `port`, which gets a new number when slot `a` holds it; unix: on `app.sock`, next to the slot
+socket), then retires the slots: no interruption. With nothing running, `app-apply` retires the
+slots at once; turned off before the first switch (the 1.0 unit is still live), it removes the
+slot units and env files that turning it on rendered. Once the helper reports `switchable: false`,
+the next save or the Reconcile (within 10 minutes) stores it together with the helper's `port`
+(the new number of the 1.0 unit: `app-apply` keeps the stored port over the panel's) and
+regenerates the 1.0 snippet, which therefore names the port the 1.0 unit listens on; the
+convergence then removes the root link, the include files and the tmpfiles `L` line as soon as the
+generated configuration no longer contains the marker. Changing the listen mode, the
+subscription's system user or the application root of an application that has or gets slots sets
+`restart_plain` (the web server configuration or the socket owner changes with it), also while the
+1.0 unit is still the live instance: one plain restart instead of a switch.
+
+Concurrency: for switchable applications `app-apply` holds the deploy lock (taken without waiting;
+lock order deploy, then ports) for its whole run: check, state write, rendering, pointer and job
+start; when a deployment holds it, the save is refused ("A deployment is running ...", as in 1.0 for
+saves with a build), except disabling and suspension, which stop the deploy unit first and then
+wait for the lock; Reconcile retries 10 minutes later. Restart is refused while a deployment runs. A
+trigger file touched during a switch starts another round afterwards, as in 1.0. Applications switch
+independently; their include writes, reloads and confirmations are serialized by the server-wide
+`web-reload` lock.
+
+### 12.6 Switching mechanisms
+
+**Unix** (no web server involvement): a slot unit binds `/run/runway/<id>/<slot>.sock`
+(`ExecStartPre=/bin/rm -f` of that path as the user, `UMask=0007`, `SocketBindDeny=any`). The web
+server's path is the root link `/run/runway/<id>.sock`, created and replaced only by the helper as
+root (symlink under a random name and `rename`, through the directory descriptor of `/run/runway`)
+and at boot by the tmpfiles `L` line. No instance can unlink or replace it: an old slot, the 1.0
+instance and an application that ignores `RUNWAY_SOCKET` only ever touch entries in the user's
+directory. A start command or framework configuration that hardcodes `app.sock` cannot take the
+traffic of a switchable application; during the first switch, while the link still points at the
+1.0 instance's `app.sock`, step 3 detects a new version that binds it and fails at once. The
+switchable nginx snippet uses `proxy_pass http://unix:/run/runway/<id>.sock:;`, the Apache snippet
+`"unix:/run/runway/<id>.sock|http://localhost/"` with `disablereuse=On` (finding 2 of §12.2), so
+Apache-only servers switch at once too. Turning the setting on and off therefore changes the
+snippet; the pointer reaches the right instance before and after the regeneration.
+
+**TCP: decision.** Two approaches were evaluated against the code:
+
+- (a) Regenerating the domain's configuration for every switch. `proxyTarget()` takes the port from
+  the domain setting, so the deploy job (root) would need a PHP round trip to store the live port
+  and trigger the regeneration, which races with panel saves of the same setting; it takes 4.5–7 s
+  synchronously (`httpdmng`) or completes asynchronously without a completion signal (`pm_WebServer`,
+  finding 7); it regenerates templates and gracefully restarts Apache for every switch even when
+  nginx carries the traffic. Rejected.
+- (b) **Chosen**: a stable snippet that Plesk renders once (when the application becomes
+  switchable) and a root-owned include that the helper rewrites, followed by a graceful reload it
+  performs itself: 0.03 s plus 0.1 s for nginx in the probe, an exact completion check (the new
+  worker generation) and a safe failure (the configuration test refuses a bad file, the old
+  configuration keeps serving). Like (a) it depends on the configuration test of the whole server:
+  a broken vhost elsewhere, or a marker that never appears because Plesk keeps the last good vhost
+  configuration, makes every switch fail; the job message then carries the output of `nginx -t`,
+  `apachectl configtest` or `httpdmng`, and Restart in place activates the new version (no automatic
+  fallback: it would cause the interruption the setting was turned on to avoid, silently).
+- Also rejected: a per-slot socket proxy behind the unix switch (`systemd-socket-proxyd`: no
+  reload, but two more units, a process, a hop and a connection cap per slot), DNAT rules (firewall
+  conflicts, not portable), `SO_REUSEPORT` or socket activation (need application changes), two
+  upstream servers with an `error_page` fallback (traffic reaches a slot before its readiness
+  check).
+
+nginx location of a switchable tcp application (headers and timeouts as today):
+
+```nginx
+# Runway: reverse proxy of the site to the application on 127.0.0.1 (port from /etc/runway/web/12.nginx.conf)
+# Runway: zero-downtime #12
+location ~ <regex> {
+    set $runway_upstream "unix:/run/runway/12.none:";
+    include /etc/runway/web/12.nginx[.]conf;
+    proxy_pass http://$runway_upstream;
+    proxy_redirect http://$runway_upstream/ /;
+    ...
+}
+```
+
+The `set` line is a fail-closed fallback: `/run/runway/12.none` never exists (only root writes
+`/run/runway`), so a missing include answers 502 instead of sending the domain's requests to
+whoever holds some port (finding 12: no port is safe). The glob keeps a missing file from breaking
+`nginx -t` for the whole server; the helper writes the include before the switchable snippet is
+first rendered and never removes it while the application is switchable. `proxy_redirect` restores
+the default `Location` rewriting that nginx drops when `proxy_pass` contains variables. Apache:
+`IncludeOptional /etc/runway/web/<id>.apache[.]conf`, then `<IfDefine !RUNWAY_UPSTREAM_<id>> Define
+RUNWAY_UPSTREAM_<id> unix:/run/runway/<id>.none|http://localhost </IfDefine>` (and a
+`RUNWAY_PORT_<id>` fallback for `ProxyPassReverse`), and `ProxyPass` to
+`${RUNWAY_UPSTREAM_<id>}<suffix>` with `retry=0 disablereuse=On` (plus `upgrade=websocket` as
+today). The helper always writes both files and reloads only the server that carries the traffic
+(nginx when it is active, else Apache), so a later change of the web server setup stays correct.
+The marker line `# Runway: zero-downtime #<id>` is part of every switchable snippet (both servers,
+both listen modes); the deploy job looks for it (step 1). `WebConfig` renders the switchable form
+while the stored `switchable` is true: `app-apply` returns `switchable = zero_downtime or slot !=
+""` and PHP stores it like `port`, so a snippet keeps its pointer until the application has really
+returned to the 1.0 unit.
+
+Cost: one graceful web server reload per tcp switch (for all sites; nginx workers holding long
+connections linger as after any Plesk regeneration, finding 10). Unix switches reload nothing.
+
+### 12.7 Tamper and hijack checks
+
+Unix socket check (`socket_check`; app-status, apps-list, every switch, the convergence): each of
+`app.sock`, `a.sock` and `b.sock` in `/run/runway/<id>/` must be absent or, by `lstat`, a socket
+owned by the application's user (the 1.0 rule, now for the three names, while the application has
+slots, §12.3, including an interrupted switch back to the 1.0 unit). Anything else is
+tampering as in 1.0: the containment stops and disables all three app units, root-unlinks the three
+entries through the directory descriptor, marks the application `tampered` and notes it in its
+journal; Start runs the live unit again. The codes and params of 1.0 (`socket_symlink`,
+`socket_not_socket`, `socket_owner` with `path`) name the offending entry. The root link
+`/run/runway/<id>.sock` lives in a directory only root writes; the convergence re-creates it when
+it is missing or does not point at exactly `<id>/a.sock`, `<id>/b.sock` or `<id>/app.sock`. The
+residual window of SECURITY.md stays with the same statement: the directory belongs to the
+application's user, who can replace the slot socket the link points to at any time; Runway finds it
+at the next check (status polling, every switch, the scheduled reconcile within 10 minutes).
+
+The root helper never connects to a path in the customer's directory after a separate check: the
+readiness, listener and health checks open the socket with `O_PATH|O_NOFOLLOW`, verify the
+descriptor (`S_ISSOCK`, owner) and connect through `/proc/self/fd/<n>` (finding 11), so a symlink
+swapped in between cannot make root talk to a root-only socket. This applies to the 1.0 `app.sock`
+checks as well.
+
+TCP: the status reports `listener` for the live port as today and, while no switch runs,
+`standby_listener` (`none|ok|foreign`, with `_detail`, `_code` `standby_none|standby_ok|
+standby_foreign` and `_params`) for the standby slot's port. The standby port is free between
+switches, so any local process may bind it; the next switch then allocates another port for N
+(step 1) instead of failing, and traffic is switched to a port only after checking that the
+application's uid alone listens on it, which is stricter than the 1.0 restart in place. Slot units
+may bind only their own port (`SocketBindAllow=tcp:<port_a>` or `tcp:<port_b>`,
+`SocketBindDeny=any`).
+
+### 12.8 Pointer ownership, convergence, boot, reconcile, upgrade
+
+- **Pointer writers**: the switch job, the plain restart, `app-apply` and the convergence, each
+  under the application's deploy lock and from a state read under it. `write_units()` renders the
+  units and env files only (for applications that are not switchable it also writes the 1.0
+  tmpfiles entry, as in 1.0). `reapply-all` and `rerender_runtime_apps` take the deploy lock
+  without waiting per application and leave the pointer alone while a deployment holds it.
+- **Convergence** (`converge(state)`, deploy lock taken without waiting, skipped while busy), for
+  applications with slots (§12.3: also an intent record alone), with slot unit or env files left
+  over, or with pointer files:
+  1. Live instance: with an intent record, the pointer's target when its unit is active (`N`: the
+     commit is completed), else the intent's source; without one, `slot`.
+  2. When the pointer differs: write it for the live instance (unix: link rename and tmpfiles line;
+     tcp: include files and a reload, with confirmation when another instance still runs).
+  3. Stop and disable the other app units only when the pointer is confirmed on the live instance
+     (unix: at once; tcp: the include is effective, `web_effective` of §12.4 step 1, otherwise a
+     reload with confirmation, and only while another instance still runs: nothing is reloaded
+     when nothing has to stop), with a journal note "left over from an interrupted switch". Clear
+     the intent record.
+  4. Enable the live unit when the application is enabled, not suspended and not stopped; it never
+     starts an application.
+  5. Setting off and the 1.0 unit live (after an interrupted switch back to it, or turned off
+     before the first switch) with slot files left: `retire_slots()` once no slot runs (a slot
+     that still runs while the pointer is in use stops in step 3 first; outside boot).
+  6. Not switchable any more (setting off, `slot` `""`) and the domain's generated configuration
+     without the marker: remove the root link, the include files and the tmpfiles `L` line.
+  It is called by `apps-list {converge: true}` (sent by `Modules_Runway_Reconcile` only, never by
+  the overview), by the boot unit, by every switch (step 1), and before `app-apply`, Start,
+  Restart and `reapply-all` act on an application with an intent record.
+- **Boot**: `runway-converge.service` runs `runway-helper _converge` before nginx and Apache start
+  and before the slot units: for every switchable application, without reloads, the live instance is
+  the enabled app unit (the pointer's target when several are enabled, the state's `slot` when none
+  is); the pointer files are written for it, other app units are disabled and their queued starts
+  cancelled (`systemctl stop --no-block`); retiring slots waits for the next run after boot. A
+  crash in the tcp window (include rewritten, commit not written) therefore never leaves nginx
+  pointing at a port nobody listens on after a reboot, and since the tmpfiles `L` line follows the
+  link rename at once, a crash in the unix window never revives a link to the old slot.
+- `apps-list`: the socket check of §12.7 with containment; `active_state`, `sub_state`, `result`
+  and `start_limit_hit` of the live unit; `memory_bytes` is the sum of the application's running
+  units; new fields `zero_downtime`, `switchable`, `slot`, `live_port`, `port_a`, `port_b`,
+  `switching` (`port` stays the 1.0 port).
+- Reconcile also re-applies (restart false) when `switchable` of `apps-list` differs from the
+  stored configuration, and for applications that are not switchable when `port` differs (a failed
+  save after a successful `app-apply`, a restore of the domain settings, a switch back to the 1.0
+  unit that gave it a new port), so the snippet follows the helper: `app-apply` keeps the stored
+  port over the payload's (also for applications without the setting, whose stored port is the
+  one the running service uses), returns it, and PHP stores it before it regenerates the snippet.
+  Without that, a re-apply without restart would write the panel's stale port into the
+  environment file of a service that keeps listening on the other one.
+- Every lifecycle command handles the three app units, the three env files, the slot sockets, the
+  root link, the include files, `port_a`/`port_b` and the tmpfiles entry: `app-apply` (disable and
+  suspend stop all three), `app-action`, `contain_tampering`, `app-remove` (removes everything and
+  frees the ports with the state file) and `uninstall` (as today; `/etc/runway/web` goes with
+  `/etc/runway`, the boot unit is removed).
+- Recover (start limit hit): plain start of the live unit.
+- `internal_deploy` waits up to 120 s for the deploy lock (the convergence and `app-apply` hold it
+  briefly); when it cannot get it, a panel request marks the job failed and the job re-arms itself
+  (`runway-redeploy-<id>`) so a trigger file is not lost. Every round of a job budgets
+  `build_timeout + 300` plus the switch allowance, the value `deploy_timeout()` adds.
+- Upgrade 1.0.0 → 1.1.0: `reapply-all` (post-install `install`) re-validates every stored state;
+  1.0 states get the defaults and render byte-identical 1.0 files; states with the setting on render
+  both slot units and env files, the 1.0 unit only while `slot` is `""`, the pointer (deploy lock
+  free; an intent record is settled by the convergence first) and the boot unit, and create the
+  socket directories; nothing is started or stopped except the leftover instance of an
+  interrupted switch (convergence).
+  Root-privileged Exec lines are stripped from every app unit file of an application that cannot be
+  re-rendered (all three names). Post-install's regeneration of the web server configuration
+  renders the snippets. A downgrade to 1.0 is not supported for applications with the setting on:
+  turn it off first.
+
+### 12.9 Limits and administrator control
+
+Server settings (*Runway > Settings*, section "Zero-downtime deployments"):
+
+| Key | Meaning | Default |
+|---|---|---|
+| `zeroDowntimeCustomers` | customers may turn the setting on (administrators always may; anyone may turn it off) | off |
+| `zeroDowntimeMaxReady` | upper limit of `readyTimeout` (5–900 s) | 120 |
+| `zeroDowntimeMaxDrain` | upper limit of `drainSeconds` (0–300 s) | 30 |
+
+PHP refuses per-application values above the caps (field errors) and sends the stored values
+clamped to the current caps, so lowering a cap takes effect at the next apply. With the caps a
+switch keeps two instances for at most `maxReady + maxDrain + 30` seconds. Not adopted: a per-app
+slice with one aggregate limit (both instances would compete for one `MemoryMax`; the kernel could
+kill the serving instance during a switch, while per-instance limits were a requirement) and a rate
+limit between switches (the administrator's grant and the caps bound the cost; a rate limit would
+delay legitimate back-to-back deployments).
+
+### 12.10 API, UI, CLI
+
+API (§6) and helper contract (§7):
+
+- Config fields `zeroDowntime` (bool, parsed like `autoDeploy`), `readyTimeout` (seconds 5 to the
+  cap), `drainSeconds` (seconds 0 to the cap); field errors `errorReadyTimeout`,
+  `errorDrainSeconds`, `errorZeroDowntimeAdmin` (a customer turns it on while the server setting is
+  off); `switchable` is read-only. The payload sends `zero_downtime` only for listen `tcp|unix`
+  (like `health_path`) plus `ready_timeout` and `drain_seconds`; app-apply's result adds `switchable`
+  and `job` (the switch job it started, else null).
+- `api/app` adds `zeroDowntimeAllowed` (the user may turn it on) and `zeroDowntimeCaps: {ready,
+  drain}`.
+- `api/app/save` adds `job` and the message `messageSavedSwitching`; `api/app/control` `restart` of a
+  switchable application whose live unit runs answers `{message: messageSwitchStarted, job}` (helper
+  `app-action restart` → `{action, job}`; otherwise a plain start without `job`, as in 1.0);
+  `{op: restart, plain: true}` restarts in place (`messageAction_restartPlain`).
+- `api/app/status` (helper `app-status`) adds `zero_downtime`, `switchable`, `slot`, `switched_at`,
+  `restart_plain`, `ready_timeout`, `drain_seconds`, `slots: {"": ..., a, b}` (each `{unit,
+  active_state, sub_state, main_pid, memory_bytes, started_iso, enabled, endpoint, live}` of the
+  existing units), `proxy_socket` (the root link), `standby_listener` (with `standby_detail`,
+  `standby_code`, `standby_params`), `switch` (the intent record) and, in `deploy`, the switch
+  fields of §12.4 plus `phase_elapsed`. `service` describes the live unit, `port` the live port,
+  `socket` the live socket path.
+- `api/app/logs?kind=app`: `journalctl -u runway-app-<id>.service -u runway-app-<id>-a.service -u
+  runway-app-<id>-b.service`, merged by time; every line names its identifier
+  (`runway-app-<id>-a`), Runway's notes keep `OBJECT_SYSTEMD_UNIT=runway-app-<id>.service`.
+- `api/overview`: applications add `zeroDowntime` and `switching`; `port` is the live port.
+- `api/settings`: the three server settings of §12.9.
+
+UI:
+
+- Settings form, "Advanced" (hidden for workers): checkbox "Zero-downtime deployments" with a hint
+  that says: the new version starts next to the running one and takes over when it listens (and its
+  health path answers); both run for a short time, so memory and CPU usage can double (limits apply
+  per version); the application must tolerate two instances briefly (database migrations,
+  schedulers, SQLite or file locks; embedded single-writer databases cannot use it); the Unix socket
+  mode switches without reloading the web server. When checked: "Readiness timeout" and "Drain
+  period" (seconds, `dir="ltr"` inputs; the stored values or the defaults 60 and 10, lowered to the
+  current caps, so that ticking the box never sends a value above a cap; the hints name the caps,
+  0 included). Disabled with an explanation for customers while the server setting is off (unless
+  it is already on).
+- Status card: fact "Zero-downtime" ("On, slot b since <time>"; "On, takes effect with the next
+  restart" while `slot` is `""`; "Off, slot a still serving until the next restart" while turning
+  off); while a switch runs, a progress row ("Switching to slot a: waiting for the new version,
+  12 s of 60 s", `Domain.status.switchPhase.<phase>`) and a "Versions" row with the running slots
+  (state and memory). A "Restart in place" button for switchable applications; Restart of a
+  switchable application follows the deploy log like "Build & restart". Slot names, ports and paths
+  go through `Mono` (`dir="ltr"`).
+- Logs card: unchanged tabs; for switchable applications a muted hint "Both versions write here; the
+  prefix names the slot".
+- Server settings page: section "Zero-downtime deployments" with the three settings.
+- New texts: en-US and tr-TR; the other 30 locales follow (until then `tests/check_locales.py`
+  reports only their missing keys).
+
+CLI (§9):
+
+- `--status` adds `Zero-downtime` (`on (slot b, switched 2026-11-12T10:15:00+00:00)` or `off`),
+  `Slots` (`a inactive; b active (running), 127.0.0.1:20031`) and, during a switch, `Switch`
+  (`waiting for the new version (12/60 s)`); `Listen` shows the live endpoint (`unix
+  /run/runway/12.sock -> 12/b.sock`).
+- `--restart <domain> [-plain] [-no-wait]`: for switchable applications it starts the switch job
+  and waits like `--deploy` (prints the job log; exit 1 when the switch failed and the old version
+  keeps serving); `-plain` restarts in place. `--list` marks switchable applications (`zd` after the
+  state) and shows the live port.
+
+### 12.11 Tests
+
+- `tests/helper-smoke.sh` (fake id 999 with a fake generated configuration that carries the marker
+  and an nginx test server on 127.0.0.1 that uses the switchable snippets): with the Go sample in
+  both listen modes, a request loop through nginx counts every non-2xx answer (expected 0) during a
+  deploy and during a restart; a new version whose health path answers 503 fails the job while the
+  old one keeps serving; an old slot that unlinks its socket on exit leaves the active one
+  reachable; the tamper check accepts the root link and still contains a symlink at a slot socket;
+  a new version that binds `app.sock` fails the first switch at once; a held standby port moves to
+  another port; a save during a switch is refused; Stop during a switch; a job killed (fault flag)
+  after the traffic moved is settled by the convergence (`runway-helper _converge`, tcp and unix);
+  turning it off from slot a (tcp) gives the 1.0 unit a new port, and a re-apply with the panel's
+  old port and no restart (as the Reconcile sends it) keeps the port the 1.0 unit listens on;
+  turning it off with the job killed after its commit (unix) stays switchable with its intent
+  record until the convergence stops the old slot, enables the 1.0 unit and retires the slots;
+  a listen mode change while the 1.0 unit is live restarts it in place; a live slot that becomes a
+  worker with a build command is restarted as the 1.0 unit by the deployment; a simulated boot
+  (`/run/runway` entries removed, `systemd-tmpfiles --create`) recreates the root link of the live
+  slot; turning the setting off returns to the 1.0 file layout; suspension and removal clean up
+  both slots; Java's and .NET's listen variables of each slot carry its own endpoint (unix mode
+  without slot ports, as `app-apply` writes it); a 1.0 state renders byte-identical files compared
+  with the 1.0.0 helper (copied from `git show v1.0.0:src/sbin/runway-helper` by
+  `.github/scripts/plesk-e2e.sh`, skipped without it).
+- Test-only fault flag `/var/lib/runway/test-switch-fault` (root-owned regular file younger than one
+  hour, content `<kill|term>:<point>`, points: the phases of §12.4 plus `moved` after the traffic
+  moved and `committed` after the commit): the switch job sends itself SIGKILL or SIGTERM there.
+- `tests/api-smoke.sh`: types, ranges and caps of the new fields and settings, workers ignore the
+  flag; with `RUNWAY_SMOKE_DEPLOY=1` a request loop through nginx counts every non-2xx answer
+  while the setting is turned on, during Build & restart and Restart (job), and again during CLI
+  `--restart`, turning it off (from slot a, so the 1.0 unit gets a new port) and the CLI
+  `--reconcile` that stores the helper's port and regenerates the 1.0 snippet; Restart in place
+  (an interruption by design) and CLI `--status` run between the two loops;
+  `tests/customer-smoke.sh`: a customer cannot turn it on while the server setting is off;
+  `tests/runtime-e2e.sh` (Go in CI): the Go sample in tcp and unix mode with a request loop through
+  nginx while the setting is turned on, during Build & restart and Restart, and while it is turned
+  off.
+- `tests/check_locales.py` with the new keys; `php -l`, pyflakes and the Python 3.8 grammar check as
+  today.
+
+### 12.12 Documentation with the implementation
+
+README (a "Zero-downtime deployments" section: behaviour, the per-instance limits, the requirements
+on the application including `RUNWAY_SOCKET` instead of a fixed path, safe build commands, tcp reload
+versus unix, turning it on and off, Restart in place, failure behaviour), SECURITY.md (the root link,
+the residual window of the slot socket it points to, the standby port), §3, §6, §7 and §9 of this
+file, CHANGELOG `[Unreleased]`.

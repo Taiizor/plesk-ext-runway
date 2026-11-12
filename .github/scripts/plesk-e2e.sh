@@ -166,6 +166,12 @@ cmd_smoke() {
     if want helper; then
         log "tests/helper-smoke.sh (inside the container)"
         dock cp "$ROOT/tests/helper-smoke.sh" "$CONTAINER:/root/helper-smoke.sh"
+        # The 1.0.0 helper, so helper-smoke can compare the files of applications without
+        # zero-downtime deployments byte for byte (skipped when the tag is not fetched).
+        in_c rm -f /root/runway-helper-1.0.0
+        if git -C "$ROOT" cat-file -e v1.0.0:src/sbin/runway-helper 2>/dev/null; then
+            git -C "$ROOT" show v1.0.0:src/sbin/runway-helper | in_ci sh -c 'cat > /root/runway-helper-1.0.0'
+        fi
         in_c env GO_VERSION="$GO_VERSION" RUNWAY_SMOKE_SELF_UPDATE="$RUNWAY_SMOKE_SELF_UPDATE" \
             bash /root/helper-smoke.sh || rc=1
     fi

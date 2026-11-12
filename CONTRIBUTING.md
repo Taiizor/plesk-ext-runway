@@ -64,7 +64,9 @@ CI (`.github/workflows/ci.yml`):
    `tests/helper-smoke.sh` with `RUNWAY_SMOKE_SELF_UPDATE=1` (its self-update section then also
    upgrades the installed extension to a repackaged release+1 through the built-in updater; that
    cannot be undone, so leave it off locally unless the container is thrown away afterwards:
-   `plesk-e2e.sh start` recreates it), *panel* runs `tests/api-smoke.sh` (with a real deployment) and
+   `plesk-e2e.sh start` recreates it; its zero-downtime section also checks that applications
+   without the setting get the same files as from the 1.0.0 helper, which `plesk-e2e.sh smoke`
+   takes from the `v1.0.0` tag), *panel* runs `tests/api-smoke.sh` (with a real deployment) and
    `tests/customer-smoke.sh` (skipped without the customer), *runtime* runs
    `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`). `.github/scripts/plesk-e2e.sh` does
    the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`

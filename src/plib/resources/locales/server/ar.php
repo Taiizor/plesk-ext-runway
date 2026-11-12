@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'يجب أن يتكون المجموع الاختباري SHA-256 من 64 حرفًا سداسيًا عشريًا.',
     'errorFetchFilename' => 'يمكن أن يحتوي اسم الملف على أحرف وأرقام و . _ + - فقط (128 حرفًا كحد أقصى).',
     'errorUpdateVersion' => 'يجب أن يكون الإصدار بالصيغة 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'يمكن للمسؤول فقط تفعيل النشر دون توقف على هذا الخادم.',
+    'errorReadyTimeout' => 'يجب أن تكون مهلة الجاهزية عددًا صحيحًا من الثواني بين %%min%% و%%max%%.',
+    'errorDrainSeconds' => 'يجب أن تكون فترة التصريف عددًا صحيحًا من الثواني بين %%min%% و%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'حد الذاكرة (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'تمت كتابة التطبيق النموذجي (ملف واحد) وتم تحديث الإعدادات.',
     'messageFetchStarted' => 'بدأ التنزيل. تابعه في سجل "البناء والنشر".',
     'messageUpdateStarted' => 'بدأ التحديث إلى Runway %%version%%. يظهر تقدمه أدناه.',
+    'messageSavedSwitching' => 'تم حفظ الإعدادات. يبدأ الإصدار الجديد بجانب الإصدار الجاري ويتولى استقبال حركة المرور عندما يصبح جاهزًا؛ تابع ذلك في سجل "البناء والنشر".',
+    'messageSwitchStarted' => 'يبدأ الإصدار الجديد بجانب الإصدار الجاري ويتولى استقبال حركة المرور عندما يصبح جاهزًا. تابع ذلك في سجل "البناء والنشر".',
+    'messageAction_restartPlain' => 'جارٍ إعادة تشغيل التطبيق في مكانه.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'يسرد التطبيقات المكوّنة وحالتها.',
     'cli.commands.status' => 'يعرض حالة تطبيق نطاق ما: --status <domain>',
     'cli.commands.start' => 'يبدأ تشغيل تطبيق نطاق ما: --start <domain>',
     'cli.commands.stop' => 'يوقف تطبيق نطاق ما؛ يبقى متوقفًا (حتى بعد إعادة تشغيل الخادم أو النشر) إلى أن يُنفَّذ --start أو --restart: --stop <domain>',
-    'cli.commands.restart' => 'يعيد تشغيل تطبيق نطاق ما: --restart <domain>',
+    'cli.commands.restart' => 'يعيد تشغيل تطبيق نطاق ما؛ مع النشر دون توقف يبدأ الإصدار الجديد بجانب الإصدار الجاري وينتظر الأمر اكتمال التبديل (-plain يعيد تشغيله في مكانه): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'يبني تطبيق نطاق ما ويعيد تشغيله وينتظر النتيجة (التطبيق المتوقف يُبنى لكنه يبقى متوقفًا): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'يمكّن التطبيق المكوّن لنطاق ما: --enable <domain>',
     'cli.commands.disable' => 'يعطّل تطبيق نطاق ما: --disable <domain>',

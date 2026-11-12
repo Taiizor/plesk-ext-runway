@@ -25,7 +25,7 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
 [Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
-[Listen modes](#listen-modes) · [Deploying with Git](#deploying-with-git) ·
+[Listen modes](#listen-modes) · [Zero-downtime deployments](#zero-downtime-deployments) · [Deploying with Git](#deploying-with-git) ·
 [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
 [License](#license)
@@ -48,7 +48,8 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - One-click installation of build dependencies (C compiler, `pkg-config`, OpenSSL headers and
   related packages) for runtimes that compile native code.
 - Server-wide settings: port range, build timeout, default resource limits for applications and
-  builds, maximum number of applications per subscription.
+  builds, maximum number of applications per subscription, zero-downtime deployments for
+  customers and their time limits.
 - Per-application memory, CPU and task limits that customers cannot change.
 - An overview of every application on the server with its state.
 
@@ -66,6 +67,8 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - **Create sample app** writes a minimal application for the chosen runtime; prebuilt binaries
   or archives can be fetched from an HTTPS URL (optional SHA-256 check).
 - Trigger files for Git and CI deployments.
+- Optional **zero-downtime deployments**: the new version starts next to the running one and
+  takes over when it is ready; a version that does not become ready never gets traffic.
 
 **Languages**: the interface follows the panel language, in all 32 languages of Plesk. English and
 Turkish are written by hand; the other 30 were machine-translated and reviewed, and corrections
@@ -253,6 +256,74 @@ The **proxy mode** decides what nginx forwards: the whole domain (`web`) or one 
 URL prefixes such as `/assets`) are always served from the document root. Let's Encrypt
 (`/.well-known/acme-challenge/`) and the Plesk web statistics are never proxied.
 
+## Zero-downtime deployments
+
+By default a deployment restarts the application: the site answers *502 Bad Gateway* while the
+new version starts, and a version that crashes on start leaves the site down. With
+**Zero-downtime deployments** (domain settings, *Advanced*; for TCP and Unix socket applications,
+not for workers) a deployment, a restart, a trigger file and saving the settings work like this
+instead:
+
+1. The new version starts in a second instance (a **slot**: `runway-app-<id>-a` or `-b`) next to
+   the running one, on its own port or socket (`PORT`, `LISTEN_ADDR` or `RUNWAY_SOCKET` name it;
+   `RUNWAY_SLOT` says which slot).
+2. Runway waits until it listens and, when a health check path is set, until that path answers
+   2xx or 3xx, at most for the **readiness timeout** (default 60 s).
+3. The web server's traffic moves to the new version: in **Unix socket** mode by atomically
+   re-pointing a root-owned symbolic link (`/run/runway/<id>.sock`, nothing is reloaded); in
+   **TCP** mode by rewriting a root-owned include file (`/etc/runway/web/<id>.nginx.conf`) and a
+   graceful reload of nginx (or Apache when nginx is off), confirmed by its new worker processes.
+4. Requests in flight on the old version may finish for up to the **drain period** (default
+   10 s); then the old version stops.
+
+A new version that exits, does not listen or fails its health check in time is stopped; the old
+version keeps serving and the deployment is reported as failed with the reason. **Restart in
+place** (a button next to *Restart*, `plesk ext runway --restart <domain> -plain`) restarts the
+running version the classic way, for example to replace a running but broken instance or to run a
+build whose switch failed.
+
+Things to know before turning it on:
+
+- **Both versions run for a short time.** Memory, CPU and task limits apply to each version, so
+  the application's usage can double for up to the readiness timeout plus the drain period. Java
+  applications should get a memory limit: two JVMs started with `-XX:MaxRAMPercentage=75` and no
+  limit both size their heap against the server's memory.
+- **The application must tolerate two instances briefly**: database migrations at startup,
+  schedulers or cron jobs inside the application, SQLite databases and file locks. Applications
+  with an embedded single-writer database or a lock file (bbolt, Badger, LevelDB, Prometheus TSDB,
+  SQLite in exclusive mode, pid files) cannot start a second instance: keep the setting off.
+- **Listen where Runway tells you.** The application must use `RUNWAY_SOCKET` or `PORT`, not a
+  fixed path or port: a configuration that hardcodes `/run/runway/<id>/app.sock` (for example in
+  `gunicorn.conf.py`, `config/puma.rb` or a Caddyfile) or a port makes the switch fail.
+- **Builds happen in place**, as before: the old version keeps serving while the build replaces
+  files under it. Builds that replace files by renaming them are safe (`go build`, `cargo build`).
+  Builds that overwrite files a running process uses can disturb the old version until it stops:
+  publish .NET applications into a new directory and rename it
+  (`dotnet publish -c Release -o publish.new && rm -rf publish.old && { [ ! -d publish ] || mv publish publish.old; } && mv publish.new publish`),
+  copy a Java jar to a new name instead of rewriting the running one, and expect interpreted
+  applications (Python, Ruby, Bun, PHP) that load modules lazily to see the new dependencies.
+- **Long connections** (WebSockets, server-sent events) to the old version are closed when it
+  stops; clients reconnect to the new one. In TCP mode an upload that is still running when the
+  drain period ends can fail.
+- **Unix socket mode is recommended**: its switch needs no web server reload. A TCP switch
+  reloads the web server gracefully; if the web server configuration of the server is broken
+  elsewhere, the reload fails and the deployment fails with the output of `nginx -t` (the running
+  version keeps serving; *Restart in place* runs the new one).
+
+Turning the setting **on** needs no restart of its own: saving switches from the classic
+instance to slot `b` once Plesk has regenerated the domain's web server configuration. Turning it
+**off** switches back to the classic instance (`runway-app-<id>.service`) the same way, without an
+interruption (in TCP mode it may get a new port, which the panel takes over with the next
+reconcile, within 10 minutes). Changing the listen mode or the subscription's system user of an
+application that uses the setting (also while turning it off) restarts it once, in place, instead
+of switching. The status card shows the live slot, the progress of a running
+switch and both versions during it; the application log contains both slots' output (each line
+names `runway-app-<id>-a` or `-b`).
+
+Customers can turn it on only when the administrator allows it (*Settings*, *Zero-downtime
+deployments for customers*); the administrator also caps the readiness timeout (default 120 s)
+and the drain period (default 30 s) of every application.
+
 ## Deploying with Git
 
 Runway watches two trigger files in the application directory (a systemd path unit, active
@@ -288,7 +359,8 @@ Runway extends the Plesk CLI (`pm_Hook_ApiCli`, administrators only):
 ```sh
 plesk ext runway --list                              # applications and their state
 plesk ext runway --status example.com
-plesk ext runway --start example.com                 # also --restart; --stop keeps it stopped
+plesk ext runway --start example.com                 # --stop keeps it stopped
+plesk ext runway --restart example.com               # zero-downtime: waits for the switch; -plain restarts in place
 plesk ext runway --deploy example.com                # build + restart (a stopped app is only built)
 plesk ext runway --enable example.com                # also --disable
 plesk ext runway --toolchains                        # installed toolchains per runtime
@@ -316,8 +388,11 @@ plesk ext runway --update                            # update Runway to it (see 
 | Build command | runs with `bash -c` in the application directory as the system user | per runtime |
 | Start command | runs with `bash -c` in the application directory as the system user | per runtime |
 | Trigger files | watch `tmp/deploy.txt` and `tmp/restart.txt` | on |
-| Environment variables | `KEY=value` lines; `PORT`, `HOST`, `LISTEN_ADDR`, `HOME`, `USER`, `LOGNAME` and the `RUNWAY_*` variables set by Runway are reserved; the loader variables `LD_PRELOAD`, `LD_AUDIT`, `GCONV_PATH` and `GLIBC_TUNABLES` cannot be set here (put them in the start command, e.g. `LD_PRELOAD=... ./app`) | |
+| Environment variables | `KEY=value` lines; `PORT`, `HOST`, `LISTEN_ADDR`, `HOME`, `USER`, `LOGNAME` and the `RUNWAY_*` variables set by Runway are reserved (except `RUNWAY_SLOT`, which only the units of [zero-downtime](#zero-downtime-deployments) slots get: there Runway's value replaces a variable of that name); the loader variables `LD_PRELOAD`, `LD_AUDIT`, `GCONV_PATH` and `GLIBC_TUNABLES` cannot be set here (put them in the start command, e.g. `LD_PRELOAD=... ./app`) | |
 | Memory, CPU, tasks | `MemoryMax`, `CPUQuota`, `TasksMax` of the service; administrators only. Untouched, the application follows the server settings; a value changed on the domain page stays for that application | server settings |
+| Zero-downtime deployments | start the new version next to the running one and switch when it is ready (TCP and Unix socket only, see [Zero-downtime deployments](#zero-downtime-deployments)); customers only when the server setting allows it | off |
+| Readiness timeout | seconds the new version may take to listen and pass the health check (5 up to the server's maximum) | 60 |
+| Drain period | seconds requests in flight may finish on the old version after a switch (0 up to the server's maximum) | 10 |
 
 ### Server settings (*Runway > Settings*)
 
@@ -330,6 +405,8 @@ plesk ext runway --update                            # update Runway to it (see 
 | Applications per subscription | maximum number of **enabled** applications per subscription, checked when an application is enabled (0 = unlimited) | 0 |
 | Check for updates twice a day | ask GitHub for the latest Runway release (see [Updating](#updating)) | on |
 | Install updates automatically | install a newer release as soon as a check finds it (requires the check) | off |
+| Zero-downtime deployments for customers | customers may turn zero-downtime deployments on (administrators always may) | off |
+| Maximum readiness timeout / drain period | upper limits of the two timeouts of every application | 120 / 30 |
 
 ### Files on the server
 
@@ -339,10 +416,11 @@ plesk ext runway --update                            # update Runway to it (see 
 | Toolchains | `/opt/runway/<runtime>/...` (`/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/dotnet`, `/opt/runway/uv/uv`, ...) |
 | State, job logs, caches | `/var/lib/runway/{apps,jobs,locks,cache}` (root, 0700); the updater's last check in `/var/lib/runway/cache/update.json` |
 | Environment files | `/etc/runway/env/<domainId>.env` (root, 0600) |
-| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, `runway-job-admin.service` |
-| Unix sockets | `/run/runway/<id>/app.sock`; the directory is recreated at boot from `/etc/tmpfiles.d/runway-<id>.conf` |
+| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, `runway-job-admin.service`; with zero-downtime deployments the slots `runway-app-<id>-a.service` and `-b.service` (environment files `<id>-a.env`, `<id>-b.env`) and `runway-converge.service` (repairs an interrupted switch at boot) |
+| Unix sockets | `/run/runway/<id>/app.sock`; the directory is recreated at boot from `/etc/tmpfiles.d/runway-<id>.conf`. Zero-downtime: `a.sock`, `b.sock` and the root-owned link `/run/runway/<id>.sock` the web server uses |
+| Zero-downtime include files (TCP) | `/etc/runway/web/<id>.nginx.conf` and `<id>.apache.conf` (the live port) |
 | Per-user caches | `~/.runway/` in the subscription |
-| Logs | `/var/log/plesk/panel.log` (PHP), `journalctl -u runway-app-<id>` (applications), `/var/lib/runway/jobs/*.log` (builds and toolchain jobs) |
+| Logs | `/var/log/plesk/panel.log` (PHP), `journalctl -u runway-app-<id>` (applications; with zero-downtime deployments also `-u runway-app-<id>-a -u runway-app-<id>-b`), `/var/lib/runway/jobs/*.log` (builds and toolchain jobs) |
 
 ## How it works
 

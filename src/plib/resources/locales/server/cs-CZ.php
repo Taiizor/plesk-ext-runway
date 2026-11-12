@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Kontrolní součet SHA-256 musí mít 64 šestnáctkových znaků.',
     'errorFetchFilename' => 'Název souboru smí obsahovat pouze písmena, číslice a . _ + - (max. 128 znaků).',
     'errorUpdateVersion' => 'Verze musí mít tvar 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Nasazení bez výpadku může na tomto serveru zapnout pouze administrátor.',
+    'errorReadyTimeout' => 'Časový limit připravenosti musí být celý počet sekund od %%min%% do %%max%%.',
+    'errorDrainSeconds' => 'Doba doběhu musí být celý počet sekund od %%min%% do %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit paměti (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Ukázková aplikace byla vytvořena (jeden soubor) a nastavení bylo aktualizováno.',
     'messageFetchStarted' => 'Stahování bylo zahájeno. Průběh sledujte v protokolu „Sestavení a nasazení“.',
     'messageUpdateStarted' => 'Aktualizace na Runway %%version%% byla zahájena. Její průběh je zobrazen níže.',
+    'messageSavedSwitching' => 'Nastavení bylo uloženo. Nová verze se spustí vedle běžící verze a převezme provoz, jakmile bude připravena; průběh sledujte v protokolu „Sestavení a nasazení“.',
+    'messageSwitchStarted' => 'Nová verze se spouští vedle běžící verze a převezme provoz, jakmile bude připravena. Průběh sledujte v protokolu „Sestavení a nasazení“.',
+    'messageAction_restartPlain' => 'Aplikace se restartuje na místě.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Vypíše nakonfigurované aplikace a jejich stav.',
     'cli.commands.status' => 'Zobrazí stav aplikace domény: --status <doména>',
     'cli.commands.start' => 'Spustí aplikaci domény: --start <doména>',
     'cli.commands.stop' => 'Zastaví aplikaci domény; zůstane zastavená (i po restartu serveru nebo nasazení), dokud nebude spuštěna pomocí --start nebo --restart: --stop <doména>',
-    'cli.commands.restart' => 'Restartuje aplikaci domény: --restart <doména>',
+    'cli.commands.restart' => 'Restartuje aplikaci domény; při nasazení bez výpadku se nová verze spustí vedle běžící a příkaz počká na přepnutí (-plain restartuje na místě): --restart <doména> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Sestaví a restartuje aplikaci domény a počká na výsledek (zastavená aplikace se sestaví, ale zůstane zastavená): --deploy <doména> [-no-wait]',
     'cli.commands.enable' => 'Povolí nakonfigurovanou aplikaci domény: --enable <doména>',
     'cli.commands.disable' => 'Zakáže aplikaci domény: --disable <doména>',

@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256 체크섬은 64자리 16진수 문자여야 합니다.',
     'errorFetchFilename' => '파일 이름에는 문자, 숫자 및 . _ + -만 사용할 수 있습니다(최대 128자).',
     'errorUpdateVersion' => '버전은 1.2.3-1과 같은 형식이어야 합니다.',
+    'errorZeroDowntimeAdmin' => '이 서버에서는 관리자만 무중단 배포를 켤 수 있습니다.',
+    'errorReadyTimeout' => '준비 제한 시간은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
+    'errorDrainSeconds' => '드레이닝 기간은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
 
     // Field names used in error messages
     'fieldMemoryMb' => '메모리 제한(MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => '샘플 애플리케이션이 생성되었으며(파일 1개) 설정이 업데이트되었습니다.',
     'messageFetchStarted' => '다운로드가 시작되었습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
     'messageUpdateStarted' => 'Runway %%version%%(으)로의 업데이트가 시작되었습니다. 진행 상황은 아래에 표시됩니다.',
+    'messageSavedSwitching' => '설정이 저장되었습니다. 새 버전이 실행 중인 버전과 나란히 시작되고 준비되면 트래픽을 넘겨받습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+    'messageSwitchStarted' => '새 버전이 실행 중인 버전과 나란히 시작되며 준비되면 트래픽을 넘겨받습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+    'messageAction_restartPlain' => '애플리케이션을 제자리에서 재시작하는 중입니다.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '구성된 애플리케이션과 그 상태를 나열합니다.',
     'cli.commands.status' => '도메인의 애플리케이션 상태를 표시합니다: --status <도메인>',
     'cli.commands.start' => '도메인의 애플리케이션을 시작합니다: --start <도메인>',
     'cli.commands.stop' => '도메인의 애플리케이션을 중지합니다. --start 또는 --restart 전까지(재부팅이나 배포 후에도) 중지된 상태로 유지됩니다: --stop <도메인>',
-    'cli.commands.restart' => '도메인의 애플리케이션을 재시작합니다: --restart <도메인>',
+    'cli.commands.restart' => '도메인의 애플리케이션을 재시작합니다. 무중단 배포에서는 새 버전이 실행 중인 버전과 나란히 시작되고 명령은 전환을 기다립니다(-plain은 제자리에서 재시작): --restart <도메인> [-plain] [-no-wait]',
     'cli.commands.deploy' => '도메인의 애플리케이션을 빌드하고 재시작한 뒤 결과를 기다립니다(중지된 애플리케이션은 빌드되지만 중지된 상태로 유지됩니다): --deploy <도메인> [-no-wait]',
     'cli.commands.enable' => '도메인의 구성된 애플리케이션을 활성화합니다: --enable <도메인>',
     'cli.commands.disable' => '도메인의 애플리케이션을 비활성화합니다: --disable <도메인>',

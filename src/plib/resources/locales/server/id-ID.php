@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Checksum SHA-256 harus terdiri dari 64 karakter heksadesimal.',
     'errorFetchFilename' => 'Nama file hanya boleh berisi huruf, angka, dan . _ + - (maks. 128 karakter).',
     'errorUpdateVersion' => 'Versi harus berformat seperti 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Hanya administrator yang dapat mengaktifkan deployment tanpa downtime di server ini.',
+    'errorReadyTimeout' => 'Batas waktu kesiapan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
+    'errorDrainSeconds' => 'Periode pengurasan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Batas memori (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Aplikasi contoh telah ditulis (satu file) dan pengaturan diperbarui.',
     'messageFetchStarted' => 'Unduhan telah dimulai. Pantau di log "Build & deploy".',
     'messageUpdateStarted' => 'Pembaruan ke Runway %%version%% telah dimulai. Kemajuannya ditampilkan di bawah.',
+    'messageSavedSwitching' => 'Pengaturan telah disimpan. Versi baru dimulai di samping versi yang sedang berjalan dan mengambil alih setelah siap; pantau di log "Build & deploy".',
+    'messageSwitchStarted' => 'Versi baru dimulai di samping versi yang sedang berjalan dan mengambil alih setelah siap. Pantau di log "Build & deploy".',
+    'messageAction_restartPlain' => 'Aplikasi sedang dimulai ulang di tempat.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Menampilkan daftar aplikasi yang dikonfigurasi beserta statusnya.',
     'cli.commands.status' => 'Menampilkan status aplikasi suatu domain: --status <domain>',
     'cli.commands.start' => 'Memulai aplikasi suatu domain: --start <domain>',
     'cli.commands.stop' => 'Menghentikan aplikasi suatu domain; aplikasi tetap berhenti (termasuk setelah reboot atau deployment) hingga --start atau --restart: --stop <domain>',
-    'cli.commands.restart' => 'Memulai ulang aplikasi suatu domain: --restart <domain>',
+    'cli.commands.restart' => 'Memulai ulang aplikasi suatu domain; dengan deployment tanpa downtime, versi baru dimulai di samping versi yang sedang berjalan dan perintah menunggu peralihan (-plain memulai ulang di tempat): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Mem-build dan memulai ulang aplikasi suatu domain lalu menunggu hasilnya (aplikasi yang dihentikan akan di-build tetapi tetap berhenti): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'Mengaktifkan aplikasi yang dikonfigurasi pada suatu domain: --enable <domain>',
     'cli.commands.disable' => 'Menonaktifkan aplikasi suatu domain: --disable <domain>',

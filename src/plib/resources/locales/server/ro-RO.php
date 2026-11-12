@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Suma de control SHA-256 trebuie să aibă 64 de caractere hexazecimale.',
     'errorFetchFilename' => 'Numele fișierului poate conține numai litere, cifre și . _ + - (max. 128 de caractere).',
     'errorUpdateVersion' => 'Versiunea trebuie să aibă forma 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Pe acest server, doar administratorul poate activa implementările fără întrerupere.',
+    'errorReadyTimeout' => 'Timpul limită de pregătire trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
+    'errorDrainSeconds' => 'Perioada de golire trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limita de memorie (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Aplicația exemplu a fost creată (un fișier) și setările au fost actualizate.',
     'messageFetchStarted' => 'Descărcarea a început. Urmăriți-o în jurnalul „Compilare și implementare”.',
     'messageUpdateStarted' => 'Actualizarea la Runway %%version%% a început. Progresul ei este afișat mai jos.',
+    'messageSavedSwitching' => 'Setările au fost salvate. Noua versiune pornește alături de cea care rulează și preia traficul când este pregătită; urmăriți-o în jurnalul „Compilare și implementare”.',
+    'messageSwitchStarted' => 'Noua versiune pornește alături de cea care rulează și preia traficul când este pregătită. Urmăriți-o în jurnalul „Compilare și implementare”.',
+    'messageAction_restartPlain' => 'Aplicația repornește pe loc.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listează aplicațiile configurate și starea lor.',
     'cli.commands.status' => 'Afișează starea aplicației unui domeniu: --status <domeniu>',
     'cli.commands.start' => 'Pornește aplicația unui domeniu: --start <domeniu>',
     'cli.commands.stop' => 'Oprește aplicația unui domeniu; rămâne oprită (și după o repornire a serverului sau o implementare) până la --start sau --restart: --stop <domeniu>',
-    'cli.commands.restart' => 'Repornește aplicația unui domeniu: --restart <domeniu>',
+    'cli.commands.restart' => 'Repornește aplicația unui domeniu; cu implementări fără întrerupere, noua versiune pornește lângă cea care rulează, iar comanda așteaptă comutarea (-plain repornește pe loc): --restart <domeniu> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Compilează și repornește aplicația unui domeniu și așteaptă rezultatul (o aplicație oprită este compilată, dar rămâne oprită): --deploy <domeniu> [-no-wait]',
     'cli.commands.enable' => 'Activează aplicația configurată a unui domeniu: --enable <domeniu>',
     'cli.commands.disable' => 'Dezactivează aplicația unui domeniu: --disable <domeniu>',

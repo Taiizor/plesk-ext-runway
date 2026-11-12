@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256-tarkistussumman on oltava 64 heksadesimaalimerkkiä.',
     'errorFetchFilename' => 'Tiedostonimi saa sisältää vain kirjaimia, numeroita sekä . _ + - (enintään 128 merkkiä).',
     'errorUpdateVersion' => 'Version on oltava muotoa 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Vain järjestelmänvalvoja voi kytkeä katkottomat käyttöönotot päälle tällä palvelimella.',
+    'errorReadyTimeout' => 'Valmiuden aikakatkaisun on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
+    'errorDrainSeconds' => 'Tyhjennysajan on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Muistiraja (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Esimerkkisovellus kirjoitettiin (yksi tiedosto) ja asetukset päivitettiin.',
     'messageFetchStarted' => 'Lataus on alkanut. Seuraa sitä "Koonti ja käyttöönotto" -lokista.',
     'messageUpdateStarted' => 'Runwayn päivitys versioon %%version%% on alkanut. Sen edistyminen näkyy alla.',
+    'messageSavedSwitching' => 'Asetukset tallennettiin. Uusi versio käynnistyy käynnissä olevan rinnalle ja ottaa liikenteen vastaan, kun se on valmis; seuraa sitä "Koonti ja käyttöönotto" -lokista.',
+    'messageSwitchStarted' => 'Uusi versio käynnistyy käynnissä olevan rinnalle ja ottaa liikenteen vastaan, kun se on valmis. Seuraa sitä "Koonti ja käyttöönotto" -lokista.',
+    'messageAction_restartPlain' => 'Sovellus käynnistyy uudelleen paikallaan.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Luettelee määritetyt sovellukset ja niiden tilan.',
     'cli.commands.status' => 'Näyttää toimialueen sovelluksen tilan: --status <toimialue>',
     'cli.commands.start' => 'Käynnistää toimialueen sovelluksen: --start <toimialue>',
     'cli.commands.stop' => 'Pysäyttää toimialueen sovelluksen; se pysyy pysäytettynä (myös palvelimen uudelleenkäynnistyksen tai käyttöönoton jälkeen), kunnes annetaan --start tai --restart: --stop <toimialue>',
-    'cli.commands.restart' => 'Käynnistää toimialueen sovelluksen uudelleen: --restart <toimialue>',
+    'cli.commands.restart' => 'Käynnistää toimialueen sovelluksen uudelleen; katkottomissa käyttöönotoissa uusi versio käynnistyy käynnissä olevan rinnalle ja komento odottaa vaihtoa (-plain käynnistää uudelleen paikallaan): --restart <toimialue> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Koostaa ja käynnistää toimialueen sovelluksen uudelleen ja odottaa tulosta (pysäytetty sovellus koostetaan, mutta se pysyy pysäytettynä): --deploy <toimialue> [-no-wait]',
     'cli.commands.enable' => 'Ottaa toimialueen määritetyn sovelluksen käyttöön: --enable <toimialue>',
     'cli.commands.disable' => 'Poistaa toimialueen sovelluksen käytöstä: --disable <toimialue>',

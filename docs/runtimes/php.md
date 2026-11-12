@@ -142,7 +142,10 @@ frankenphp-mac-arm64, frankenphp-windows-x86_64.zip
   **[verified]**; under Octane it is obtained with `composer require spiral/roadrunner-cli
   spiral/roadrunner-http` + `./vendor/bin/rr get-binary` (writes `<app>/rr`). Octane always passes
   `-o http.address=<host>:<port>` → **tcp only with Octane**; standalone RoadRunner supports
-  `http.address: "unix:///run/runway/<id>/app.sock"` + `unix_socket: {mode: "0660"}` **[docs]**.
+  `http.address: "unix://${RUNWAY_SOCKET}"` (environment substitution of `.rr.yaml`) +
+  `unix_socket: {mode: "0660"}` **[docs]**. Use the variable, not the literal
+  `/run/runway/<id>/app.sock`: with zero-downtime deployments each slot has its own socket
+  (README, "Zero-downtime deployments").
 
 ---
 

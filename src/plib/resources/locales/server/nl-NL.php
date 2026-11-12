@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'De SHA-256-checksum moet uit 64 hexadecimale tekens bestaan.',
     'errorFetchFilename' => 'De bestandsnaam mag alleen letters, cijfers en . _ + - bevatten (max. 128 tekens).',
     'errorUpdateVersion' => 'De versie moet de vorm 1.2.3-1 hebben.',
+    'errorZeroDowntimeAdmin' => 'Op deze server kan alleen de beheerder deployments zonder downtime inschakelen.',
+    'errorReadyTimeout' => 'De time-out voor gereedheid moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
+    'errorDrainSeconds' => 'De afbouwperiode moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Geheugenlimiet (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'De voorbeeldapplicatie is aangemaakt (één bestand) en de instellingen zijn bijgewerkt.',
     'messageFetchStarted' => 'De download is gestart. Volg de voortgang in het logboek "Build en deploy".',
     'messageUpdateStarted' => 'De update naar Runway %%version%% is gestart. De voortgang wordt hieronder weergegeven.',
+    'messageSavedSwitching' => 'De instellingen zijn opgeslagen. De nieuwe versie start naast de draaiende versie en neemt het over zodra deze gereed is; volg de voortgang in het logboek "Build en deploy".',
+    'messageSwitchStarted' => 'De nieuwe versie start naast de draaiende versie en neemt het over zodra deze gereed is. Volg de voortgang in het logboek "Build en deploy".',
+    'messageAction_restartPlain' => 'De applicatie wordt ter plaatse herstart.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Toont de geconfigureerde applicaties en hun status.',
     'cli.commands.status' => 'Toont de status van de applicatie van een domein: --status <domein>',
     'cli.commands.start' => 'Start de applicatie van een domein: --start <domein>',
     'cli.commands.stop' => 'Stopt de applicatie van een domein; deze blijft gestopt (ook na een herstart van de server of een deployment) tot --start of --restart: --stop <domein>',
-    'cli.commands.restart' => 'Herstart de applicatie van een domein: --restart <domein>',
+    'cli.commands.restart' => 'Herstart de applicatie van een domein; bij deployments zonder downtime start de nieuwe versie naast de draaiende versie en wacht de opdracht op de omschakeling (-plain herstart ter plaatse): --restart <domein> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Bouwt en herstart de applicatie van een domein en wacht op het resultaat (een gestopte applicatie wordt gebouwd, maar blijft gestopt): --deploy <domein> [-no-wait]',
     'cli.commands.enable' => 'Schakelt de geconfigureerde applicatie van een domein in: --enable <domein>',
     'cli.commands.disable' => 'Schakelt de applicatie van een domein uit: --disable <domein>',

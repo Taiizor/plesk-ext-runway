@@ -60,6 +60,9 @@ return [
     'errorFetchSha256' => 'SHA-256 sağlama toplamı 64 onaltılık karakterden oluşmalıdır.',
     'errorFetchFilename' => 'Dosya adı yalnızca harf, rakam ve . _ + - içerebilir (en fazla 128 karakter).',
     'errorUpdateVersion' => 'Sürüm 1.2.3-1 biçiminde olmalıdır.',
+    'errorZeroDowntimeAdmin' => 'Bu sunucuda kesintisiz dağıtımları yalnızca yönetici açabilir.',
+    'errorReadyTimeout' => 'Hazır olma zaman aşımı %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
+    'errorDrainSeconds' => 'Boşaltma süresi %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Bellek sınırı (MiB)',
@@ -82,13 +85,16 @@ return [
     'messageSampleWrittenOne' => 'Örnek uygulama yazıldı (bir dosya) ve ayarlar güncellendi.',
     'messageFetchStarted' => 'İndirme başladı. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
     'messageUpdateStarted' => 'Runway %%version%% güncellemesi başladı. İlerlemesi aşağıda gösteriliyor.',
+    'messageSavedSwitching' => 'Ayarlar kaydedildi. Yeni sürüm çalışan sürümün yanında başlar ve hazır olduğunda trafiği devralır; "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+    'messageSwitchStarted' => 'Yeni sürüm çalışan sürümün yanında başlıyor ve hazır olduğunda trafiği devralacak. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+    'messageAction_restartPlain' => 'Uygulama yerinde yeniden başlatılıyor.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Yapılandırılmış uygulamaları ve durumlarını listeler.',
     'cli.commands.status' => 'Bir alan adındaki uygulamanın durumunu gösterir: --status <alan-adı>',
     'cli.commands.start' => 'Bir alan adındaki uygulamayı başlatır: --start <alan-adı>',
     'cli.commands.stop' => 'Bir alan adındaki uygulamayı durdurur; --start veya --restart ile başlatılana kadar (yeniden başlatma veya dağıtımdan sonra da) durdurulmuş kalır: --stop <alan-adı>',
-    'cli.commands.restart' => 'Bir alan adındaki uygulamayı yeniden başlatır: --restart <alan-adı>',
+    'cli.commands.restart' => 'Bir alan adındaki uygulamayı yeniden başlatır; kesintisiz dağıtımlarda yeni sürüm çalışan sürümün yanında başlar ve komut geçişi bekler (-plain yerinde yeniden başlatır): --restart <alan-adı> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Bir alan adındaki uygulamayı derleyip yeniden başlatır ve sonucu bekler (durdurulmuş bir uygulama derlenir ama durdurulmuş kalır): --deploy <alan-adı> [-no-wait]',
     'cli.commands.enable' => 'Bir alan adındaki yapılandırılmış uygulamayı etkinleştirir: --enable <alan-adı>',
     'cli.commands.disable' => 'Bir alan adındaki uygulamayı devre dışı bırakır: --disable <alan-adı>',

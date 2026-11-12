@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Il checksum SHA-256 deve essere composto da 64 caratteri esadecimali.',
     'errorFetchFilename' => 'Il nome del file può contenere solo lettere, cifre e . _ + - (max 128 caratteri).',
     'errorUpdateVersion' => 'La versione deve avere un formato come 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Su questo server solo l\'amministratore può attivare le implementazioni senza interruzioni.',
+    'errorReadyTimeout' => 'Il timeout di disponibilità deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
+    'errorDrainSeconds' => 'Il periodo di drenaggio deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite di memoria (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'L\'applicazione di esempio è stata creata (un file) e le impostazioni sono state aggiornate.',
     'messageFetchStarted' => 'Il download è iniziato. Segui l\'avanzamento nel log "Build e implementazione".',
     'messageUpdateStarted' => 'L\'aggiornamento a Runway %%version%% è iniziato. L\'avanzamento è mostrato qui sotto.',
+    'messageSavedSwitching' => 'Le impostazioni sono state salvate. La nuova versione si avvia accanto a quella in esecuzione e subentra quando è pronta; segui l\'avanzamento nel log "Build e implementazione".',
+    'messageSwitchStarted' => 'La nuova versione si avvia accanto a quella in esecuzione e subentra quando è pronta. Segui l\'avanzamento nel log "Build e implementazione".',
+    'messageAction_restartPlain' => 'L\'applicazione è in fase di riavvio sul posto.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Elenca le applicazioni configurate e il loro stato.',
     'cli.commands.status' => 'Mostra lo stato dell\'applicazione di un dominio: --status <dominio>',
     'cli.commands.start' => 'Avvia l\'applicazione di un dominio: --start <dominio>',
     'cli.commands.stop' => 'Arresta l\'applicazione di un dominio; resta arrestata (anche dopo un riavvio del server o un\'implementazione) fino a --start o --restart: --stop <dominio>',
-    'cli.commands.restart' => 'Riavvia l\'applicazione di un dominio: --restart <dominio>',
+    'cli.commands.restart' => 'Riavvia l\'applicazione di un dominio; con le implementazioni senza interruzioni la nuova versione si avvia accanto a quella in esecuzione e il comando attende il passaggio (-plain riavvia sul posto): --restart <dominio> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Esegue la build dell\'applicazione di un dominio, la riavvia e attende il risultato (un\'applicazione arrestata viene sottoposta a build ma resta arrestata): --deploy <dominio> [-no-wait]',
     'cli.commands.enable' => 'Abilita l\'applicazione configurata di un dominio: --enable <dominio>',
     'cli.commands.disable' => 'Disabilita l\'applicazione di un dominio: --disable <dominio>',

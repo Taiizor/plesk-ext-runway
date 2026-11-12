@@ -60,6 +60,9 @@ return [
     'errorFetchSha256' => 'The SHA-256 checksum must be 64 hexadecimal characters.',
     'errorFetchFilename' => 'The file name may contain letters, digits and . _ + - only (max. 128 characters).',
     'errorUpdateVersion' => 'The version must look like 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Only the administrator can turn on zero-downtime deployments on this server.',
+    'errorReadyTimeout' => 'The readiness timeout must be a whole number of seconds between %%min%% and %%max%%.',
+    'errorDrainSeconds' => 'The drain period must be a whole number of seconds between %%min%% and %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memory limit (MiB)',
@@ -82,13 +85,16 @@ return [
     'messageSampleWrittenOne' => 'The sample application was written (one file) and the settings were updated.',
     'messageFetchStarted' => 'The download has started. Follow it in the "Build & deploy" log.',
     'messageUpdateStarted' => 'The update to Runway %%version%% has started. Its progress is shown below.',
+    'messageSavedSwitching' => 'The settings were saved. The new version starts next to the running one and takes over when it is ready; follow it in the "Build & deploy" log.',
+    'messageSwitchStarted' => 'The new version starts next to the running one and takes over when it is ready. Follow it in the "Build & deploy" log.',
+    'messageAction_restartPlain' => 'The application is restarting in place.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'List the configured applications and their state.',
     'cli.commands.status' => 'Show the state of the application of a domain: --status <domain>',
     'cli.commands.start' => 'Start the application of a domain: --start <domain>',
     'cli.commands.stop' => 'Stop the application of a domain; it stays stopped (also after a reboot or a deployment) until --start or --restart: --stop <domain>',
-    'cli.commands.restart' => 'Restart the application of a domain: --restart <domain>',
+    'cli.commands.restart' => 'Restart the application of a domain; with zero-downtime deployments the new version starts next to the running one and the command waits for the switch (-plain restarts in place): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Build and restart the application of a domain and wait for the result (a stopped application is built but stays stopped): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'Enable the configured application of a domain: --enable <domain>',
     'cli.commands.disable' => 'Disable the application of a domain: --disable <domain>',

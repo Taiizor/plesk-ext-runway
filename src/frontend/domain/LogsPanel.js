@@ -11,7 +11,7 @@ const KINDS = ['app', 'deploy'];
  * Logs card: application log (journal) and build/deploy log in tabs, refreshed with the
  * status polling while "Auto-refresh" is on.
  */
-const LogsPanel = ({ kind, text, error, loading, autoRefresh, onKind, onAutoRefresh, onRefresh }) => {
+const LogsPanel = ({ kind, text, error, loading, autoRefresh, switchable, onKind, onAutoRefresh, onRefresh }) => {
     const body = (
         <div style={{ paddingTop: '12px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
@@ -23,6 +23,10 @@ const LogsPanel = ({ kind, text, error, loading, autoRefresh, onKind, onAutoRefr
                 </Button>
                 {error && <Text intent="danger">{error}</Text>}
             </div>
+            {kind === 'app' && switchable && (
+                // Zero-downtime slots: both versions write into the application log.
+                <div style={{ marginBottom: '8px' }}><Text intent="muted" fontSize="sm"><Translate content="Domain.logs.slotsHint" /></Text></div>
+            )}
             <LogOutput text={text} />
         </div>
     );
@@ -46,6 +50,7 @@ LogsPanel.propTypes = {
     error: PropTypes.string,
     loading: PropTypes.bool,
     autoRefresh: PropTypes.bool,
+    switchable: PropTypes.bool,
     onKind: PropTypes.func.isRequired,
     onAutoRefresh: PropTypes.func.isRequired,
     onRefresh: PropTypes.func.isRequired,
@@ -56,6 +61,7 @@ LogsPanel.defaultProps = {
     error: null,
     loading: false,
     autoRefresh: true,
+    switchable: false,
 };
 
 export default LogsPanel;

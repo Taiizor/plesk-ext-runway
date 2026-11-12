@@ -81,11 +81,38 @@ UNIT_APP = "runway-app-%d.service"
 UNIT_DEPLOY = "runway-deploy-%d.service"
 UNIT_PATH = "runway-deploy-%d.path"
 UNIT_ADMIN_JOB = "runway-job-admin.service"
+# Zero-downtime deployments (docs/DESIGN.md section 12): two slot units per application, the
+# live one carries the traffic; runway-converge.service repairs interrupted switches at boot.
+UNIT_SLOT = "runway-app-%d-%s.service"
+UNIT_CONVERGE = "runway-converge.service"
+SLOTS = ("a", "b")
 
 # Unix socket mode: /run/runway/<id>/app.sock, directory owned by the system user with the
 # web server group (nginx and Apache are members of psaserv, hosting customers are not).
 RUN_DIR = "/run/runway"
 WEB_GROUP = "psaserv"
+# Zero-downtime: root-owned include files of tcp applications (the live port) and the readiness
+# and drain limits of a switch.
+WEB_DIR = CONF_DIR + "/web"
+ZD_READY_DEFAULT = 60
+ZD_DRAIN_DEFAULT = 10
+# Allowance of a switch beyond readyTimeout + drainSeconds: marker wait and httpdmng, starts,
+# reload confirmation and the stop of the old version.
+ZD_SWITCH_EXTRA = 300
+# TimeoutStopSec of the deploy unit of a switchable application: ends an interrupted switch.
+ZD_DEPLOY_STOP = 300
+ZD_MARKER = "# Runway: zero-downtime #%d"
+# Seconds a switch waits for Plesk's regeneration of the domain configuration, and for httpdmng.
+ZD_MARKER_WAIT = 60
+ZD_HTTPDMNG_TIMEOUT = 120
+# Seconds a reload of the web server may take until its new worker generation is confirmed.
+ZD_RELOAD_WAIT = 60
+# Confirmed reloads per web server unit (web_effective()): the modification time of a stamp file
+# touched just before the reload, i.e. on the same (coarse) clock as the configuration files.
+WEB_RELOADS = "/var/lib/runway/web-reloads.json"
+WEB_RELOAD_STAMP = "/var/lib/runway/web-reload.stamp"
+# Root-only test flag: "<kill|term>:<phase>" makes the switch job signal itself in that phase.
+SWITCH_FAULT_FLAG = "/var/lib/runway/test-switch-fault"
 
 TRIGGER_DEPLOY = "tmp/deploy.txt"
 TRIGGER_RESTART = "tmp/restart.txt"
@@ -206,6 +233,10 @@ def root_env(extra=None):
     return env
 
 
+def _ignore_sigterm():
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+
+
 def run(cmd, check=False, timeout=120, env=None, input_text=None):
     try:
         proc = subprocess.run(
@@ -217,6 +248,10 @@ def run(cmd, check=False, timeout=120, env=None, input_text=None):
             env=env if env is not None else root_env(),
             universal_newlines=True,
             errors="replace",
+            # Inside the critical section of a zero-downtime switch the deploy job defers SIGTERM
+            # (_TERM); systemd sends it to every process of the deploy unit, so its children (e.g.
+            # "systemctl reload nginx") ignore it too and finish what the switch depends on.
+            preexec_fn=_ignore_sigterm if _TERM["critical"] else None,
         )
     except FileNotFoundError:
         raise HelperError("Command not found: %s" % cmd[0])
@@ -520,12 +555,59 @@ def validate_app(payload):
         "mount_path": v_url_prefix(payload.get("mount_path"), "mount path") if mode == "path" else "",
         "static_paths": v_static_paths(payload.get("static_paths")),
         "health_path": v_health_path(payload.get("health_path")) if listen != "none" else "",
+        # Zero-downtime deployments (docs/DESIGN.md section 12): workers have nothing to switch.
+        "zero_downtime": bool(payload.get("zero_downtime")) and listen != "none",
+        "ready_timeout": v_int(_or_default(payload.get("ready_timeout"), ZD_READY_DEFAULT), 5, 900, "readiness timeout"),
+        "drain_seconds": v_int(_or_default(payload.get("drain_seconds"), ZD_DRAIN_DEFAULT), 0, 300, "drain period"),
     }
     if state["port"] and state["port"] < 1024:
         raise HelperError("Port must be 1024 or higher")
     if state["tampered"]:
         state["stopped"] = True
+    state.update(helper_fields({}))
     return state, pw
+
+
+def _or_default(value, default):
+    return default if value is None or value == "" else value
+
+
+# State fields that only the helper writes (never taken from a payload): the live slot, the slot
+# ports, the time of the last switch, a pending plain restart and the intent record of a switch.
+HELPER_FIELDS = ("slot", "port_a", "port_b", "switched_at", "restart_plain", "switch")
+
+
+def helper_fields(stored):
+    """The helper-owned fields of a stored state, validated (defaults for a 1.0 state)."""
+    stored = stored if isinstance(stored, dict) else {}
+
+    def port(key):
+        value = stored.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) and 1024 <= value <= 65535 else 0
+
+    intent = stored.get("switch")
+    if not (isinstance(intent, dict) and intent.get("from") in ("",) + SLOTS and intent.get("to") in ("",) + SLOTS
+            and intent.get("from") != intent.get("to")):
+        intent = None
+    else:
+        intent = {"from": intent["from"], "to": intent["to"], "phase": str(intent.get("phase") or "")[:20],
+                  "started_epoch": float(intent.get("started_epoch") or 0) if isinstance(intent.get("started_epoch"), (int, float)) else 0.0}
+    return {
+        "slot": stored.get("slot") if stored.get("slot") in SLOTS else "",
+        "port_a": port("port_a"),
+        "port_b": port("port_b"),
+        "switched_at": str(stored.get("switched_at") or "")[:40],
+        "restart_plain": bool(stored.get("restart_plain")),
+        "switch": intent,
+    }
+
+
+def stored_port(stored):
+    """The port of a stored state, or 0 (no state, or not a valid port). app-apply keeps it over
+    the panel's copy: the running service uses it, and a switch back to the 1.0 unit may have
+    given it a new one that the panel has not stored yet (docs/DESIGN.md section 12.8)."""
+    value = stored.get("port") if isinstance(stored, dict) else None
+    return value if isinstance(value, int) and not isinstance(value, bool) and 1024 <= value <= 65535 else 0
 
 
 def load_app_state(domain_id):
@@ -535,6 +617,7 @@ def load_app_state(domain_id):
     # Re-validate: the state file is root-owned, but be strict anyway.
     validated, pw = validate_app(state)
     validated["port"] = state.get("port", 0)
+    validated.update(helper_fields(state))
     return validated, pw
 
 
@@ -550,8 +633,22 @@ def app_triggers_path(domain_id):
     return os.path.join(APPS_DIR, "%d.triggers.json" % domain_id)
 
 
-def env_file_path(domain_id):
-    return os.path.join(ENV_DIR, "%d.env" % domain_id)
+def env_file_path(domain_id, slot=""):
+    return os.path.join(ENV_DIR, ("%d-%s.env" % (domain_id, slot)) if slot else ("%d.env" % domain_id))
+
+
+def app_unit(domain_id, slot=""):
+    """Unit of the 1.0 instance (slot "") or of a zero-downtime slot ("a", "b")."""
+    return UNIT_SLOT % (domain_id, slot) if slot else UNIT_APP % domain_id
+
+
+def all_app_units(domain_id):
+    return [app_unit(domain_id, slot) for slot in ("",) + SLOTS]
+
+
+def include_paths(domain_id):
+    """Root-owned web server include files of a switchable tcp application (nginx, Apache)."""
+    return (os.path.join(WEB_DIR, "%d.nginx.conf" % domain_id), os.path.join(WEB_DIR, "%d.apache.conf" % domain_id))
 
 
 def job_paths(job):
@@ -900,7 +997,9 @@ def toolchain_env(state, pw):
             spec = dict(rt.env(pw.pw_dir, state["toolchain"], state["app_dir"]))
             paths = list(spec.pop("PATH", []))
             env.update(spec)
-        if state.get("port"):
+        # A zero-downtime slot of a unix application may have no port of its own (slot b): its
+        # listen conventions name its socket (e.g. ASPNETCORE_URLS=http://unix:.../b.sock).
+        if state.get("port") or (state.get("_slot") and state.get("listen") == "unix"):
             env.update(rt.listen_env(state))
     env["PATH"] = ":".join(paths + [USER_PATH])
     return env
@@ -912,6 +1011,33 @@ def socket_dir(domain_id):
 
 def socket_path(domain_id):
     return socket_dir(domain_id) + "/app.sock"
+
+
+# Socket file names in /run/runway/<id>: the 1.0 instance's and the two slots'.
+SOCKET_NAMES = ("app.sock", "a.sock", "b.sock")
+
+
+def socket_name(slot):
+    return "%s.sock" % slot if slot else "app.sock"
+
+
+def slot_socket_path(domain_id, slot):
+    return "%s/%s" % (socket_dir(domain_id), socket_name(slot))
+
+
+def link_path(domain_id):
+    """The web server's path of a switchable unix application: a root-owned symlink in the
+    root-owned /run/runway, so no instance and no customer can remove or replace it."""
+    return "%s/%d.sock" % (RUN_DIR, domain_id)
+
+
+def link_target(domain_id, slot):
+    return "%d/%s" % (domain_id, socket_name(slot))
+
+
+def endpoint_socket(state):
+    """The socket an instance binds: app.sock, or the slot's socket in a slot view."""
+    return state.get("_socket") or socket_path(state["domain_id"])
 
 
 def web_server_group():
@@ -1019,9 +1145,11 @@ def tmpfiles_path(domain_id):
     return os.path.join(TMPFILES_DIR, "runway-%d.conf" % domain_id)
 
 
-def write_tmpfiles(state, pw):
+def write_tmpfiles(state, pw, link_slot=None):
     """systemd-tmpfiles entry that recreates the socket directory at boot (before the units
-    start), or removes the entry when the application does not use a unix socket."""
+    start), or removes the entry when the application does not use a unix socket. link_slot
+    (zero-downtime, written under the deploy lock only): also recreate the root link
+    /run/runway/<id>.sock to that slot's socket ("" = app.sock of the 1.0 instance)."""
     path = tmpfiles_path(state["domain_id"])
     if state.get("listen") != "unix":
         remove_quietly(path)
@@ -1030,32 +1158,79 @@ def write_tmpfiles(state, pw):
     if not os.path.isfile(TMPFILES_BASE):
         write_file_atomic(TMPFILES_BASE, "# Managed by the Plesk Runway extension. Do not edit.\n"
                           "d %s 0755 root root -\n" % RUN_DIR, 0o644)
-    write_file_atomic(path, "# Managed by the Plesk Runway extension. Do not edit.\n"
-                      "d %s 2750 %s %s -\n" % (socket_dir(state["domain_id"]), pw.pw_name, web_server_group()), 0o644)
+    text = ("# Managed by the Plesk Runway extension. Do not edit.\n"
+            "d %s 2750 %s %s -\n" % (socket_dir(state["domain_id"]), pw.pw_name, web_server_group()))
+    if link_slot is not None:
+        text += "L %s - - - - %s\n" % (link_path(state["domain_id"]), link_target(state["domain_id"], link_slot))
+    write_file_atomic(path, text, 0o644)
+
+
+def tmpfiles_link_slot(domain_id):
+    """The slot of the L line of the tmpfiles entry, or None without one."""
+    text = _read_text(tmpfiles_path(domain_id), 4096) or ""
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 7 and parts[0] == "L" and parts[1] == link_path(domain_id):
+            return _slot_of_target(domain_id, parts[6])
+    return None
+
+
+def _slot_of_target(domain_id, target):
+    for slot in ("",) + SLOTS:
+        if target == link_target(domain_id, slot):
+            return slot
+    return None
 
 
 def socket_check(state, pw):
-    """Unix mode: (detail, code, params) when /run/runway/<id>/app.sock is anything but a socket
-    owned by the application's user (e.g. a symbolic link to another application's socket, which
-    nginx would follow), else None (also when nothing is there)."""
-    path = socket_path(state["domain_id"])
-    try:
-        st = os.lstat(path)
-    except OSError:
-        return None
-    if stat.S_ISLNK(st.st_mode):
+    """Unix mode: (detail, code, params) when a socket path of the application in
+    /run/runway/<id> (app.sock; with zero-downtime slots also a.sock and b.sock) is anything but
+    a socket owned by the application's user (e.g. a symbolic link to another application's
+    socket, which nginx would follow), else None (also when nothing is there)."""
+    names = SOCKET_NAMES if zd_has_slots(state) else ("app.sock",)
+    for name in names:
+        path = "%s/%s" % (socket_dir(state["domain_id"]), name)
         try:
-            target = os.readlink(path)[:200]
+            st = os.lstat(path)
         except OSError:
-            target = "?"
-        return ("%s was replaced by a symbolic link to %s" % (path, target), "socket_symlink",
-                {"path": path, "target": target})
-    if not stat.S_ISSOCK(st.st_mode):
-        return "%s is not a socket" % path, "socket_not_socket", {"path": path}
-    if st.st_uid != pw.pw_uid:
-        return ("%s belongs to uid %d, not to %s" % (path, st.st_uid, pw.pw_name), "socket_owner",
-                {"path": path, "uid": st.st_uid, "user": pw.pw_name})
+            continue
+        if stat.S_ISLNK(st.st_mode):
+            try:
+                target = os.readlink(path)[:200]
+            except OSError:
+                target = "?"
+            return ("%s was replaced by a symbolic link to %s" % (path, target), "socket_symlink",
+                    {"path": path, "target": target})
+        if not stat.S_ISSOCK(st.st_mode):
+            return "%s is not a socket" % path, "socket_not_socket", {"path": path}
+        if st.st_uid != pw.pw_uid:
+            return ("%s belongs to uid %d, not to %s" % (path, st.st_uid, pw.pw_name), "socket_owner",
+                    {"path": path, "uid": st.st_uid, "user": pw.pw_name})
     return None
+
+
+def unix_connect(path, uid, timeout):
+    """Root connects to the unix socket at `path` (in a directory the customer controls) without
+    following a symbolic link swapped in after a check: the path is opened with O_PATH|O_NOFOLLOW,
+    the descriptor must be a socket owned by `uid`, and the connection goes through
+    /proc/self/fd/<n>, i.e. to exactly that inode. Raises OSError otherwise."""
+    fd = os.open(path, _O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISSOCK(st.st_mode):
+            raise OSError("%s is not a socket" % path)
+        if st.st_uid != uid:
+            raise OSError("%s belongs to uid %d" % (path, st.st_uid))
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(timeout)
+            sock.connect("/proc/self/fd/%d" % fd)
+        except BaseException:
+            sock.close()
+            raise
+        return sock
+    finally:
+        os.close(fd)
 
 
 def socket_tampered(state, pw):
@@ -1086,10 +1261,18 @@ def contain_tampering(state, detail):
     link), remember it in the state (Start clears it) and note it in the application's journal."""
     domain_id = state["domain_id"]
     # Unlink first (nginx stops following the link at once), stop the service, unlink again in
-    # case the still running application recreated it.
-    unlink_socket_entry(domain_id)
-    systemctl("disable", "--now", UNIT_APP % domain_id, timeout=120)
-    unlink_socket_entry(domain_id)
+    # case the still running application recreated it. With zero-downtime slots every app unit
+    # and every socket name of the application.
+    slots = zd_has_slots(state)
+    names = SOCKET_NAMES if slots else ("app.sock",)
+    for name in names:
+        unlink_socket_entry(domain_id, name)
+    if slots:
+        systemctl("disable", "--now", *existing_app_units(domain_id), timeout=120)
+    else:
+        systemctl("disable", "--now", UNIT_APP % domain_id, timeout=120)
+    for name in names:
+        unlink_socket_entry(domain_id, name)
     with FileLock("ports"):
         stored = read_json(app_state_path(domain_id))
         if isinstance(stored, dict):
@@ -1118,26 +1301,30 @@ def prepare_start(state, pw):
     application root (as the user). Called by every path that starts or restarts the unit."""
     if state.get("listen") == "unix":
         ensure_socket_dir(state["domain_id"], pw)
-        if socket_tampered(state, pw):
-            # e.g. the socket of the previous system user after a subscription change.
-            unlink_socket_entry(state["domain_id"])
+        # e.g. the socket of the previous system user after a subscription change; only the
+        # offending entries (the socket of a running slot stays).
+        for _attempt in range(len(SOCKET_NAMES)):
+            found = socket_check(state, pw)
+            if not found:
+                break
+            unlink_socket_entry(state["domain_id"], os.path.basename(found[2]["path"]))
     rt = RUNTIMES.get(state["runtime"])
     if rt is not None:
         rt.prepare_start(state, pw)
 
 
-def unlink_socket_entry(domain_id):
-    """Root: removes whatever /run/runway/<id>/app.sock is (never follows it)."""
+def unlink_socket_entry(domain_id, name="app.sock"):
+    """Root: removes whatever /run/runway/<id>/<name> is (never follows it)."""
     try:
         fd = os.open(socket_dir(domain_id), _DIR_FLAGS)
     except OSError:
         return
     try:
-        st = os.stat("app.sock", dir_fd=fd, follow_symlinks=False)
+        st = os.stat(name, dir_fd=fd, follow_symlinks=False)
         if stat.S_ISDIR(st.st_mode):
-            os.rmdir("app.sock", dir_fd=fd)
+            os.rmdir(name, dir_fd=fd)
         else:
-            os.unlink("app.sock", dir_fd=fd)
+            os.unlink(name, dir_fd=fd)
     except OSError:
         pass
     finally:
@@ -1162,10 +1349,13 @@ def forced_env(state):
         "RUNWAY_LISTEN": state.get("listen", "tcp"),
     }
     if state.get("listen") == "unix":
-        env["RUNWAY_SOCKET"] = socket_path(state["domain_id"])
+        env["RUNWAY_SOCKET"] = endpoint_socket(state)
     else:
         port = str(state["port"])
         env.update({"PORT": port, "HOST": "127.0.0.1", "LISTEN_ADDR": "127.0.0.1:" + port})
+    if state.get("_slot"):
+        # Zero-downtime slot (docs/DESIGN.md section 12): its socket or port is in the variables above.
+        env["RUNWAY_SLOT"] = state["_slot"]
     return env
 
 
@@ -1192,15 +1382,20 @@ def render_env_file(state, pw):
 
 
 def render_app_unit(state, pw):
+    """The unit of the 1.0 instance, or of a zero-downtime slot for a slot view (slot_view())."""
     domain_id = state["domain_id"]
+    slot = state.get("_slot") or ""
     group = grp.getgrgid(pw.pw_gid).gr_name
     lines = [
         "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
         "[Unit]",
-        "Description=Runway app #%d (%s, %s)" % (domain_id, sanitize_description(state["domain"]), state["runtime"]),
+        ("Description=Runway app #%d slot %s (%s, %s)" % (domain_id, slot, sanitize_description(state["domain"]), state["runtime"])
+         if slot else "Description=Runway app #%d (%s, %s)" % (domain_id, sanitize_description(state["domain"]), state["runtime"])),
         # Soft ordering after local databases (units that do not exist are ignored), so an app that
-        # needs its database at boot does not exhaust the start limit while it recovers.
-        "After=network-online.target mariadb.service mysql.service postgresql.service",
+        # needs its database at boot does not exhaust the start limit while it recovers. Slots start
+        # after the boot repair of interrupted switches.
+        "After=network-online.target mariadb.service mysql.service postgresql.service"
+        + (" " + UNIT_CONVERGE if slot else ""),
         "Wants=network-online.target",
         "StartLimitIntervalSec=120",
         "StartLimitBurst=%d" % APP_START_LIMIT_BURST,
@@ -1210,20 +1405,20 @@ def render_app_unit(state, pw):
         "User=%s" % pw.pw_name,
         "Group=%s" % group,
         "WorkingDirectory=%s" % state["app_dir"],
-        "EnvironmentFile=%s" % env_file_path(domain_id),
+        "EnvironmentFile=%s" % env_file_path(domain_id, slot),
     ]
     if state.get("listen") == "unix":
         # /run/runway/<id> is created by the helper (prepare_start) and by systemd-tmpfiles at boot
         # (/etc/tmpfiles.d/runway-<id>.conf). No Exec line of this unit ever runs as root ("+"/"!"):
         # every Exec line gets the customer's environment file.
-        lines.append("ExecStartPre=/bin/rm -f %s" % socket_path(domain_id))
+        lines.append("ExecStartPre=/bin/rm -f %s" % endpoint_socket(state))
     lines += [
         # ${VAR} as a separate word expands to exactly one argument (no word splitting).
         "ExecStart=/bin/bash -c ${RUNWAY_START_CMD}",
         "Restart=always",
         "RestartSec=3",
         "TimeoutStopSec=30",
-        "SyslogIdentifier=runway-app-%d" % domain_id,
+        ("SyslogIdentifier=runway-app-%d-%s" % (domain_id, slot)) if slot else ("SyslogIdentifier=runway-app-%d" % domain_id),
         # Unix socket mode needs a group-connectable socket (group = web server group).
         "UMask=%s" % ("0007" if state.get("listen") == "unix" else "0027"),
         "LimitNOFILE=65536",
@@ -1256,17 +1451,26 @@ def render_app_unit(state, pw):
     return "\n".join(lines)
 
 
+def switch_allowance(state):
+    """Seconds a zero-downtime switch may take (0 for applications without slots): readiness,
+    drain and ZD_SWITCH_EXTRA for the marker wait, the reload confirmation and the stops."""
+    if not zd_has_slots(state):
+        return 0
+    return int(state.get("ready_timeout") or ZD_READY_DEFAULT) + int(state.get("drain_seconds") or 0) + ZD_SWITCH_EXTRA
+
+
 def deploy_timeout(state):
     """Backstop of the deploy unit: a fetch (bounded by FETCH_TIMEOUT and the build timeout), the
-    build itself, and 300 s for the restart and the listener check. The helper enforces its own
-    deadlines for each step; TimeoutStartSec only catches a hung job."""
-    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300
+    build itself, and 300 s for the restart and the listener check (plus the switch allowance
+    with zero-downtime slots). The helper enforces its own deadlines for each step;
+    TimeoutStartSec only catches a hung job."""
+    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300 + switch_allowance(state)
 
 
 def render_deploy_service(state):
     domain_id = state["domain_id"]
     timeout = deploy_timeout(state)
-    return "\n".join([
+    lines = [
         "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
         "[Unit]",
         "Description=Runway deploy job #%d (%s)" % (domain_id, sanitize_description(state["domain"])),
@@ -1275,10 +1479,17 @@ def render_deploy_service(state):
         "Type=oneshot",
         "ExecStart=%s _deploy %d" % (HELPER_COPY, domain_id),
         "TimeoutStartSec=%d" % timeout,
+    ]
+    if zd_has_slots(state):
+        # A stopped job ends an interrupted switch (stops the new version, or finishes the
+        # switch after the commit) before systemd kills it.
+        lines.append("TimeoutStopSec=%d" % ZD_DEPLOY_STOP)
+    lines += [
         "Nice=10",
         "IOSchedulingClass=best-effort",
         "IOSchedulingPriority=7",
-    ] + build_limit_lines(state) + [""])
+    ]
+    return "\n".join(lines + build_limit_lines(state) + [""])
 
 
 def build_limit_lines(state):
@@ -1334,11 +1545,28 @@ def listening_ports():
 
 
 def assigned_ports(exclude_id=None):
+    """Ports of every application (the port of the 1.0 instance and the ports of the
+    zero-downtime slots) except those of exclude_id."""
     ports = {}
     for state in iter_app_states():
-        if state.get("domain_id") != exclude_id and state.get("port"):
-            ports[int(state["port"])] = state.get("domain_id")
+        if state.get("domain_id") == exclude_id:
+            continue
+        for key in ("port", "port_a", "port_b"):
+            value = state.get(key)
+            if isinstance(value, int) and not isinstance(value, bool) and value:
+                ports[value] = state.get("domain_id")
     return ports
+
+
+def allocate_extra_port(domain_id, port_range, avoid):
+    """A free port of the range for a zero-downtime slot: not assigned to any application, not in
+    `avoid` (the application's own ports) and not listening. Called under the "ports" lock."""
+    taken = assigned_ports(exclude_id=domain_id)
+    listening = listening_ports()
+    for port in range(port_range[0], port_range[1] + 1):
+        if port not in taken and port not in avoid and port not in listening:
+            return port
+    raise HelperError("No free port left in range %d-%d" % tuple(port_range))
 
 
 def allocate_port(domain_id, current, port_range):
@@ -1381,7 +1609,7 @@ def listener_info(state, pw):
     if state.get("listen") == "none":
         return "worker", "workers are not checked for a listener", "worker", {}
     if state.get("listen") == "unix":
-        path = socket_path(state["domain_id"])
+        path = endpoint_socket(state)
         if state.get("tampered"):
             return "tampered", state.get("tampered_detail") or path, "tampered", {"path": path}
         found = socket_check(state, pw)
@@ -1391,15 +1619,12 @@ def listener_info(state, pw):
             os.lstat(path)
         except OSError:
             return "none", path, "none", {"endpoint": path}
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(0.5)
         try:
-            sock.connect(path)
+            # Never follows a symbolic link swapped in after socket_check() (O_PATH, see unix_connect).
+            unix_connect(path, pw.pw_uid, 0.5).close()
             return "ok", path, "ok", {"endpoint": path}
         except OSError:
             return "none", path, "none", {"endpoint": path}
-        finally:
-            sock.close()
     port = int(state.get("port") or 0)
     endpoint = "127.0.0.1:%d" % port
     uids = tcp_listener_uids(port) if port else set()
@@ -2843,7 +3068,7 @@ class DotnetRuntime(Runtime):
 
     def listen_env(self, state):
         if state.get("listen") == "unix":
-            return {"ASPNETCORE_URLS": "http://unix:" + socket_path(state["domain_id"])}
+            return {"ASPNETCORE_URLS": "http://unix:" + endpoint_socket(state)}
         return {"ASPNETCORE_URLS": "http://127.0.0.1:%d" % int(state["port"])}
 
     def inspect(self, app_dir):
@@ -4060,7 +4285,20 @@ def rerender_runtime_apps(runtime, log=None):
         try:
             state, pw = validate_app(raw)
             state["port"] = raw.get("port", 0)
-            write_units(state, pw)
+            state.update(helper_fields(raw))
+            if zd_has_slots(state):
+                lock = FileLock("deploy-%d" % state["domain_id"])
+                if not lock.acquire(blocking=False):
+                    if log:
+                        log.line("App #%s is being deployed; its environment follows with its next apply." % state["domain_id"])
+                    continue
+                try:
+                    state, pw = load_app_state(state["domain_id"])
+                    write_units(state, pw)
+                finally:
+                    lock.release()
+            else:
+                write_units(state, pw)
             count += 1
         except Exception as exc:  # noqa: BLE001
             if log:
@@ -4617,10 +4855,23 @@ def trigger_mtimes(pw, app_dir):
 
 
 def write_units(state, pw):
+    """Renders the units and environment files of an application. Without zero-downtime slots
+    exactly the 1.0 set (with its tmpfiles entry); with slots both slot units and their
+    environment files, and the 1.0 unit while it is the live instance. The pointer (include files,
+    root link, tmpfiles entry of a switchable application) is not written here (write_pointer(),
+    under the deploy lock)."""
     domain_id = state["domain_id"]
-    write_tmpfiles(state, pw)
-    write_file_atomic(env_file_path(domain_id), render_env_file(state, pw), 0o600)
-    write_file_atomic(os.path.join(UNIT_DIR, UNIT_APP % domain_id), render_app_unit(state, pw), 0o644)
+    if not zd_has_slots(state):
+        write_tmpfiles(state, pw)
+        write_file_atomic(env_file_path(domain_id), render_env_file(state, pw), 0o600)
+        write_file_atomic(os.path.join(UNIT_DIR, UNIT_APP % domain_id), render_app_unit(state, pw), 0o644)
+    else:
+        if not state.get("slot"):
+            write_slot_units(state, pw, "")
+        for slot in SLOTS:
+            if state.get("listen") == "tcp" and not slot_port(state, slot):
+                continue
+            write_slot_units(state, pw, slot)
     write_file_atomic(os.path.join(UNIT_DIR, UNIT_DEPLOY % domain_id), render_deploy_service(state), 0o644)
     write_file_atomic(os.path.join(UNIT_DIR, UNIT_PATH % domain_id), render_deploy_path(state), 0o644)
 
@@ -4639,11 +4890,14 @@ def app_status(domain_id, state=None):
         if found and not state.get("tampered"):
             contain_tampering(state, found[0])
         elif found:
-            unlink_socket_entry(domain_id)
-    units = [UNIT_APP % domain_id, UNIT_DEPLOY % domain_id, UNIT_PATH % domain_id]
+            unlink_socket_entry(domain_id, os.path.basename(found[2]["path"]))
+    slots = bool(state) and zd_has_slots(state)
+    live = (state.get("slot") or "") if state else ""
+    units = [app_unit(domain_id, live), UNIT_DEPLOY % domain_id, UNIT_PATH % domain_id]
+    others = [slot for slot in ("",) + SLOTS if slot != live] if slots else []
     props = ["LoadState", "ActiveState", "SubState", "MainPID", "ExecMainStartTimestamp",
              "NRestarts", "MemoryCurrent", "Result", "UnitFileState", "ActiveEnterTimestamp"]
-    shown = unit_show(units, props)
+    shown = unit_show(units + [app_unit(domain_id, slot) for slot in others], props)
     app = shown.get(units[0], {})
     memory = app.get("MemoryCurrent", "")
     started = app.get("ExecMainStartTimestamp") or None
@@ -4684,12 +4938,49 @@ def app_status(domain_id, state=None):
         status["health_detail"] = "" if state.get("health_path") else "No health check path configured"
         status["health_code"] = "" if state.get("health_path") else "no_path"
         status["health_params"] = {}
+        # Zero-downtime deployments (docs/DESIGN.md section 12.10).
+        status["zero_downtime"] = bool(state.get("zero_downtime"))
+        status["switchable"] = zd_switchable(state)
+        status["slot"] = live
+        status["switched_at"] = state.get("switched_at") or None
+        status["restart_plain"] = bool(state.get("restart_plain"))
+        status["switch"] = state.get("switch")
+        status["ready_timeout"] = state.get("ready_timeout", ZD_READY_DEFAULT)
+        status["drain_seconds"] = state.get("drain_seconds", ZD_DRAIN_DEFAULT)
+        if slots:
+            status["slots"] = {}
+            for slot in ("",) + SLOTS:
+                unit = app_unit(domain_id, slot)
+                info = shown.get(unit, {})
+                if info.get("LoadState") in (None, "not-found") and slot != live:
+                    continue
+                mem = info.get("MemoryCurrent", "")
+                start = info.get("ExecMainStartTimestamp") or None
+                if state.get("listen") == "unix":
+                    endpoint = slot_socket_path(domain_id, slot)
+                elif state.get("listen") == "tcp" and slot_port(state, slot):
+                    endpoint = "127.0.0.1:%d" % slot_port(state, slot)
+                else:
+                    endpoint = None
+                status["slots"][slot] = {
+                    "unit": unit, "active_state": info.get("ActiveState"), "sub_state": info.get("SubState"),
+                    "main_pid": int(info.get("MainPID") or 0) if (info.get("MainPID") or "").isdigit() else 0,
+                    "memory_bytes": int(mem) if mem.isdigit() and int(mem) < 2 ** 63 else None,
+                    "started_iso": systemd_time_iso(start), "enabled": info.get("UnitFileState"),
+                    "endpoint": endpoint, "live": slot == live,
+                }
+        deploy = status["deploy"]
+        if isinstance(deploy, dict) and deploy.get("phase") and deploy.get("state") in ("queued", "running"):
+            deploy["phase_elapsed"] = max(0, int(time.time() - float(deploy.get("phase_started_epoch") or time.time())))
     if state and state.get("port"):
-        status["port"] = state["port"]
+        view = live_view(state) if slots else state
+        status["port"] = (slot_port(state, live) or state["port"]) if slots and state.get("listen") == "tcp" else state["port"]
         if state.get("listen") == "unix":
-            status["socket"] = socket_path(domain_id)
+            status["socket"] = endpoint_socket(view)
+            if zd_switchable(state):
+                status["proxy_socket"] = link_path(domain_id)
         if pw is not None:
-            listener, detail, code, params = listener_info(state, pw)
+            listener, detail, code, params = listener_info(view, pw)
         else:
             listener, detail, code, params = "none", "", "none", {}
         status["listener"] = listener
@@ -4699,13 +4990,30 @@ def app_status(domain_id, state=None):
         status["listening"] = listener == "ok"
         if state.get("health_path"):
             (status["health"], status["health_detail"], status["health_code"],
-             status["health_params"]) = health_check(state, listener)
+             status["health_params"]) = health_check(view, listener, pw)
+        if slots and pw is not None and state.get("listen") == "tcp" and state.get("zero_downtime") and not state.get("switch") \
+                and not (isinstance(status["deploy"], dict) and status["deploy"].get("phase")):
+            standby = slot_port(state, "a" if live == "b" else "b")
+            if standby:
+                uids = tcp_listener_uids(standby)
+                if not uids:
+                    status.update({"standby_listener": "none", "standby_detail": "nothing listens on 127.0.0.1:%d" % standby,
+                                   "standby_code": "standby_none", "standby_params": {"port": standby}})
+                elif uids == {pw.pw_uid}:
+                    status.update({"standby_listener": "ok", "standby_detail": "the application's user listens on 127.0.0.1:%d" % standby,
+                                   "standby_code": "standby_ok", "standby_params": {"port": standby}})
+                else:
+                    others = ", ".join(str(uid) for uid in sorted(uids - {pw.pw_uid}))
+                    status.update({"standby_listener": "foreign",
+                                   "standby_detail": "port %d of the next switch is held by uid %s; the switch uses another port" % (standby, others),
+                                   "standby_code": "standby_foreign", "standby_params": {"port": standby, "uids": others}})
     return status
 
 
-def health_check(state, listener):
+def health_check(state, listener, pw=None):
     """One HTTP GET of the health path (2 s, Host = domain): (healthy | unhealthy | unknown, detail,
-    code, params). Only talks to an endpoint held by the application's own user (listener "ok")."""
+    code, params). Only talks to an endpoint held by the application's own user (listener "ok");
+    a unix socket is opened without following a symbolic link (unix_connect)."""
     if listener != "ok":
         return "unknown", "The application is not listening", "not_listening", {}
     try:
@@ -4714,17 +5022,18 @@ def health_check(state, listener):
         host = state["domain"].encode("ascii", "replace").decode("ascii")
     request = ("GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: runway-health/%s\r\nAccept: */*\r\n"
                "Connection: close\r\n\r\n" % (state["health_path"], host, VERSION)).encode("ascii", "replace")
-    if state.get("listen") == "unix":
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        target = socket_path(state["domain_id"])
-    else:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        target = ("127.0.0.1", int(state["port"]))
     deadline = time.time() + HEALTH_TIMEOUT
     data = b""
+    sock = None
     try:
-        sock.settimeout(HEALTH_TIMEOUT)
-        sock.connect(target)
+        if state.get("listen") == "unix":
+            if pw is None:
+                pw = pwd.getpwnam(str(state.get("sysuser")))
+            sock = unix_connect(endpoint_socket(state), pw.pw_uid, HEALTH_TIMEOUT)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(HEALTH_TIMEOUT)
+            sock.connect(("127.0.0.1", int(state["port"])))
         sock.sendall(request)
         while b"\r\n" not in data and len(data) < 4096:
             remaining = deadline - time.time()
@@ -4735,11 +5044,12 @@ def health_check(state, listener):
             if not chunk:
                 break
             data += chunk
-    except OSError as exc:
+    except (OSError, KeyError) as exc:
         error = str(exc) or type(exc).__name__
         return "unhealthy", "Health check failed: %s" % error, "failed", {"error": error}
     finally:
-        sock.close()
+        if sock is not None:
+            sock.close()
     match = re.match(br"^HTTP/\d(?:\.\d)?\s+(\d{3})", data)
     if not match:
         return "unhealthy", "Health check got no valid HTTP response", "no_http", {}
@@ -4769,6 +5079,32 @@ def cmd_app_apply(payload):
     if state["enabled"] and not state["suspended"] and state["toolchain"] \
             and not toolchain_installed(state["runtime"], state["toolchain"]):
         raise HelperError("%s toolchain '%s' is not installed on this server" % (RUNTIMES[state["runtime"]].label, state["toolchain"]))
+    stored = read_json(app_state_path(domain_id))
+    if state["zero_downtime"] or (isinstance(stored, dict) and (zd_has_slots(helper_fields(stored)) or stored.get("zero_downtime")
+                                                                or slot_files_left(domain_id))):
+        # Zero-downtime slots (docs/DESIGN.md section 12.5): the whole apply runs under the deploy
+        # lock, so no switch, convergence or other writer of the pointer interleaves with it.
+        lock = FileLock("deploy-%d" % domain_id)
+        if not state["enabled"] or state["suspended"]:
+            # Disabling or suspension ends a running deployment first (a switch finishes or rolls back).
+            systemctl("disable", "--now", UNIT_PATH % domain_id)
+            systemctl("stop", UNIT_DEPLOY % domain_id, timeout=ZD_DEPLOY_STOP + 30)
+            if not lock.acquire(blocking=True, timeout=60):
+                raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+        elif unit_is_active(UNIT_DEPLOY % domain_id) or not lock.acquire(blocking=False):
+            raise HelperError("A deployment is running for this application. Wait until it finishes, then save again.")
+        try:
+            if isinstance(stored, dict) and helper_fields(stored)["switch"]:
+                # An interrupted switch is settled from the pointer before anything is re-pointed
+                # or stopped (the instance that carries the traffic must keep running).
+                try:
+                    current, current_pw = load_app_state(domain_id)
+                    zd_converge_locked(current, current_pw)
+                except HelperError:
+                    pass
+            return _zd_app_apply(state, pw, restart, start, resume)
+        finally:
+            lock.release()
     if not start and state["enabled"] and not state["suspended"] and unit_is_active(UNIT_DEPLOY % domain_id):
         raise HelperError("A deployment is running for this application. Wait until it finishes, then save again.")
     ensure_layout()
@@ -4777,8 +5113,10 @@ def cmd_app_apply(payload):
     # Runs as the customer: done before taking the global lock (it cannot be trusted to finish quickly).
     call_as_user(pw, _user_prepare_app_root, state["app_dir"])
     with FileLock("ports"):
-        state["port"] = allocate_port(domain_id, state["port"], state["port_range"])
         previous = read_json(app_state_path(domain_id))
+        # The helper's own port wins over the panel's copy (stored_port()); the panel's port only
+        # counts for an application without a stored state.
+        state["port"] = allocate_port(domain_id, stored_port(previous) or state["port"], state["port_range"])
         for key in FLAG_KEYS:
             state[key] = previous.get(key, CLEARED_FLAGS[key]) if isinstance(previous, dict) and not resume \
                 else CLEARED_FLAGS[key]
@@ -4811,7 +5149,98 @@ def cmd_app_apply(payload):
         systemctl("disable", "--now", path_unit)
         systemctl("stop", UNIT_DEPLOY % domain_id, timeout=150)
         systemctl("disable", "--now", app_unit)
-    return {"port": state["port"], "state": state}
+    return {"port": state["port"], "state": state, "switchable": False, "job": None}
+
+
+def _zd_app_apply(state, pw, restart, start, resume):
+    """app-apply of an application that has, gets or had zero-downtime slots (the deploy lock is
+    held): renders both slots, keeps the live instance running, writes the pointer, and starts
+    the switch job for a restart (docs/DESIGN.md section 12.5)."""
+    domain_id = state["domain_id"]
+    ensure_layout()
+    if state["listen"] == "unix":
+        web_server_group()
+    call_as_user(pw, _user_prepare_app_root, state["app_dir"])
+    with FileLock("ports"):
+        previous = read_json(app_state_path(domain_id))
+        previous = previous if isinstance(previous, dict) else None
+        # The helper's own port wins over the panel's copy (a switch may have given the 1.0 unit
+        # a new one).
+        state["port"] = allocate_port(domain_id, stored_port(previous) or state["port"], state["port_range"])
+        for key in FLAG_KEYS:
+            state[key] = previous.get(key, CLEARED_FLAGS[key]) if previous and not resume else CLEARED_FLAGS[key]
+        state.update(helper_fields(previous))
+        if previous and zd_has_slots(state) and (previous.get("listen") != state["listen"] or previous.get("sysuser") != state["sysuser"]
+                                                 or previous.get("app_dir") != state["app_dir"]):
+            # The web server configuration or the socket owner changes: the next restart is plain,
+            # also while the 1.0 unit is still the live instance (a switch would leave the site
+            # without a backend between Plesk's regeneration and the pointer move, and a new system
+            # user does not own the running instance's socket).
+            state["restart_plain"] = True
+        if state["zero_downtime"] and state["listen"] == "tcp":
+            if not state["port_a"]:
+                state["port_a"] = state["port"]
+            if not state["port_b"] or state["port_b"] in (state["port"], state["port_a"]):
+                state["port_b"] = allocate_extra_port(domain_id, state["port_range"], {state["port"], state["port_a"]})
+        elif not state["slot"]:
+            state["port_a"] = state["port_b"] = 0
+        state["updated_epoch"] = time.time()
+        write_json(app_state_path(domain_id), state)
+    if not previous or previous.get("app_dir") != state["app_dir"]:
+        write_json(app_triggers_path(domain_id), trigger_mtimes(pw, state["app_dir"]))
+    active = state["enabled"] and not state["suspended"]
+    live = state["slot"]
+    if live and (not state["zero_downtime"] or state["listen"] == "none") \
+            and (not active or state["stopped"] or not unit_is_active(app_unit(domain_id, live))):
+        # Turned off (or a worker now) while nothing runs: back to the 1.0 unit at once.
+        state = retire_slots(state, pw)
+        live = ""
+    elif not zd_has_slots(state) and slot_files_left(domain_id):
+        # Turned off before the first switch (the slots were rendered but never ran): their units
+        # and environment files go now.
+        state = retire_slots(state, pw)
+    if zd_has_slots(state):
+        ensure_converge_unit()
+    write_units(state, pw)
+    if pointer_wanted(state):
+        if write_pointer(state, pw, live):
+            web_unit, web_kind = web_traffic_server()
+            if web_unit and config_references(state, "%s/%d." % (WEB_DIR, domain_id)):
+                # The include is in use: the traffic reaches the live instance before any other
+                # instance stops below.
+                with FileLock("web-reload"):
+                    web_reload_confirm(web_unit, web_kind)
+    elif state["listen"] == "unix":
+        write_tmpfiles(state, pw)
+    if state["listen"] != "unix":
+        remove_socket_dir(domain_id)
+        remove_quietly(tmpfiles_path(domain_id))
+    systemctl("daemon-reload", check=True)
+    path_unit = UNIT_PATH % domain_id
+    live_unit = app_unit(domain_id, live)
+    others = [unit for unit in existing_app_units(domain_id) if unit != live_unit]
+    job = None
+    if active:
+        if state["auto_deploy"]:
+            systemctl("enable", path_unit, check=True)
+            systemctl("restart", path_unit)
+        else:
+            systemctl("disable", "--now", path_unit)
+        if state["stopped"]:
+            # Stopped by the user (or contained by Runway): enabled for builds, but not running.
+            systemctl("disable", "--now", *existing_app_units(domain_id), timeout=120)
+        else:
+            if others:
+                systemctl("disable", "--now", *others, timeout=120)
+            systemctl("enable", live_unit, check=True)
+            running = unit_is_active(live_unit)
+            if start and restart and running and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
+                job = start_deploy_job(domain_id, "restart", False)["job"]
+            elif start and (restart or not running):
+                state = zd_plain_restart(state, pw)[0]
+    else:
+        systemctl("disable", "--now", *existing_app_units(domain_id), timeout=120)
+    return {"port": state["port"], "state": state, "switchable": zd_switchable(state), "job": job}
 
 
 def cmd_app_remove(payload):
@@ -4821,15 +5250,23 @@ def cmd_app_remove(payload):
 
 
 def remove_app(domain_id):
-    units = [UNIT_PATH % domain_id, UNIT_DEPLOY % domain_id, UNIT_APP % domain_id]
+    """Stops and deletes everything of an application: its units (the 1.0 unit and both
+    zero-downtime slots), environment files, state, tmpfiles entry, socket directory, root link,
+    web server include files and job files (the ports are free with the state file)."""
+    units = [UNIT_PATH % domain_id, UNIT_DEPLOY % domain_id] + [
+        unit for unit in all_app_units(domain_id)
+        if unit == UNIT_APP % domain_id or os.path.exists(os.path.join(UNIT_DIR, unit))]
     systemctl("disable", "--now", *units, timeout=120)
     for unit in units:
         remove_quietly(os.path.join(UNIT_DIR, unit))
-    remove_quietly(env_file_path(domain_id))
+    for slot in ("",) + SLOTS:
+        remove_quietly(env_file_path(domain_id, slot))
     remove_quietly(app_state_path(domain_id))
     remove_quietly(app_triggers_path(domain_id))
     remove_quietly(tmpfiles_path(domain_id))
     remove_socket_dir(domain_id)
+    remove_link(domain_id)
+    remove_include(domain_id)
     for path in job_paths("deploy-%d" % domain_id):
         remove_quietly(path)
     systemctl("daemon-reload")
@@ -4844,6 +5281,8 @@ def cmd_app_action(payload):
     domain_id = v_domain_id((payload or {}).get("domain_id"))
     action = (payload or {}).get("action")
     state, pw = load_app_state(domain_id)
+    if zd_has_slots(state):
+        return _zd_app_action(state, pw, action, bool((payload or {}).get("plain")))
     unit = UNIT_APP % domain_id
     if action in ("start", "restart", "recover"):
         if not state["enabled"]:
@@ -4866,6 +5305,68 @@ def cmd_app_action(payload):
     else:
         raise HelperError("Invalid action")
     return {"action": action}
+
+
+def _zd_app_action(state, pw, action, plain):
+    """app-action of an application with zero-downtime slots (docs/DESIGN.md section 12.5):
+    restart of a running application starts the switch job ({action, job}); plain (Restart in
+    place), start and recover act on the live unit; stop stops every app unit."""
+    domain_id = state["domain_id"]
+    if action == "stop":
+        update_state_flags(domain_id, stopped=True)
+        systemctl("disable", "--now", *existing_app_units(domain_id), check=True, timeout=120)
+        return {"action": action}
+    if action not in ("start", "restart", "recover"):
+        raise HelperError("Invalid action")
+    if not state["enabled"]:
+        raise HelperError("The application is disabled")
+    if state["suspended"]:
+        raise HelperError("The domain is suspended")
+    if action == "recover" and state["stopped"]:
+        raise HelperError("The application is stopped")
+    lock = FileLock("deploy-%d" % domain_id)
+    busy = unit_is_active(UNIT_DEPLOY % domain_id) or not lock.acquire(blocking=False)
+    try:
+        if not busy and state["switch"]:
+            # An interrupted switch is settled from the pointer first, so the instance that carries
+            # the traffic is the one started or restarted (docs/DESIGN.md section 12.8).
+            try:
+                zd_converge_locked(state, pw)
+            except HelperError:
+                pass
+            state, pw = load_app_state(domain_id)
+        live_unit = app_unit(domain_id, state["slot"])
+        if action == "restart" and (busy or plain or unit_is_active(live_unit)):
+            if busy:
+                raise HelperError("A deployment is already running for this application")
+            if action != "recover" and (state["stopped"] or state["tampered"]):
+                update_state_flags(domain_id, **CLEARED_FLAGS)
+                state.update(CLEARED_FLAGS)
+            if not plain and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
+                return {"action": action, "job": start_deploy_job(domain_id, "restart", False)["job"]}
+            zd_plain_restart(state, pw)
+            return {"action": action}
+        if action != "recover" and (state["stopped"] or state["tampered"]):
+            update_state_flags(domain_id, **CLEARED_FLAGS)
+            state.update(CLEARED_FLAGS)
+        if not busy:
+            if not state["zero_downtime"] and state["slot"]:
+                # Turned off and nothing runs: the 1.0 unit starts instead of the slot.
+                zd_plain_restart(state, pw)
+                return {"action": action}
+            if pointer_wanted(state) and write_pointer(state, pw, state["slot"]):
+                web_unit = web_traffic_server()[0]
+                if web_unit:
+                    with FileLock("web-reload"):
+                        web_reload_nowait(web_unit)
+        prepare_start(live_view(state), pw)
+        systemctl("enable", live_unit, check=True)
+        systemctl("reset-failed", live_unit)
+        systemctl("restart" if action == "restart" else "start", "--no-block", live_unit, check=True)
+        return {"action": action}
+    finally:
+        if not busy:
+            lock.release()
 
 
 DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart"}
@@ -4906,26 +5407,34 @@ def cmd_app_deploy(payload):
             # "Build & restart" in the panel is an explicit start: it clears "stopped". Deploys
             # from the CLI, fetches and trigger files build a stopped application but keep it stopped.
             update_state_flags(domain_id, **CLEARED_FLAGS)
-            systemctl("enable", UNIT_APP % domain_id)
+            systemctl("enable", app_unit(domain_id, state["slot"]))
             stopped = False
-        title, title_key = deploy_title(mode, stopped)
-        ensure_helper_copy()
-        status_path, _log, request_path = job_paths(job)
-        ensure_dir(JOBS_DIR, 0o700)
-        request = {"mode": mode, "source": "panel"}
-        if fetch:
-            request["fetch"] = fetch
-        write_json(request_path, request)
-        job_set_status(job, state="queued", title=title, title_key=title_key, title_params={},
-                       queued_at=now_iso(), queued_epoch=time.time(), started_at=None, finished_at=None, message=None)
-        systemctl("reset-failed", unit)
-        proc = systemctl("start", "--no-block", unit)
-        if proc.returncode != 0:
-            remove_quietly(request_path)
-            job_set_status(job, state="failed", finished_at=now_iso(), message=proc.stderr.strip())
-            raise HelperError("Could not start deployment: %s" % proc.stderr.strip())
+        return start_deploy_job(domain_id, mode, stopped, fetch)
     finally:
         lock.release()
+
+
+def start_deploy_job(domain_id, mode, stopped, fetch=None):
+    """Queues a request for the deploy unit and starts it (the caller holds the deploy lock)."""
+    job = "deploy-%d" % domain_id
+    unit = UNIT_DEPLOY % domain_id
+    title, title_key = deploy_title(mode, stopped)
+    ensure_helper_copy()
+    _status_path, _log, request_path = job_paths(job)
+    ensure_dir(JOBS_DIR, 0o700)
+    request = {"mode": mode, "source": "panel"}
+    if fetch:
+        request["fetch"] = fetch
+    write_json(request_path, request)
+    job_set_status(job, state="queued", title=title, title_key=title_key, title_params={},
+                   queued_at=now_iso(), queued_epoch=time.time(), started_at=None, finished_at=None, message=None,
+                   phase="", slot_from=None, slot_to=None)
+    systemctl("reset-failed", unit)
+    proc = systemctl("start", "--no-block", unit)
+    if proc.returncode != 0:
+        remove_quietly(request_path)
+        job_set_status(job, state="failed", finished_at=now_iso(), message=proc.stderr.strip())
+        raise HelperError("Could not start deployment: %s" % proc.stderr.strip())
     return {"job": job}
 
 
@@ -5319,9 +5828,12 @@ def cmd_app_logs(payload):
         return {"log": tail_file(job_paths("deploy-%d" % domain_id)[1], lines)}
     if kind != "app":
         raise HelperError("Invalid log kind")
-    # Newest first, so the byte budget keeps the most recent entries; reversed afterwards.
-    text = capped_output(["journalctl", "-u", UNIT_APP % domain_id, "-n", str(lines), "-r", "--no-pager",
-                          "-o", "short-iso", "--no-hostname"])
+    # Newest first, so the byte budget keeps the most recent entries; reversed afterwards. Both
+    # zero-downtime slots write their own journal identifier (runway-app-<id>-a/-b): merged by time.
+    cmd = ["journalctl"]
+    for unit in all_app_units(domain_id):
+        cmd += ["-u", unit]
+    text = capped_output(cmd + ["-n", str(lines), "-r", "--no-pager", "-o", "short-iso", "--no-hostname"])
     return {"log": "\n".join(reversed(text.splitlines()))}
 
 
@@ -5363,12 +5875,22 @@ def cmd_app_inspect(payload):
     return result
 
 
-def cmd_apps_list(_payload):
+def cmd_apps_list(payload):
+    """Every application with the state of its live unit. converge: true (the panel's scheduled
+    Reconcile only) also repairs zero-downtime slots and pointers (docs/DESIGN.md section 12.8)."""
+    converge = bool((payload or {}).get("converge"))
     states = list(iter_app_states())
     for state in states:
+        if not isinstance(state.get("domain_id"), int):
+            continue
+        if converge and zd_needs_converge(state):
+            try:
+                zd_converge(state)
+            except Exception as exc:  # noqa: BLE001 - one application must not stop the list
+                journal_note(state["domain_id"], "the convergence failed: %s" % exc)
         # Unix mode: contain a tampered socket path (docs/DESIGN.md section 7). Reconcile calls
         # apps-list every 10 minutes, so the check also runs when nobody looks at the panel.
-        if state.get("listen") != "unix" or not isinstance(state.get("domain_id"), int):
+        if state.get("listen") != "unix":
             continue
         try:
             pw = pwd.getpwnam(str(state.get("sysuser")))
@@ -5378,19 +5900,48 @@ def cmd_apps_list(_payload):
         if found and not state.get("tampered"):
             contain_tampering(state, found[0])
         elif found:
-            unlink_socket_entry(state["domain_id"])
-    units = [UNIT_APP % int(s["domain_id"]) for s in states]
-    shown = unit_show(units, ["ActiveState", "SubState", "MemoryCurrent", "Result", "NRestarts"])
+            unlink_socket_entry(state["domain_id"], os.path.basename(found[2]["path"]))
+    if converge:
+        states = list(iter_app_states())
+    units = []
+    for state in states:
+        live = state.get("slot") if state.get("slot") in SLOTS else ""
+        units.append(app_unit(int(state["domain_id"]), live))
+    extra = [app_unit(int(s["domain_id"]), slot) for s in states if zd_has_slots(helper_fields(s)) or s.get("zero_downtime")
+             for slot in ("",) + SLOTS]
+    shown = unit_show(list(dict.fromkeys(units + extra)), ["ActiveState", "SubState", "MemoryCurrent", "Result", "NRestarts"])
     apps = []
     for state, unit in zip(states, units):
         info = shown.get(unit, {})
         memory = info.get("MemoryCurrent", "")
+        memory_bytes = int(memory) if memory.isdigit() and int(memory) < 2 ** 63 else None
+        fields = helper_fields(state)
+        slots = zd_has_slots(dict(state, **fields))
+        if slots:
+            # Both versions run during a switch: the application's memory is their sum.
+            total = 0
+            for slot in ("",) + SLOTS:
+                mem = shown.get(app_unit(int(state["domain_id"]), slot), {}).get("MemoryCurrent", "")
+                if mem.isdigit() and int(mem) < 2 ** 63:
+                    total += int(mem)
+            memory_bytes = total if total or memory_bytes is not None else None
+        live_port = state.get("port")
+        if slots and state.get("listen") == "tcp":
+            view = dict(state, **fields)
+            live_port = slot_port(view, fields["slot"]) or state.get("port")
         apps.append({
             "domain_id": state.get("domain_id"),
             "domain": state.get("domain"),
             "runtime": state.get("runtime"),
             "toolchain": state.get("toolchain"),
             "port": state.get("port"),
+            "live_port": live_port,
+            "zero_downtime": bool(state.get("zero_downtime")),
+            "switchable": state.get("listen") in ("tcp", "unix") and slots,
+            "slot": fields["slot"],
+            "port_a": fields["port_a"],
+            "port_b": fields["port_b"],
+            "switching": bool(fields["switch"]),
             "enabled": state.get("enabled"),
             "listen": state.get("listen", "tcp"),
             "mode": state.get("mode", "web"),
@@ -5409,7 +5960,7 @@ def cmd_apps_list(_payload):
             "start_limit_hit": info.get("ActiveState") == "failed" and (
                 info.get("Result") == "start-limit-hit"
                 or int(info.get("NRestarts") or 0 if (info.get("NRestarts") or "").isdigit() else 0) >= APP_START_LIMIT_BURST),
-            "memory_bytes": int(memory) if memory.isdigit() and int(memory) < 2 ** 63 else None,
+            "memory_bytes": memory_bytes,
         })
     return {"apps": apps, "reconcile_paused": reconcile_paused()}
 
@@ -5486,14 +6037,38 @@ def cmd_reapply_all(_payload):
                               % (domain_id, ", ".join(dropped)))
             state, pw = validate_app(raw)
             state["port"] = raw.get("port", 0)
-            write_units(state, pw)
+            state.update(helper_fields(raw))
+            if zd_has_slots(state):
+                # Zero-downtime slots: the units and env files of both slots; the pointer only
+                # while no deployment holds the deploy lock (docs/DESIGN.md section 12.8).
+                ensure_converge_unit()
+                lock = FileLock("deploy-%d" % state["domain_id"])
+                if lock.acquire(blocking=False):
+                    try:
+                        state, pw = load_app_state(state["domain_id"])
+                        if state["switch"]:
+                            # An interrupted switch is settled from the pointer first (§12.8).
+                            zd_converge_locked(state, pw)
+                            state, pw = load_app_state(state["domain_id"])
+                        write_units(state, pw)
+                        if pointer_wanted(state):
+                            write_pointer(state, pw, state["slot"])
+                    finally:
+                        lock.release()
+                else:
+                    errors.append("#%s: a deployment is running; its units were not re-rendered" % domain_id)
+            else:
+                write_units(state, pw)
             if state["listen"] == "unix":
                 ensure_socket_dir(state["domain_id"], pw)
             count += 1
         except Exception as exc:  # noqa: BLE001
             errors.append("#%s: %s" % (domain_id, exc))
-            if isinstance(domain_id, int) and _strip_privileged_exec(os.path.join(UNIT_DIR, UNIT_APP % domain_id)):
-                errors.append("#%s: removed root-privileged Exec lines from the old unit file" % domain_id)
+            if isinstance(domain_id, int):
+                for unit in all_app_units(domain_id):
+                    if _strip_privileged_exec(os.path.join(UNIT_DIR, unit)):
+                        errors.append("#%s: removed root-privileged Exec lines from the old unit file%s"
+                                      % (domain_id, "" if unit == UNIT_APP % domain_id else " " + unit))
     systemctl("daemon-reload")
     return {"count": count, "errors": errors}
 
@@ -5517,6 +6092,9 @@ def cmd_uninstall(payload):
         except Exception:  # noqa: BLE001 - best effort during uninstall
             pass
     systemctl("stop", UNIT_ADMIN_JOB)
+    if os.path.exists(os.path.join(UNIT_DIR, UNIT_CONVERGE)):
+        remove_converge_unit()
+        systemctl("daemon-reload")
     for name in _listdir(TMPFILES_DIR):
         if name == "runway.conf" or re.match(r"^runway-\d+\.conf$", name):
             remove_quietly(os.path.join(TMPFILES_DIR, name))
@@ -5587,11 +6165,17 @@ def _rearm_deploy(domain_id):
 def internal_deploy(domain_id):
     job = "deploy-%d" % domain_id
     lock = FileLock(job)
-    if not lock.acquire(blocking=True, timeout=30):
+    # The panel's app-apply and the convergence hold the lock briefly (zero-downtime slots).
+    if not lock.acquire(blocking=True, timeout=120):
+        _deploy_lock_busy(domain_id, job)
         return
     started = time.time()
 
     def on_term(_signum, _frame):
+        if _TERM["critical"]:
+            # A zero-downtime switch moved (or is moving) the traffic: it finishes first.
+            _TERM["pending"] = True
+            return
         try:
             limit = deploy_timeout(load_app_state(domain_id)[0])
         except HelperError:
@@ -5607,6 +6191,8 @@ def internal_deploy(domain_id):
         # previous round ran (systemd's path unit does not watch while the deploy unit runs).
         for _round in range(3):
             _deploy_once(domain_id, job)
+            if _TERM["pending"]:
+                break
             if os.path.exists(job_paths(job)[2]):
                 continue
             if not _triggers_moved(domain_id):
@@ -5615,12 +6201,70 @@ def internal_deploy(domain_id):
                 state = load_app_state(domain_id)[0]
             except HelperError:
                 break
-            if time.time() - started + state["build_timeout"] + 300 > deploy_timeout(state) or _round == 2:
+            # Every round may build and switch: the same allowance deploy_timeout() adds.
+            if time.time() - started + state["build_timeout"] + 300 + switch_allowance(state) > deploy_timeout(state) \
+                    or _round == 2:
                 _rearm_deploy(domain_id)
                 break
     finally:
         signal.signal(signal.SIGTERM, signal.SIG_DFL)
         lock.release()
+
+
+def _deploy_lock_busy(domain_id, job):
+    """The deploy lock stayed busy: a panel request fails with the reason, and the job starts again
+    a minute later so a trigger file is not lost."""
+    request_path = job_paths(job)[2]
+    if os.path.exists(request_path):
+        remove_quietly(request_path)
+        job_set_status(job, state="failed", finished_at=now_iso(), exit_code=1,
+                       message="Another operation of this application held its lock for two minutes; the deployment "
+                               "did not start. Try again.")
+    else:
+        _rearm_deploy(domain_id)
+
+
+def restart_and_check(state, pw, unit, log, restarted=False):
+    """Restarts `unit` (unless `restarted`) and checks that it runs and listens on the endpoint of
+    `state` (a slot view for zero-downtime slots). Returns (ok, message); raises HelperError."""
+    if not restarted:
+        prepare_start(state, pw)
+        log.line("Restarting %s" % unit)
+        systemctl("reset-failed", unit)
+        proc = systemctl("restart", unit, timeout=120)
+        if proc.returncode != 0:
+            raise HelperError("systemctl restart failed: %s" % proc.stderr.strip())
+    if state["listen"] == "none":
+        time.sleep(3)
+        if not unit_running(unit):
+            raise HelperError("The worker is not running (it keeps exiting). Check the application log.")
+        log.line("Worker is running (workers have no listener to check).")
+        return True, None
+    deadline = time.time() + 30
+    listener, detail = "none", ""
+    while time.time() < deadline:
+        listener, detail = listener_state(state, pw)
+        if listener != "none" or not unit_is_active(unit):
+            break
+        time.sleep(0.5)
+    endpoint = endpoint_socket(state) if state["listen"] == "unix" else "127.0.0.1:%d" % int(state["port"])
+    hint = "RUNWAY_SOCKET" if state["listen"] == "unix" else "PORT"
+    if listener == "tampered":
+        contain_tampering(state, detail)
+        raise HelperError("The socket path was tampered with (%s); the application was stopped." % detail)
+    if listener == "foreign":
+        raise HelperError("Another user's process holds the application endpoint (%s). "
+                          "The application cannot serve the domain until it is released." % detail)
+    if listener == "ok":
+        log.line("Application is listening on %s" % endpoint)
+        return True, None
+    if not unit_running(unit):
+        raise HelperError("The service is not running (it keeps exiting). Check the application log.")
+    if unit_is_active(unit):
+        log.line("WARNING: the service is running but nothing listens on %s yet. "
+                 "Make sure the application listens on the %s environment variable." % (endpoint, hint))
+        return True, "Service running, but nothing listens on %s yet" % endpoint
+    raise HelperError("The service stopped right after starting. Check the application log.")
 
 
 def _deploy_once(domain_id, job):
@@ -5696,46 +6340,13 @@ def _deploy_once(domain_id, job):
             ok = True
             message = "The application is stopped; it was not started"
             return
-        prepare_start(fresh, pw)
-        log.line("Restarting %s" % unit)
-        systemctl("reset-failed", unit)
-        proc = systemctl("restart", unit, timeout=120)
-        if proc.returncode != 0:
-            raise HelperError("systemctl restart failed: %s" % proc.stderr.strip())
-        if fresh["listen"] == "none":
-            time.sleep(3)
-            if not unit_running(unit):
-                raise HelperError("The worker is not running (it keeps exiting). Check the application log.")
-            log.line("Worker is running (workers have no listener to check).")
-            ok = True
+        if zd_has_slots(fresh):
+            # Zero-downtime slots (docs/DESIGN.md section 12.4): a switch, or a plain restart (also
+            # of an application that became a worker while a slot runs: the 1.0 unit does not exist
+            # then, zd_restart() retires the slots first).
+            ok, message = zd_restart(fresh, pw, job, log)
             return
-        deadline = time.time() + 30
-        listener, detail = "none", ""
-        while time.time() < deadline:
-            listener, detail = listener_state(fresh, pw)
-            if listener != "none" or not unit_is_active(unit):
-                break
-            time.sleep(0.5)
-        endpoint = socket_path(domain_id) if fresh["listen"] == "unix" else "127.0.0.1:%d" % int(fresh["port"])
-        hint = "RUNWAY_SOCKET" if fresh["listen"] == "unix" else "PORT"
-        if listener == "tampered":
-            contain_tampering(fresh, detail)
-            raise HelperError("The socket path was tampered with (%s); the application was stopped." % detail)
-        if listener == "foreign":
-            raise HelperError("Another user's process holds the application endpoint (%s). "
-                              "The application cannot serve the domain until it is released." % detail)
-        if listener == "ok":
-            log.line("Application is listening on %s" % endpoint)
-            ok = True
-        elif not unit_running(unit):
-            raise HelperError("The service is not running (it keeps exiting). Check the application log.")
-        elif unit_is_active(unit):
-            log.line("WARNING: the service is running but nothing listens on %s yet. "
-                     "Make sure the application listens on the %s environment variable." % (endpoint, hint))
-            ok = True
-            message = "Service running, but nothing listens on %s yet" % endpoint
-        else:
-            raise HelperError("The service stopped right after starting. Check the application log.")
+        ok, message = restart_and_check(fresh, pw, unit, log)
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         log.line("ERROR: %s" % exc)
@@ -5744,6 +6355,1314 @@ def _deploy_once(domain_id, job):
         log.close()
         job_set_status(job, state="succeeded" if ok else "failed", finished_at=now_iso(),
                        exit_code=0 if ok else 1, message=message)
+
+
+# ---------------------------------------------------------------------------
+# Zero-downtime deployments (docs/DESIGN.md section 12)
+#
+# An application with the setting on runs in one of two slot units (runway-app-<id>-a/-b); a
+# switch starts the other slot, waits until it is ready, moves the web server's pointer to it
+# (unix: the root link /run/runway/<id>.sock; tcp: the include files in /etc/runway/web and a
+# graceful reload), drains and stops the old one. The pointer is the truth about which instance
+# carries the traffic: everything that finds an interrupted switch decides from it.
+# ---------------------------------------------------------------------------
+
+_O_PATH = getattr(os, "O_PATH", 0o10000000)
+# SIGTERM of the deploy job inside a critical section (from the traffic move on) only sets
+# "pending"; the job then finishes the switch instead of leaving it half done.
+_TERM = {"critical": 0, "pending": False}
+
+
+class SwitchFailed(HelperError):
+    """A switch that failed while the running version keeps serving."""
+
+
+def zd_has_slots(state):
+    """True when the application uses (or still uses) zero-downtime slots: the setting is on, a
+    slot is still the live instance after it was turned off, or the intent record of an
+    interrupted switch exists (also of a switch back to the 1.0 unit that already committed: the
+    old slot may still run, and the convergence, Stop, suspension and the socket check must cover
+    it until the slots are retired)."""
+    return bool(state.get("zero_downtime")) or state.get("slot") in SLOTS or isinstance(state.get("switch"), dict)
+
+
+def slot_files_left(domain_id):
+    """True when a unit or environment file of a zero-downtime slot exists (e.g. after the
+    setting was turned off before the first switch, or after the boot repair of an interrupted
+    switch back to the 1.0 unit): the convergence and app-apply retire them."""
+    return any(os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot))) or os.path.exists(env_file_path(domain_id, slot))
+               for slot in SLOTS)
+
+
+def zd_switchable(state):
+    """The web server snippet of the application must use the pointer (PHP stores this)."""
+    return state.get("listen") in ("tcp", "unix") and zd_has_slots(state)
+
+
+def zd_target(state):
+    """The instance a switch starts: the other slot while the setting is on, the 1.0 unit ("")
+    when it was turned off and a slot is still live; None when there is nothing to switch."""
+    if state.get("zero_downtime") and state.get("listen") in ("tcp", "unix"):
+        return "a" if state.get("slot") == "b" else "b"
+    if state.get("slot") in SLOTS:
+        return ""
+    return None
+
+
+def slot_label(slot):
+    """Name of an instance in messages: "slot a", or the classic (single-instance) unit."""
+    return "slot %s" % slot if slot else "the classic unit"
+
+
+def slot_port(state, slot):
+    if slot == "a":
+        return state.get("port_a") or state.get("port")
+    if slot == "b":
+        return state.get("port_b")
+    return state.get("port")
+
+
+def slot_view(state, slot):
+    """The state as one instance sees it: a slot's port, socket and RUNWAY_SLOT (render_app_unit,
+    render_env_file, listen_env, listener_info, health_check and prepare_start use it)."""
+    view = dict(state)
+    if slot:
+        view["_slot"] = slot
+        view["port"] = slot_port(state, slot) or 0
+    view["_socket"] = slot_socket_path(state["domain_id"], slot)
+    return view
+
+
+def live_view(state):
+    return slot_view(state, state.get("slot") or "")
+
+
+def existing_app_units(domain_id):
+    """App units of the application that have a unit file (systemctl refuses unknown names)."""
+    units = [unit for unit in all_app_units(domain_id) if os.path.exists(os.path.join(UNIT_DIR, unit))]
+    return units or [UNIT_APP % domain_id]
+
+
+def unit_enabled(unit):
+    return run(["systemctl", "is-enabled", unit], timeout=30).stdout.strip() in ("enabled", "enabled-runtime")
+
+
+def zd_journal(state, message, priority=5):
+    journal_note(state["domain_id"], message, priority)
+
+
+# --- pointer: root link (unix) and include files (tcp) ------------------------------------------
+
+def set_link(domain_id, slot):
+    """Root: points /run/runway/<id>.sock at the slot's socket: a new symlink under a random name,
+    renamed over the old one through the directory descriptor of /run/runway (atomic, never
+    follows anything). Returns True when it changed."""
+    ensure_run_dir()
+    target = link_target(domain_id, slot)
+    name = "%d.sock" % domain_id
+    fd = os.open(RUN_DIR, _DIR_FLAGS)
+    try:
+        try:
+            if os.readlink(name, dir_fd=fd) == target:
+                return False
+        except OSError:
+            pass
+        tmp = ".%d.%s.tmp" % (domain_id, base64.b16encode(os.urandom(6)).decode("ascii").lower())
+        os.symlink(target, tmp, dir_fd=fd)
+        try:
+            os.rename(tmp, name, src_dir_fd=fd, dst_dir_fd=fd)
+        except OSError:
+            try:
+                os.unlink(tmp, dir_fd=fd)
+            except OSError:
+                pass
+            raise
+        return True
+    finally:
+        os.close(fd)
+
+
+def read_link_slot(domain_id):
+    """The slot the root link points at ("" = app.sock), or None (missing or not Runway's)."""
+    path = link_path(domain_id)
+    try:
+        st = os.lstat(path)
+        if not stat.S_ISLNK(st.st_mode) or st.st_uid != 0:
+            return None
+        return _slot_of_target(domain_id, os.readlink(path))
+    except OSError:
+        return None
+
+
+def remove_link(domain_id):
+    try:
+        fd = os.open(RUN_DIR, _DIR_FLAGS)
+    except OSError:
+        return
+    try:
+        name = "%d.sock" % domain_id
+        st = os.stat(name, dir_fd=fd, follow_symlinks=False)
+        if not stat.S_ISDIR(st.st_mode):
+            os.unlink(name, dir_fd=fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _read_exact(path, limit=4096):
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read(limit)
+    except OSError:
+        return None
+
+
+def write_include(domain_id, port):
+    """Root-owned include files of a switchable tcp application naming the live port (nginx:
+    $runway_upstream; Apache: RUNWAY_UPSTREAM_<id> and RUNWAY_PORT_<id>). Returns True when a
+    file changed."""
+    ensure_dir(WEB_DIR, 0o755)
+    nginx, apache = include_paths(domain_id)
+    header = "# Managed by the Plesk Runway extension. Do not edit.\n"
+    changed = False
+    for path, text in ((nginx, header + "set $runway_upstream 127.0.0.1:%d;\n" % int(port)),
+                       (apache, header + "Define RUNWAY_UPSTREAM_%d http://127.0.0.1:%d\nDefine RUNWAY_PORT_%d %d\n"
+                        % (domain_id, int(port), domain_id, int(port)))):
+        if _read_exact(path) != text:
+            write_file_atomic(path, text, 0o644)
+            changed = True
+    return changed
+
+
+def read_include_port(domain_id):
+    match = re.search(r"^set \$runway_upstream 127\.0\.0\.1:(\d{1,5});$", _read_exact(include_paths(domain_id)[0]) or "", re.M)
+    return int(match.group(1)) if match else None
+
+
+def include_mtime(domain_id):
+    mtimes = []
+    for path in include_paths(domain_id):
+        try:
+            mtimes.append(os.stat(path).st_mtime)
+        except OSError:
+            pass
+    return max(mtimes) if mtimes else 0.0
+
+
+def remove_include(domain_id):
+    for path in include_paths(domain_id):
+        remove_quietly(path)
+    try:
+        os.rmdir(WEB_DIR)  # only when no other application uses it
+    except OSError:
+        pass
+
+
+def read_pointer_slot(state):
+    """The instance the pointer names: the root link's slot (unix) or the slot whose port the
+    include names (tcp; the intent's target, the live slot and the intent's source first, because
+    the 1.0 port and slot a's port may be the same number while only one of them runs)."""
+    domain_id = state["domain_id"]
+    if state.get("listen") == "unix":
+        return read_link_slot(domain_id)
+    if state.get("listen") != "tcp":
+        return None
+    port = read_include_port(domain_id)
+    if port is None:
+        return None
+    intent = state.get("switch") or {}
+    order = [intent.get("to"), state.get("slot") or "", intent.get("from"), "a", "b", ""]
+    for slot in order:
+        if slot is not None and slot_port(state, slot) == port:
+            return slot
+    return None
+
+
+def pointer_wanted(state):
+    """The pointer files must name the live instance: the application is switchable, or its web
+    server snippet may still use them (until Plesk regenerated the 1.0 snippet)."""
+    domain_id = state["domain_id"]
+    return state.get("listen") in ("tcp", "unix") and (zd_switchable(state) or os.path.lexists(link_path(domain_id))
+                                                      or os.path.exists(include_paths(domain_id)[0]))
+
+
+def write_pointer(state, pw, slot):
+    """Points the web server at `slot` (the caller holds the application's deploy lock). tcp:
+    returns True when the include files changed (a reload makes it effective)."""
+    domain_id = state["domain_id"]
+    if state.get("listen") == "unix":
+        ensure_socket_dir(domain_id, pw)
+        set_link(domain_id, slot)
+        write_tmpfiles(state, pw, link_slot=slot)
+        return False
+    if state.get("listen") == "tcp":
+        port = slot_port(state, slot)
+        return bool(port) and write_include(domain_id, port)
+    return False
+
+
+def tmpfiles_drop_link(state, pw):
+    """The tmpfiles entry without its L line (the root link is no longer used)."""
+    if state.get("listen") == "unix" and tmpfiles_link_slot(state["domain_id"]) is not None:
+        write_tmpfiles(state, pw)
+
+
+# --- web server: which one carries the traffic, its worker generations, reloads ------------------
+
+_PROC_TIME = []
+
+
+def _proc_clock():
+    """(boot time as epoch seconds, clock ticks per second). The boot time comes from
+    /proc/uptime (10 ms resolution; btime of /proc/stat is whole seconds, too coarse to compare
+    process start times with file modification times)."""
+    if not _PROC_TIME:
+        try:
+            uptime = float((_read_text("/proc/uptime", 256) or "0").split()[0])
+        except ValueError:
+            uptime = 0.0
+        _PROC_TIME.append((time.time() - uptime, float(os.sysconf("SC_CLK_TCK") or 100)))
+    return _PROC_TIME[0]
+
+
+def proc_stat(pid):
+    """(ppid, start time as epoch seconds) of a process, or None."""
+    data = _read_text("/proc/%d/stat" % pid, 4096)
+    if not data or ")" not in data:
+        return None
+    fields = data.rsplit(")", 1)[1].split()
+    try:
+        btime, ticks = _proc_clock()
+        return int(fields[1]), btime + int(fields[19]) / ticks
+    except (IndexError, ValueError):
+        return None
+
+
+def proc_title(pid):
+    try:
+        with open("/proc/%d/cmdline" % pid, "rb") as fh:
+            return fh.read(512).replace(b"\0", b" ").decode("utf-8", "replace").strip()
+    except OSError:
+        return ""
+
+
+def web_traffic_server():
+    """(unit, kind) of the web server that carries the domains' traffic: nginx when it runs,
+    else Apache; (None, None) when neither runs."""
+    for unit, kind in (("nginx.service", "nginx"), ("apache2.service", "apache"), ("httpd.service", "apache")):
+        if run(["systemctl", "is-active", unit], timeout=30).stdout.strip() == "active":
+            return unit, kind
+    return None, None
+
+
+def web_main_pid(unit):
+    main = unit_show([unit], ["MainPID"]).get(unit, {}).get("MainPID", "0")
+    try:
+        return int(main)
+    except ValueError:
+        return 0
+
+
+def web_workers(unit, kind):
+    """Worker processes of the web server: [{pid, start, old}], old = an nginx worker that is
+    shutting down (Apache children cannot be told apart: old is False)."""
+    main = web_main_pid(unit)
+    if main <= 1:
+        return []
+    workers = []
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        info = proc_stat(pid)
+        if not info or info[0] != main:
+            continue
+        title = proc_title(pid)
+        if kind == "nginx":
+            if "worker process" not in title:
+                continue
+            old = "shutting down" in title
+        else:
+            old = False
+        workers.append({"pid": pid, "start": info[1], "old": old})
+    return workers
+
+
+def web_confirmed_at(unit):
+    """Time (epoch) before which every configuration file was read by a reload of `unit` that
+    web_reload_confirm() confirmed, or 0.0."""
+    data = read_json(WEB_RELOADS, {})
+    value = data.get(unit) if isinstance(data, dict) else None
+    return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else 0.0
+
+
+def web_reload_stamp():
+    """Touches the stamp file and returns its modification time (0.0 on failure): a file written
+    before has an older or equal time, one written afterwards a newer or equal one, on the clock
+    of file modification times (which lags time.time() by up to a clock tick)."""
+    try:
+        with open(WEB_RELOAD_STAMP, "a"):
+            pass
+        os.utime(WEB_RELOAD_STAMP, None)
+        return os.stat(WEB_RELOAD_STAMP).st_mtime
+    except OSError:
+        return 0.0
+
+
+def web_record_confirmed(unit, issued):
+    """Remembers a confirmed reload of `unit` issued at `issued` (web_reload_stamp(); the caller
+    holds the web-reload lock). Only an optimisation: a failure means one more reload later."""
+    if not issued:
+        return
+    try:
+        data = read_json(WEB_RELOADS, {})
+        data = data if isinstance(data, dict) else {}
+        data[unit] = issued
+        write_json(WEB_RELOADS, data)
+    except OSError:
+        pass
+
+
+def web_effective(unit, kind, since):
+    """True when the configuration files changed before `since` (epoch) are active in the web
+    server: a reload confirmed by web_reload_confirm() was issued after `since`, the server (its
+    main process) started after it, or (nginx) every worker that is not shutting down started
+    after it. Apache children of an old generation that still finish long requests (downloads,
+    WebSockets) after a graceful restart look like the new ones, and children forked later for
+    more load run the configuration of their generation: only the first two count for Apache.
+    No web server: True."""
+    if not unit:
+        return True
+    if web_confirmed_at(unit) > since:
+        return True
+    main = web_main_pid(unit)
+    info = proc_stat(main) if main > 1 else None
+    if info and info[1] > since:
+        return True
+    if kind != "nginx":
+        return False
+    current = [w for w in web_workers(unit, kind) if not w["old"]]
+    return bool(current) and all(w["start"] > since for w in current)
+
+
+def web_config_test(kind):
+    """Output of the configuration test of the web server (for failure messages)."""
+    if kind == "nginx":
+        cmd = ["nginx", "-t"]
+    elif shutil.which("apachectl", path=ROOT_PATH):
+        cmd = ["apachectl", "-t"]
+    else:
+        cmd = ["httpd", "-t"]
+    try:
+        proc = run(cmd, timeout=60)
+    except HelperError as exc:
+        return str(exc)
+    lines = [line for line in (proc.stderr + proc.stdout).splitlines() if line.strip()]
+    return " ".join(lines)[-1500:]
+
+
+def web_reload_confirm(unit, kind, wait=ZD_RELOAD_WAIT):
+    """Reloads the web server and waits until its new worker generation is in place: a worker
+    that did not exist before, no worker of before that is not shutting down (nginx), and the set
+    of current workers unchanged for one second (a later generation, e.g. of Plesk's own reload,
+    is adopted). Returns (ok, reason, detail, workers before the reload): reason "reload" when
+    the reload was refused (detail: the configuration test; the running configuration stays),
+    "unknown" when the systemctl client was killed by a signal (systemd may still carry the
+    reload out), "timeout" otherwise. A confirmed reload is remembered (web_effective()).
+    Raises HelperError when a systemctl call times out (the outcome is unknown then, too)."""
+    before = set(w["pid"] for w in web_workers(unit, kind))
+    issued = web_reload_stamp()
+    proc = run(["systemctl", "reload", unit], timeout=120)
+    if proc.returncode < 0:
+        return False, "unknown", "systemctl reload %s ended by signal %d" % (unit, -proc.returncode), before
+    if proc.returncode != 0:
+        return False, "reload", web_config_test(kind) or (proc.stderr or proc.stdout).strip(), before
+    deadline = time.time() + wait
+    last = None
+    since = 0.0
+    while time.time() < deadline:
+        workers = web_workers(unit, kind)
+        current = frozenset(w["pid"] for w in workers if not w["old"])
+        new = current - before
+        stale = (current & before) if kind == "nginx" else set()
+        if new and not stale:
+            if current != last:
+                last, since = current, time.time()
+            elif time.time() - since >= 1.0:
+                web_record_confirmed(unit, issued)
+                return True, "", "", before
+        else:
+            last = None
+        time.sleep(0.1)
+    return False, "timeout", "no new worker generation of %s within %d s" % (unit, wait), before
+
+
+def web_reload_nowait(unit):
+    if unit:
+        run(["systemctl", "reload", unit], timeout=120)
+
+
+def vhosts_dir():
+    for line in (_read_text("/etc/psa/psa.conf", 65536) or "").splitlines():
+        parts = line.split()
+        if len(parts) == 2 and parts[0] == "HTTPD_VHOSTS_D" and RE_SAFE_PATH.match(parts[1]):
+            return parts[1].rstrip("/")
+    return "/var/www/vhosts"
+
+
+def generated_config(state, kind):
+    """(text, mtime) of the domain's configuration that Plesk generated for nginx or Apache, or
+    (None, 0) when it does not exist."""
+    domain = state["domain"]
+    try:
+        domain = domain.encode("idna").decode("ascii")
+    except (UnicodeError, ValueError):
+        pass
+    name = "nginx.conf" if kind == "nginx" else "httpd.conf"
+    path = os.path.join(vhosts_dir(), "system", domain, "conf", name)
+    try:
+        st = os.stat(path)
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            return fh.read(4 * 1024 * 1024), st.st_mtime
+    except OSError:
+        return None, 0.0
+
+
+def pointer_reference(state, kind):
+    """The string the switchable snippet of the application's listen mode contains."""
+    if state.get("listen") == "unix":
+        return link_path(state["domain_id"])
+    return "%s/%d.%s[.]conf" % (WEB_DIR, state["domain_id"], "nginx" if kind == "nginx" else "apache")
+
+
+def config_references(state, needle):
+    """True when the domain's generated nginx or Apache configuration contains `needle`."""
+    for kind in ("nginx", "apache"):
+        text = generated_config(state, kind)[0]
+        if text and needle in text:
+            return True
+    return False
+
+
+# --- connections, listeners -------------------------------------------------------------------
+
+def unix_connections(path):
+    """Connections of the listener bound to `path`: accepted (state 03) or still in its accept
+    queue (state 02), from /proc/net/unix."""
+    count = 0
+    try:
+        with open("/proc/net/unix", "r", errors="replace") as fh:
+            next(fh, None)
+            for row in fh:
+                parts = row.split()
+                if len(parts) >= 8 and parts[7] == path and parts[5] in ("02", "03"):
+                    count += 1
+    except OSError:
+        pass
+    return count
+
+
+def unix_listener_inodes(path):
+    """Socket inodes of the listeners bound to `path` (state 01 with the listening flag)."""
+    inodes = set()
+    try:
+        with open("/proc/net/unix", "r", errors="replace") as fh:
+            next(fh, None)
+            for row in fh:
+                parts = row.split()
+                if len(parts) >= 8 and parts[7] == path and parts[3] == "00010000":
+                    inodes.add(parts[6])
+    except OSError:
+        pass
+    return inodes
+
+
+def tcp_connections(port):
+    """Connections (accepted or queued, state 01) whose local port is `port`."""
+    count = 0
+    for name in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            with open(name, "r") as fh:
+                rows = fh.read().splitlines()[1:]
+        except OSError:
+            continue
+        for row in rows:
+            parts = row.split()
+            try:
+                if len(parts) > 3 and parts[3] == "01" and int(parts[1].rsplit(":", 1)[1], 16) == port:
+                    count += 1
+            except (IndexError, ValueError):
+                pass
+    return count
+
+
+def unit_pids(unit):
+    """Processes in the cgroup of a unit (cgroup v2, else v1's systemd hierarchy)."""
+    group = unit_show([unit], ["ControlGroup"]).get(unit, {}).get("ControlGroup", "")
+    if not group or not group.startswith("/"):
+        return []
+    for base in ("/sys/fs/cgroup", "/sys/fs/cgroup/systemd", "/sys/fs/cgroup/unified"):
+        text = _read_text(base + group + "/cgroup.procs", 65536)
+        if text:
+            return [int(pid) for pid in text.split() if pid.isdigit()]
+    return []
+
+
+def pids_hold_sockets(pids, inodes):
+    """True when one of the processes has one of the socket inodes open."""
+    wanted = set("socket:[%s]" % inode for inode in inodes)
+    for pid in pids:
+        try:
+            for fd in os.listdir("/proc/%d/fd" % pid):
+                try:
+                    if os.readlink("/proc/%d/fd/%s" % (pid, fd)) in wanted:
+                        return True
+                except OSError:
+                    continue
+        except OSError:
+            continue
+    return False
+
+
+# --- state helpers ------------------------------------------------------------------------------
+
+def zd_update_state(domain_id, **fields):
+    """Changes helper-owned fields of the stored state under the state lock; returns the stored
+    state (raw)."""
+    return update_state_flags(domain_id, **fields)
+
+
+def zd_flags_block(domain_id):
+    """The reason a switch must not move the traffic or start an instance now, or None."""
+    stored = read_json(app_state_path(domain_id))
+    if not isinstance(stored, dict):
+        return "removed"
+    if not stored.get("enabled"):
+        return "disabled"
+    if stored.get("suspended"):
+        return "suspended"
+    if stored.get("stopped") or stored.get("tampered"):
+        return "stopped"
+    return None
+
+
+def switch_fault(point):
+    """Test-only: the root-owned flag SWITCH_FAULT_FLAG ("<kill|term>:<point>", younger than one
+    hour) makes the switch job signal itself at that point (docs/DESIGN.md section 12.11)."""
+    try:
+        st = os.lstat(SWITCH_FAULT_FLAG)
+    except OSError:
+        return
+    if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or time.time() - st.st_mtime > RECONCILE_PAUSE_MAX:
+        return
+    kind, _sep, where = (_read_text(SWITCH_FAULT_FLAG, 200) or "").partition(":")
+    if where.strip() != point:
+        return
+    os.kill(os.getpid(), signal.SIGKILL if kind.strip() == "kill" else signal.SIGTERM)
+    time.sleep(1)
+
+
+def ensure_converge_unit():
+    """Installs and enables runway-converge.service (boot repair of interrupted switches) once
+    an application uses zero-downtime slots."""
+    path = os.path.join(UNIT_DIR, UNIT_CONVERGE)
+    text = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]",
+        "Description=Runway: settle interrupted zero-downtime switches before the web server starts",
+        "After=local-fs.target systemd-tmpfiles-setup.service",
+        "Before=nginx.service apache2.service httpd.service",
+        "",
+        "[Service]",
+        "Type=oneshot",
+        "ExecStart=%s _converge" % HELPER_COPY,
+        "TimeoutStartSec=180",
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target",
+        "",
+    ])
+    if _read_exact(path, 8192) != text:
+        write_file_atomic(path, text, 0o644)
+        systemctl("daemon-reload")
+    if not unit_enabled(UNIT_CONVERGE):
+        systemctl("enable", UNIT_CONVERGE)
+
+
+def remove_converge_unit():
+    systemctl("disable", UNIT_CONVERGE)
+    remove_quietly(os.path.join(UNIT_DIR, UNIT_CONVERGE))
+
+
+def write_unit_file(path, text, mode=0o644):
+    """Writes a unit or environment file when its content changed; True when it did."""
+    if _read_exact(path, 1024 * 1024) == text:
+        return False
+    write_file_atomic(path, text, mode)
+    return True
+
+
+def write_slot_units(state, pw, slot):
+    """Renders the unit and environment file of one instance ("" = the 1.0 unit); True when a
+    file changed."""
+    domain_id = state["domain_id"]
+    view = slot_view(state, slot) if slot else state
+    changed = write_unit_file(env_file_path(domain_id, slot), render_env_file(view, pw), 0o600)
+    changed = write_unit_file(os.path.join(UNIT_DIR, app_unit(domain_id, slot)), render_app_unit(view, pw)) or changed
+    return changed
+
+
+def retire_legacy(state):
+    """After the first switch: the 1.0 unit is no longer used (disabled, files removed)."""
+    domain_id = state["domain_id"]
+    unit = UNIT_APP % domain_id
+    if os.path.exists(os.path.join(UNIT_DIR, unit)):
+        systemctl("disable", "--now", unit, timeout=120)
+        remove_quietly(os.path.join(UNIT_DIR, unit))
+        remove_quietly(env_file_path(domain_id))
+        systemctl("daemon-reload")
+        systemctl("reset-failed", unit)
+
+
+def retire_slots(state, pw):
+    """The setting is off and the 1.0 unit is live (or nothing runs): removes the slot units and
+    environment files, frees the slot ports and their sockets, and sets slot "". The pointer keeps
+    naming the 1.0 instance until the snippet no longer uses it (convergence). Returns the
+    updated state."""
+    domain_id = state["domain_id"]
+    units = [app_unit(domain_id, slot) for slot in SLOTS if os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))]
+    if units:
+        systemctl("disable", "--now", *units, timeout=120)
+    for slot in SLOTS:
+        remove_quietly(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))
+        remove_quietly(env_file_path(domain_id, slot))
+        unlink_socket_entry(domain_id, socket_name(slot))
+    zd_update_state(domain_id, slot="", port_a=0, port_b=0, switch=None)
+    state.update({"slot": "", "port_a": 0, "port_b": 0, "switch": None})
+    if units:
+        systemctl("daemon-reload")
+        systemctl("reset-failed", *units)
+    return state
+
+
+# --- convergence ----------------------------------------------------------------------------
+
+def zd_converge_locked(state, pw, log=None, boot=False):
+    """Repairs the slot units and the pointer of one application (the caller holds its deploy
+    lock; docs/DESIGN.md section 12.8). Settles an interrupted switch from where the pointer
+    points, stops leftover instances only when the pointer is confirmed elsewhere, enables the
+    live unit, and removes pointer files the generated configuration no longer uses. Never
+    starts an application. Returns the (updated) state."""
+    domain_id = state["domain_id"]
+
+    def note(text):
+        if log:
+            log.line(text)
+        zd_journal(state, text)
+
+    listen = state.get("listen")
+    if listen in ("tcp", "unix") and (zd_has_slots(state) or (slot_files_left(domain_id) and pointer_wanted(state))):
+        pointer = read_pointer_slot(state)
+        intent = state.get("switch")
+        live = state["slot"]
+        if boot:
+            enabled = [slot for slot in ("",) + SLOTS
+                       if os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot))) and unit_enabled(app_unit(domain_id, slot))]
+            if len(enabled) == 1:
+                live = enabled[0]
+            elif enabled:
+                live = pointer if pointer in enabled else (live if live in enabled else enabled[0])
+        elif intent:
+            target = intent["to"]
+            live = target if pointer == target and unit_is_active(app_unit(domain_id, target)) else intent["from"]
+        if intent or live != state["slot"]:
+            fields = {"slot": live, "switch": None}
+            if live != state["slot"]:
+                fields["switched_at"] = now_iso()
+            zd_update_state(domain_id, **fields)
+            state.update(fields)
+            if intent:
+                note("settled an interrupted switch (%s to %s): %s serves." % (slot_label(intent["from"]), slot_label(intent["to"]),
+                                                                              slot_label(live)))
+        web_unit, web_kind = (None, None) if boot else web_traffic_server()
+        changed = False
+        if pointer != live:
+            changed = write_pointer(state, pw, live)
+            pointer = live
+        elif listen == "unix" and tmpfiles_link_slot(domain_id) != live:
+            write_tmpfiles(state, pw, link_slot=live)
+        leftover = [slot for slot in ("",) + SLOTS if slot != live and os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))
+                    and unit_is_active(app_unit(domain_id, slot))]
+        confirmed = True
+        if listen == "tcp" and web_unit:
+            if leftover and (changed or not web_effective(web_unit, web_kind, include_mtime(domain_id))):
+                # Another instance still runs: it stops only once the running configuration of
+                # the web server names the live port (a confirmed reload).
+                with FileLock("web-reload"):
+                    try:
+                        confirmed = web_reload_confirm(web_unit, web_kind)[0]
+                    except HelperError:
+                        confirmed = False
+            elif changed:
+                # Nothing to stop: the reload only has to happen.
+                with FileLock("web-reload"):
+                    web_reload_nowait(web_unit)
+        for slot in ("",) + SLOTS:
+            unit = app_unit(domain_id, slot)
+            if slot == live or not os.path.exists(os.path.join(UNIT_DIR, unit)):
+                continue
+            active = slot in leftover
+            if active and not confirmed:
+                continue
+            if active or unit_enabled(unit):
+                if boot:
+                    systemctl("disable", unit)
+                    systemctl("stop", "--no-block", unit)
+                else:
+                    systemctl("disable", "--now", unit, timeout=120)
+                    systemctl("reset-failed", unit)
+                if active:
+                    note("stopped %s, left over from an interrupted switch." % unit)
+            if listen == "unix" and slot in SLOTS and not active:
+                unlink_socket_entry(domain_id, socket_name(slot))
+        live_unit = app_unit(domain_id, live)
+        if state.get("enabled") and not state.get("suspended") and not state.get("stopped") \
+                and os.path.exists(os.path.join(UNIT_DIR, live_unit)) and not unit_enabled(live_unit):
+            systemctl("enable", live_unit)
+        if live and os.path.exists(os.path.join(UNIT_DIR, UNIT_APP % domain_id)) and not unit_is_active(UNIT_APP % domain_id):
+            retire_legacy(state)
+    if not boot and not zd_has_slots(state) and slot_files_left(domain_id):
+        # The setting is off and the 1.0 unit is the live instance: after an interrupted switch
+        # back to it (settled above), or when it was turned off before the first switch. The slots
+        # go; a slot that still runs while the pointer is in use stops only after the pointer was
+        # confirmed on the 1.0 unit (above, then at the next run).
+        running = [slot for slot in SLOTS if os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))
+                   and unit_is_active(app_unit(domain_id, slot))]
+        if not running or not pointer_wanted(state):
+            state = retire_slots(state, pw)
+            if log:
+                log.line("Removed the units of the zero-downtime slots (the setting is off).")
+    # Pointer files that the domain's generated configuration no longer uses.
+    if not (listen == "unix" and zd_has_slots(state)) and os.path.lexists(link_path(domain_id)) \
+            and not config_references(state, link_path(domain_id)):
+        remove_link(domain_id)
+        tmpfiles_drop_link(state, pw)
+    if not (listen == "tcp" and zd_has_slots(state)) and os.path.exists(include_paths(domain_id)[0]) \
+            and not config_references(state, "%s/%d." % (WEB_DIR, domain_id)):
+        remove_include(domain_id)
+    return state
+
+
+def zd_converge(state, boot=False):
+    """Convergence of one application when its deploy lock is free (skipped while busy)."""
+    lock = FileLock("deploy-%d" % state["domain_id"])
+    if not lock.acquire(blocking=False):
+        return False
+    try:
+        fresh, pw = load_app_state(state["domain_id"])
+        zd_converge_locked(fresh, pw, boot=boot)
+        return True
+    finally:
+        lock.release()
+
+
+def zd_needs_converge(raw):
+    """Applications the convergence looks at: with slots (or the intent record of an interrupted
+    switch), or with slot units or pointer files left over."""
+    if not isinstance(raw.get("domain_id"), int):
+        return False
+    return zd_has_slots(raw) or slot_files_left(raw["domain_id"]) or os.path.lexists(link_path(raw["domain_id"])) \
+        or os.path.exists(include_paths(raw["domain_id"])[0])
+
+
+def internal_converge():
+    """runway-converge.service (boot) or a manual run: converges every application. Before the
+    web server runs nothing is reloaded and the enabled unit decides (boot mode)."""
+    boot = web_traffic_server()[0] is None
+    for raw in list(iter_app_states()):
+        if not zd_needs_converge(raw):
+            continue
+        try:
+            zd_converge(raw, boot=boot)
+        except Exception as exc:  # noqa: BLE001 - one application must not stop the others
+            sys.stderr.write("runway: convergence of #%s failed: %s\n" % (raw.get("domain_id"), exc))
+
+
+# --- plain restart ----------------------------------------------------------------------------
+
+def zd_plain_restart(state, pw, block=False):
+    """Restarts the live instance in place (short interruption; the caller holds the deploy
+    lock): stops every other app unit, makes the 1.0 unit live when the setting is off, points
+    the web server at the live instance and restarts it. Returns (state, unit)."""
+    domain_id = state["domain_id"]
+    if not state.get("zero_downtime") and (state.get("slot") or slot_files_left(domain_id)):
+        # Turned off (or a worker now): the 1.0 unit becomes the live instance, the slots go.
+        state = retire_slots(state, pw)
+        write_slot_units(state, pw, "")
+        systemctl("daemon-reload")
+    live = state.get("slot") or ""
+    others = [app_unit(domain_id, slot) for slot in ("",) + SLOTS
+              if slot != live and os.path.exists(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))]
+    if others:
+        systemctl("disable", "--now", *others, timeout=120)
+    unit = app_unit(domain_id, live)
+    if pointer_wanted(state):
+        changed = write_pointer(state, pw, live)
+        if changed:
+            web_unit = web_traffic_server()[0]
+            if web_unit:
+                with FileLock("web-reload"):
+                    web_reload_nowait(web_unit)
+    if state.get("switch") or state.get("restart_plain"):
+        zd_update_state(domain_id, switch=None, restart_plain=False)
+        state.update({"switch": None, "restart_plain": False})
+    prepare_start(live_view(state), pw)
+    systemctl("enable", unit, check=True)
+    systemctl("reset-failed", unit)
+    if block:
+        proc = systemctl("restart", unit, timeout=120)
+        if proc.returncode != 0:
+            raise HelperError("systemctl restart failed: %s" % proc.stderr.strip())
+    else:
+        systemctl("restart", "--no-block", unit, check=True)
+    return state, unit
+
+
+# --- the switch -------------------------------------------------------------------------------
+
+class SwitchJob(object):
+    """Phase bookkeeping of a switch in the deploy job status (docs/DESIGN.md section 12.4)."""
+
+    def __init__(self, job, log, source, target):
+        self.job = job
+        self.log = log
+        self.source = source
+        self.target = target
+
+    def phase(self, name, limit=0):
+        job_set_status(self.job, phase=name, phase_started_epoch=time.time() if name else None,
+                       phase_limit=int(limit), slot_from=self.source, slot_to=self.target)
+        if name:
+            switch_fault(name)
+
+
+def zd_restart(state, pw, job, log):
+    """Deploy job of an application with zero-downtime slots: a switch, or a plain restart when
+    the next restart must be plain or nothing runs that could keep serving. Returns
+    (ok, message); raises HelperError on failure."""
+    domain_id = state["domain_id"]
+    live = state.get("slot") or ""
+    target = zd_target(state)
+    reason = None
+    if state.get("restart_plain"):
+        reason = "the listen mode or the system user changed"
+    elif state.get("listen") not in ("tcp", "unix"):
+        reason = "workers have no traffic to switch"
+    elif target is None:
+        reason = "zero-downtime deployments are off"
+    elif not unit_is_active(app_unit(domain_id, live)):
+        reason = "nothing is running"
+    if reason:
+        log.line("Restarting in place (%s)." % reason)
+        state, unit = zd_plain_restart(state, pw, block=True)
+        return restart_and_check(live_view(state), pw, unit, log, restarted=True)
+    return zd_switch(state, pw, job, log, live, target)
+
+
+def zd_stop_new(unit):
+    systemctl("stop", unit, timeout=120)
+    systemctl("reset-failed", unit)
+
+
+def zd_wait_marker(state, web_unit, web_kind, log):
+    """Step 1: the generated configuration of the web server that carries the traffic uses the
+    switchable snippet of the listen mode, and it is active (reload when it is not yet)."""
+    if not web_unit:
+        return
+    marker = ZD_MARKER % state["domain_id"]
+    reference = pointer_reference(state, web_kind)
+    deadline = time.time() + ZD_MARKER_WAIT
+    httpdmng = None
+    waited = False
+    while True:
+        text, mtime = generated_config(state, web_kind)
+        if text and marker in text and reference in text:
+            if web_effective(web_unit, web_kind, mtime):
+                return
+            with FileLock("web-reload"):
+                if web_effective(web_unit, web_kind, mtime):
+                    return
+                ok, _reason, detail, _before = web_reload_confirm(web_unit, web_kind)
+            if ok:
+                return
+            raise SwitchFailed("The web server could not be reloaded: %s" % detail)
+        if not waited:
+            log.line("Waiting for the web server configuration of %s with the zero-downtime snippet." % state["domain"])
+            waited = True
+        if time.time() >= deadline:
+            if httpdmng is not None:
+                raise SwitchFailed("The web server configuration of %s does not use Runway's zero-downtime snippet: %s"
+                                   % (state["domain"], httpdmng or "httpdmng reported no error"))
+            plesk = shutil.which("plesk", path=ROOT_PATH) or "/usr/sbin/plesk"
+            log.line("Regenerating the configuration of %s (httpdmng)." % state["domain"])
+            try:
+                proc = run([plesk, "sbin", "httpdmng", "--reconfigure-domain", state["domain"]], timeout=ZD_HTTPDMNG_TIMEOUT)
+                httpdmng = (proc.stderr or proc.stdout).strip()[-1000:]
+            except HelperError as exc:
+                httpdmng = str(exc)
+            deadline = time.time() + 10
+        time.sleep(1)
+
+
+def zd_ensure_include(state, live, web_unit, web_kind):
+    """tcp, before a switch: the include files name the live port and are active."""
+    domain_id = state["domain_id"]
+    with FileLock("web-reload"):
+        changed = write_include(domain_id, slot_port(state, live))
+        if web_unit and (changed or not web_effective(web_unit, web_kind, include_mtime(domain_id))):
+            ok, _reason, detail, _before = web_reload_confirm(web_unit, web_kind)
+            if not ok:
+                raise SwitchFailed("The web server could not be reloaded: %s" % detail)
+
+
+def zd_prepare_port(state, live, target, log):
+    """tcp: the port of the new instance must be free and differ from the live one; otherwise it
+    gets a newly allocated port (stored in the state). Returns the port."""
+    domain_id = state["domain_id"]
+    port_live = slot_port(state, live)
+    port_new = slot_port(state, target)
+    reason = None
+    if not port_new or port_new == port_live:
+        reason = "it is the port of the running version"
+    else:
+        uids = tcp_listener_uids(port_new)
+        if uids:
+            reason = "port %d is held by uid %s" % (port_new, ", ".join(str(uid) for uid in sorted(uids)))
+    if reason:
+        key = "port_" + target if target else "port"
+        with FileLock("ports"):
+            stored = read_json(app_state_path(domain_id))
+            if not isinstance(stored, dict):
+                raise HelperError("Application #%d is not configured" % domain_id)
+            avoid = set(p for p in (state.get("port"), state.get("port_a"), state.get("port_b"), port_live) if p)
+            new = allocate_extra_port(domain_id, state["port_range"], avoid)
+            stored[key] = new
+            write_json(app_state_path(domain_id), stored)
+        if port_new:
+            log.line("The new version gets port %d (%s)." % (new, reason))
+        state[key] = new
+        port_new = new
+    return port_new
+
+
+def zd_wait_ready(state, pw, view, live, live_inodes, log, limit):
+    """Step 3: waits until the new instance listens on its own endpoint (and its health path
+    answers). Returns ("ready", ""), ("stopped", reason) or ("failed", message)."""
+    domain_id = state["domain_id"]
+    unit = app_unit(domain_id, view.get("_slot") or "")
+    unix = state["listen"] == "unix"
+    endpoint = view["_socket"] if unix else "127.0.0.1:%d" % int(view["port"])
+    expect = ("$RUNWAY_SOCKET (%s)" % endpoint) if unix else ("127.0.0.1:$PORT (%d)" % int(view["port"]))
+    live_path = slot_socket_path(domain_id, live)
+    deadline = time.time() + limit
+    seen = False
+    last = "nothing listens on %s" % endpoint
+    while True:
+        block = zd_flags_block(domain_id)
+        if block:
+            return "stopped", block
+        info = unit_show([unit], ["ActiveState", "SubState", "NRestarts", "Result", "ExecMainStatus"]).get(unit, {})
+        active = info.get("ActiveState")
+        restarts = int(info.get("NRestarts") or 0) if (info.get("NRestarts") or "").isdigit() else 0
+        if active in ("active", "activating", "reloading"):
+            seen = True
+        if active == "failed" or (seen and active == "inactive") or restarts > 0:
+            return "failed", ("The new version exited during startup (status=%s/%s); it must listen on %s"
+                              % (info.get("ExecMainStatus") or "?", info.get("Result") or "?", expect))
+        if unix:
+            # A second listener on the live instance's path while that instance still holds its
+            # own listener: the path was taken over (e.g. a hardcoded app.sock). Without that
+            # evidence (the live instance restarted), only a listener held by one of the new
+            # version's processes counts (reading /proc/<pid>/fd needs CAP_SYS_PTRACE).
+            current = unix_listener_inodes(live_path)
+            stray = current - live_inodes
+            if stray and ((live_inodes and live_inodes <= current) or pids_hold_sockets(unit_pids(unit), stray)):
+                return "failed", ("The new version listens on %s instead of $RUNWAY_SOCKET (%s)" % (live_path, endpoint))
+        listener, detail, code, _params = listener_info(view, pw)
+        if listener == "tampered":
+            contain_tampering(state, detail)
+            raise HelperError("The socket path was tampered with (%s); the application was stopped." % detail)
+        if listener == "foreign":
+            return "failed", "Another user's process holds the endpoint of the new version (%s)" % detail
+        if listener == "ok":
+            if not state.get("health_path"):
+                return "ready", ""
+            health, hdetail, _code, _params = health_check(view, "ok", pw)
+            if health == "healthy":
+                return "ready", ""
+            last = hdetail
+        else:
+            last = detail
+        if time.time() >= deadline:
+            return "failed", "The new version was not ready within %d s (%s)" % (limit, last)
+        time.sleep(0.5)
+
+
+def zd_drain(state, live, limit, old_workers, web_unit):
+    """Step 5: waits (at most `limit` s) until the old instance has no connection left; tcp also
+    until no web server worker of before the reload is alive. Ends early after a SIGTERM."""
+    if limit <= 0:
+        return
+    unix = state["listen"] == "unix"
+    path = slot_socket_path(state["domain_id"], live)
+    port = slot_port(state, live)
+    deadline = time.time() + limit
+    while time.time() < deadline and not _TERM["pending"]:
+        if unix:
+            busy = unix_connections(path)
+        else:
+            busy = tcp_connections(port) or any(os.path.exists("/proc/%d" % pid) for pid in old_workers or ())
+        if not busy:
+            return
+        time.sleep(0.5)
+
+
+def zd_switch(state, pw, job, log, live, target):
+    """The switch of docs/DESIGN.md section 12.4 (the deploy lock is held). Returns
+    (ok, message); raises SwitchFailed/HelperError when the new version was not activated."""
+    domain_id = state["domain_id"]
+    sj = SwitchJob(job, log, live, target)
+    unit_live, unit_new = app_unit(domain_id, live), app_unit(domain_id, target)
+    started = False
+    stop_new_on_error = True
+    critical = False
+    live_file = None
+    keep_hint = " The running version keeps serving; Restart in place runs the new version with an interruption."
+    try:
+        sj.phase("prepare")
+        log.line("Zero-downtime switch from %s to %s." % (slot_label(live), slot_label(target)))
+        zd_converge_locked(state, pw, log)
+        state, pw = load_app_state(domain_id)
+        if (state.get("slot") or "") != live or zd_target(state) != target:
+            live, target = state.get("slot") or "", zd_target(state)
+            if target is None or not zd_switchable(state):
+                # The convergence settled an interrupted switch back to the 1.0 unit (the setting
+                # is off): the restart of the setting off, in place.
+                return zd_restart(state, pw, job, log)
+            sj = SwitchJob(job, log, live, target)
+            unit_live, unit_new = app_unit(domain_id, live), app_unit(domain_id, target)
+        if unit_is_active(unit_new):
+            stop_new_on_error = False
+            raise SwitchFailed("A previous switch is still being cleaned up (%s is running); try again in a minute." % unit_new)
+        unix = state["listen"] == "unix"
+        web_unit, web_kind = web_traffic_server()
+        live_inodes = set()
+        if unix:
+            ensure_socket_dir(domain_id, pw)
+            found = socket_check(state, pw)
+            if found:
+                contain_tampering(state, found[0])
+                raise HelperError("The socket path was tampered with (%s); the application was stopped." % found[0])
+            unlink_socket_entry(domain_id, socket_name(target))
+            live_inodes = unix_listener_inodes(slot_socket_path(domain_id, live))
+            # The live instance's socket file: a failed new version that took its path is detected
+            # by a different (or missing) file afterwards (zd_rescue_live()).
+            live_file = socket_file_id(slot_socket_path(domain_id, live))
+        else:
+            zd_prepare_port(state, live, target, log)
+        zd_wait_marker(state, web_unit, web_kind, log)
+        if not unix:
+            zd_ensure_include(state, live, web_unit, web_kind)
+        view = slot_view(state, target)
+        if write_slot_units(state, pw, target):
+            systemctl("daemon-reload")
+
+        sj.phase("starting")
+        with FileLock("ports"):
+            block = zd_flags_block(domain_id)
+        if block:
+            return True, "The application was stopped during the switch; the new version was not started."
+        zd_update_state(domain_id, switch={"from": live, "to": target, "phase": "starting", "started_epoch": time.time()})
+        prepare_start(view, pw)
+        systemctl("reset-failed", unit_new)
+        started = True
+        proc = systemctl("start", "--no-block", unit_new)
+        if proc.returncode != 0:
+            raise SwitchFailed("The new version could not be started: %s" % proc.stderr.strip())
+        log.line("Started %s; waiting until it is ready (at most %d s)." % (unit_new, state["ready_timeout"]))
+
+        sj.phase("waiting", state["ready_timeout"])
+        result, detail = zd_wait_ready(state, pw, view, live, live_inodes, log, state["ready_timeout"])
+        if result == "stopped":
+            return zd_stopped_during(state, unit_new, target)
+        if result != "ready":
+            raise SwitchFailed(detail + "." + keep_hint)
+        log.line("The new version is ready.")
+
+        sj.phase("switching")
+        _TERM["critical"] += 1
+        critical = True
+        old_workers = None
+        with FileLock("ports"):
+            block = zd_flags_block(domain_id)
+            if not block:
+                stored = read_json(app_state_path(domain_id))
+                intent = dict(stored.get("switch") or {}, phase="switching")
+                stored["switch"] = intent
+                write_json(app_state_path(domain_id), stored)
+        if block:
+            return zd_stopped_during(state, unit_new, target)
+        if unix:
+            # The socket the link will name: a socket of the application's user (O_PATH check).
+            try:
+                unix_connect(view["_socket"], pw.pw_uid, 2.0).close()
+            except OSError as exc:
+                raise SwitchFailed("The new version's socket cannot be used (%s)." % exc + keep_hint)
+            set_link(domain_id, target)
+            stop_new_on_error = False
+            # At once, not after the commit: a reboot recreates the link from this entry, and the
+            # boot repair decides from the link and the enabled units (docs/DESIGN.md section 12.8).
+            write_tmpfiles(state, pw, link_slot=target)
+        else:
+            with FileLock("web-reload"):
+                try:
+                    write_include(domain_id, slot_port(state, target))
+                    if web_unit:
+                        ok, reason, detail, old_workers = web_reload_confirm(web_unit, web_kind)
+                    else:
+                        ok, reason, detail = True, "", ""
+                except (HelperError, OSError) as exc:
+                    # e.g. a systemctl call that timed out: whether the web server already runs with
+                    # the new port is unknown, so the old one is restored and confirmed first.
+                    ok, reason, detail = False, "unknown", str(exc)
+                if not ok:
+                    # The new version is stopped only once the running configuration names the old
+                    # port again: a refused reload (configuration test) left it in place, otherwise
+                    # a confirmed reload of the restored include files.
+                    restored, rdetail = False, ""
+                    try:
+                        write_include(domain_id, slot_port(state, live))
+                        if reason == "reload" or not web_unit:
+                            restored = True
+                        else:
+                            restored, _r, rdetail, _b = web_reload_confirm(web_unit, web_kind)
+                    except (HelperError, OSError) as exc:
+                        rdetail = str(exc)
+                    if not restored:
+                        stop_new_on_error = False
+                        raise SwitchFailed("The web server did not confirm its configuration (%s; %s); both versions keep "
+                                           "running until the next check." % (detail, rdetail))
+                    if reason == "reload":
+                        raise SwitchFailed("The web server could not be reloaded: %s." % detail + keep_hint)
+                    raise SwitchFailed("The web server did not confirm the new configuration (%s)." % detail + keep_hint)
+            stop_new_on_error = False
+        log.line("The web server now sends the traffic to %s." % slot_label(target))
+        switch_fault("moved")
+        with FileLock("ports"):
+            stored = read_json(app_state_path(domain_id))
+            stored.update({"slot": target, "switched_at": now_iso(),
+                           "switch": dict(stored.get("switch") or {"from": live, "to": target}, phase="draining")})
+            write_json(app_state_path(domain_id), stored)
+        state.update({"slot": target})
+        switch_fault("committed")
+        systemctl("enable", unit_new)
+        if os.path.exists(os.path.join(UNIT_DIR, unit_live)):
+            systemctl("disable", unit_live)
+        if zd_flags_block(domain_id):
+            systemctl("disable", "--now", *existing_app_units(domain_id), timeout=120)
+            zd_update_state(domain_id, switch=None)
+            return True, "The application was stopped during the switch."
+
+        sj.phase("draining", state["drain_seconds"])
+        zd_drain(state, live, state["drain_seconds"], old_workers, web_unit)
+        sj.phase("stopping")
+        message = "Switched from %s to %s" % (slot_label(live), slot_label(target))
+        try:
+            zd_stop_new(unit_live)
+            if unix:
+                unlink_socket_entry(domain_id, socket_name(live))
+            if not live:
+                retire_legacy(state)
+            if not target:
+                # Clears the intent record with the slots (a switch back to the 1.0 unit).
+                retire_slots(state, pw)
+            zd_update_state(domain_id, switch=None)
+        except (HelperError, OSError) as exc:
+            # The new version serves: the switch succeeded. The intent record stays, so the
+            # convergence (scheduled reconcile, within 10 minutes) stops the old version.
+            log.line(message + ".")
+            log.line("WARNING: stopping %s failed (%s); the next check retries it." % (slot_label(live), exc))
+            zd_journal(state, "%s; stopping %s failed (%s), the next check retries it." % (message, slot_label(live), exc), 4)
+            return True, "%s; stopping %s failed, the next check retries it" % (message, slot_label(live))
+        log.line(message + ".")
+        zd_journal(state, message.lower()[:1] + message[1:] + " (zero-downtime deployment).")
+        return True, None
+    except DeployTerminated:
+        if started and stop_new_on_error:
+            zd_stop_new(unit_new)
+            if state["listen"] == "unix":
+                unlink_socket_entry(domain_id, socket_name(target))
+                zd_rescue_live(state, pw, live, live_file, log)
+            zd_update_state(domain_id, switch=None)
+        raise
+    except HelperError as exc:
+        if started and stop_new_on_error:
+            zd_stop_new(unit_new)
+            if state["listen"] == "unix":
+                unlink_socket_entry(domain_id, socket_name(target))
+                zd_rescue_live(state, pw, live, live_file, log)
+            zd_update_state(domain_id, switch=None)
+        elif not started:
+            zd_update_state(domain_id, switch=None)
+        if isinstance(exc, SwitchFailed):
+            zd_journal(state, "the zero-downtime deployment failed: %s" % exc)
+        raise
+    finally:
+        if critical:
+            _TERM["critical"] -= 1
+        try:
+            sj.phase("")
+        except Exception:  # noqa: BLE001 - never hide the real result
+            pass
+
+
+def zd_stopped_during(state, unit_new, target):
+    """Stop or disable during the switch, before the traffic moved: the new version goes."""
+    zd_stop_new(unit_new)
+    if state["listen"] == "unix":
+        unlink_socket_entry(state["domain_id"], socket_name(target))
+    zd_update_state(state["domain_id"], switch=None)
+    return True, "The application was stopped during the switch; the new version was not started."
+
+
+def socket_file_id(path):
+    """(device, inode) of the socket file at `path` (lstat, never followed), or None."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return None
+    return (st.st_dev, st.st_ino) if stat.S_ISSOCK(st.st_mode) else None
+
+
+def zd_rescue_live(state, pw, live, live_file, log):
+    """Unix, after a failed switch: a new version that bound the live instance's path (e.g. a
+    hardcoded app.sock; gunicorn and asyncio remove an existing socket before they bind, Go,
+    gunicorn and uvicorn unlink their path when they stop) replaced or removed the live socket
+    file (`live_file`, recorded before the new version started). The live instance is then
+    unreachable: restart it in place. A live socket file that is still the same file is left
+    alone: a connection that fails because the instance is busy is no reason to interrupt it."""
+    if live_file is None:
+        return
+    path = slot_socket_path(state["domain_id"], live)
+    if socket_file_id(path) == live_file:
+        return
+    unit = app_unit(state["domain_id"], live)
+    if not unit_is_active(unit):
+        return
+    log.line("The running version lost its socket %s (the new version replaced or removed it); restarting it in place." % path)
+    prepare_start(slot_view(state, live), pw)
+    systemctl("restart", "--no-block", unit)
 
 
 # ---------------------------------------------------------------------------
@@ -5833,6 +7752,9 @@ def main(argv):
         return 0
     if command == "_job" and len(argv) == 3 and argv[2] == "admin":
         internal_admin_job()
+        return 0
+    if command == "_converge" and len(argv) == 2:
+        internal_converge()
         return 0
 
     handler = COMMANDS.get(command)

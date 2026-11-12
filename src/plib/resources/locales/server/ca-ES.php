@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'La suma de verificació SHA-256 ha de tenir 64 caràcters hexadecimals.',
     'errorFetchFilename' => 'El nom del fitxer només pot contenir lletres, dígits i . _ + - (màx. 128 caràcters).',
     'errorUpdateVersion' => 'La versió ha de tenir el format 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Només l\'administrador pot activar els desplegaments sense interrupció en aquest servidor.',
+    'errorReadyTimeout' => 'El termini de disponibilitat ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
+    'errorDrainSeconds' => 'El període de buidatge ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límit de memòria (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'S\'ha escrit l\'aplicació d\'exemple (un fitxer) i s\'ha actualitzat la configuració.',
     'messageFetchStarted' => 'La baixada ha començat. Seguiu-la al registre "Compilació i desplegament".',
     'messageUpdateStarted' => 'L\'actualització a Runway %%version%% ha començat. El progrés es mostra a sota.',
+    'messageSavedSwitching' => 'S\'ha desat la configuració. La versió nova s\'inicia al costat de la que s\'està executant i pren el relleu quan està a punt; seguiu-la al registre "Compilació i desplegament".',
+    'messageSwitchStarted' => 'La versió nova s\'inicia al costat de la que s\'està executant i pren el relleu quan està a punt. Seguiu-la al registre "Compilació i desplegament".',
+    'messageAction_restartPlain' => 'L\'aplicació s\'està reiniciant in situ.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Llista les aplicacions configurades i el seu estat.',
     'cli.commands.status' => 'Mostra l\'estat de l\'aplicació d\'un domini: --status <domini>',
     'cli.commands.start' => 'Inicia l\'aplicació d\'un domini: --start <domini>',
     'cli.commands.stop' => 'Atura l\'aplicació d\'un domini; es manté aturada (també després d\'un reinici del servidor o d\'un desplegament) fins a --start o --restart: --stop <domini>',
-    'cli.commands.restart' => 'Reinicia l\'aplicació d\'un domini: --restart <domini>',
+    'cli.commands.restart' => 'Reinicia l\'aplicació d\'un domini; amb els desplegaments sense interrupció, la versió nova s\'inicia al costat de la que s\'està executant i l\'ordre espera la commutació (-plain reinicia in situ): --restart <domini> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Compila i reinicia l\'aplicació d\'un domini i espera el resultat (una aplicació aturada es compila però es manté aturada): --deploy <domini> [-no-wait]',
     'cli.commands.enable' => 'Habilita l\'aplicació configurada d\'un domini: --enable <domini>',
     'cli.commands.disable' => 'Inhabilita l\'aplicació d\'un domini: --disable <domini>',

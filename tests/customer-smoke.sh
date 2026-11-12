@@ -92,6 +92,10 @@ if [ "$(echo "$APP" | jexpr "d['data']['configured'] and d['data']['config']['en
     check "app/control start: running again" "d['status'] == 'success' and d['data']['stopped'] is False and d['data'].get('listener') in ('ok', 'worker')" "$(get "app/status?site_id=$SITE_ID")"
 fi
 check "overview: application links come from appUrl" "all('appUrl' in a for a in d['data']['apps'])" "$(get overview)"
+check "zero-downtime deployments: not offered to customers while the server setting is off (default)" \
+    "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is False" "$(get "app?site_id=$SITE_ID")"
+check "a customer cannot turn zero-downtime deployments on (field error)" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntime']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": true}")"
 check "customer cannot change admin-only limits" \
     "d['status'] == 'success' and d['data']['limits'] == $(echo "$APP" | jexpr "json.dumps(d['data']['limits'])")" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"memoryMb\": 1, \"cpuPercent\": 1, \"tasks\": 1}")"

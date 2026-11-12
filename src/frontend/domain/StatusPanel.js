@@ -3,7 +3,7 @@
 import { createElement } from 'react';
 import PropTypes from 'prop-types';
 import { Alert, Button, Label, Panel, Text, Translate, useTranslate } from '@plesk/plesk-ext-sdk';
-import { appState, formatBytes, formatTime, helperText, isObject, jobTitle } from '../lib/format';
+import { appState, formatBytes, formatTime, helperText, isObject, isolate, jobTitle } from '../lib/format';
 import { isBusy } from '../lib/hooks';
 import Facts from '../components/Facts';
 import Mono from '../components/Mono';
@@ -71,6 +71,86 @@ const listenerValue = (translate, current, running, worker) => {
     );
 };
 
+// Phases of a zero-downtime switch (helper job status "phase", docs/DESIGN.md section 12.4).
+// i18n-keys: Domain.status.switchPhase.prepare Domain.status.switchPhase.starting Domain.status.switchPhase.waiting
+// i18n-keys: Domain.status.switchPhase.switching Domain.status.switchPhase.draining Domain.status.switchPhase.stopping
+const PHASES = ['prepare', 'starting', 'waiting', 'switching', 'draining', 'stopping'];
+
+/** Name of an instance: "slot a", or the classic unit (slot "") of the setting off. */
+const slotName = slot => (slot
+    ? <Translate content="Domain.status.slotName" params={{ slot: isolate(slot) }} />
+    : <Translate content="Domain.status.slotClassic" />);
+
+/** "Zero-downtime" fact: on (live slot and the time of the last switch), pending, or turning off. */
+const zeroDowntimeValue = current => {
+    if (!current.zero_downtime && !current.slot) {
+        return null;
+    }
+    let text;
+    if (!current.zero_downtime) {
+        text = <Translate content="Domain.status.zeroDowntimeOffPending" params={{ slot: isolate(current.slot) }} />;
+    } else if (!current.slot) {
+        text = <Translate content="Domain.status.zeroDowntimePending" />;
+    } else if (current.switched_at) {
+        text = <Translate content="Domain.status.zeroDowntimeOn" params={{ slot: isolate(current.slot), time: formatTime(current.switched_at) }} />;
+    } else {
+        text = <Translate content="Domain.status.zeroDowntimeOnSlot" params={{ slot: isolate(current.slot) }} />;
+    }
+    const standby = current.standby_listener === 'foreign' && isObject(current.standby_params) ? current.standby_params : null;
+    return (
+        <span>
+            {text}
+            {standby ? (
+                <div>
+                    <Text intent="warning" fontSize="sm">
+                        <Translate content="Domain.status.standbyForeign" params={{ port: isolate(String(standby.port)), uids: isolate(String(standby.uids)) }} />
+                    </Text>
+                </div>
+            ) : null}
+        </span>
+    );
+};
+
+/** Progress of a running switch: "to slot a: waiting for the new version, 12 s of 60 s". */
+const switchValue = (translate, deploy, deploying) => {
+    if (!deploying || !deploy || PHASES.indexOf(deploy.phase) === -1) {
+        return null;
+    }
+    const target = deploy.slot_to
+        ? translate('Domain.status.slotName', { slot: isolate(deploy.slot_to) })
+        : translate('Domain.status.slotClassic');
+    const phase = translate(`Domain.status.switchPhase.${deploy.phase}`);
+    const limit = Number(deploy.phase_limit) || 0;
+    return limit
+        ? translate('Domain.status.switchProgress', { target, phase, elapsed: String(Number(deploy.phase_elapsed) || 0), limit: String(limit) })
+        : translate('Domain.status.switchProgressNoLimit', { target, phase });
+};
+
+/** The instances that run right now (both during a switch), with their state and memory. */
+const versionsValue = current => {
+    const slots = isObject(current.slots) ? current.slots : null;
+    if (!slots) {
+        return null;
+    }
+    const running = Object.keys(slots).filter(key => isObject(slots[key]) && ['active', 'activating', 'deactivating'].indexOf(slots[key].active_state) !== -1);
+    if (!running.length) {
+        return null;
+    }
+    return (
+        <span>
+            {running.map(key => (
+                <div key={key || 'classic'}>
+                    {slotName(key)}
+                    {': '}
+                    {slots[key].active_state}
+                    {slots[key].memory_bytes ? `, ${formatBytes(slots[key].memory_bytes)}` : ''}
+                    {slots[key].live ? <Text intent="muted" fontSize="sm">{' '}<Translate content="Domain.status.versionLive" /></Text> : null}
+                </div>
+            ))}
+        </span>
+    );
+};
+
 const deployValue = (translate, deploy, deploying) => {
     if (!deploy || !deploy.state || deploy.state === 'none') {
         return null;
@@ -108,6 +188,8 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
         : '';
     const url = siteUrl(data, config);
     const watcher = isObject(current.watcher) ? current.watcher : {};
+    // Zero-downtime slots: Restart switches to a new instance; "Restart in place" restarts the running one.
+    const switchable = Boolean(current.switchable);
 
     let endpoint = null;
     if (worker) {
@@ -147,6 +229,9 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
                 </span>
             ) : null,
         },
+        { key: 'zeroDowntime', label: <Translate content="Domain.status.zeroDowntime" />, value: worker ? null : zeroDowntimeValue(current) },
+        { key: 'switch', label: <Translate content="Domain.status.switch" />, value: switchValue(translate, deploy, deploying) },
+        { key: 'versions', label: <Translate content="Domain.status.versions" />, value: switchable ? versionsValue(current) : null },
         { key: 'deploy', label: <Translate content="Domain.status.deploy" />, value: deployValue(translate, deploy, deploying) },
         { key: 'triggers', label: <Translate content="Domain.status.triggers" />, value: triggers },
     ];
@@ -197,6 +282,17 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
                     >
                         <Translate content="Domain.actions.restart" />
                     </Button>
+                    {switchable && (
+                        <Button
+                            icon="reload"
+                            ghost
+                            disabled={!enabled || deploying || Boolean(busyOp)}
+                            state={busyOp === 'restartPlain' ? 'loading' : undefined}
+                            onClick={() => onControl('restartPlain')}
+                        >
+                            <Translate content="Domain.actions.restartPlain" />
+                        </Button>
+                    )}
                     <Button
                         intent="primary"
                         icon="deploy"

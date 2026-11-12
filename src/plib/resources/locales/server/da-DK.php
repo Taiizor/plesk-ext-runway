@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256-kontrolsummen skal bestå af 64 hexadecimale tegn.',
     'errorFetchFilename' => 'Filnavnet må kun indeholde bogstaver, cifre og . _ + - (maks. 128 tegn).',
     'errorUpdateVersion' => 'Versionen skal have formatet 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Kun administratoren kan slå udrulninger uden nedetid til på denne server.',
+    'errorReadyTimeout' => 'Parathedstimeouten skal være et helt antal sekunder mellem %%min%% og %%max%%.',
+    'errorDrainSeconds' => 'Afviklingstiden skal være et helt antal sekunder mellem %%min%% og %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Hukommelsesgrænse (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Eksempelapplikationen blev oprettet (én fil), og indstillingerne blev opdateret.',
     'messageFetchStarted' => 'Downloadet er startet. Følg med i loggen "Build og udrulning".',
     'messageUpdateStarted' => 'Opdateringen til Runway %%version%% er startet. Fremdriften vises nedenfor.',
+    'messageSavedSwitching' => 'Indstillingerne blev gemt. Den nye version starter ved siden af den kørende og overtager, når den er klar; følg med i loggen "Build og udrulning".',
+    'messageSwitchStarted' => 'Den nye version starter ved siden af den kørende og overtager, når den er klar. Følg med i loggen "Build og udrulning".',
+    'messageAction_restartPlain' => 'Applikationen genstarter på stedet.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Viser de konfigurerede applikationer og deres tilstand.',
     'cli.commands.status' => 'Viser tilstanden for applikationen på et domæne: --status <domæne>',
     'cli.commands.start' => 'Starter applikationen på et domæne: --start <domæne>',
     'cli.commands.stop' => 'Stopper applikationen på et domæne; den forbliver stoppet (også efter en genstart af serveren eller en udrulning), indtil --start eller --restart: --stop <domæne>',
-    'cli.commands.restart' => 'Genstarter applikationen på et domæne: --restart <domæne>',
+    'cli.commands.restart' => 'Genstarter applikationen på et domæne; med udrulninger uden nedetid starter den nye version ved siden af den kørende, og kommandoen venter på skiftet (-plain genstarter på stedet): --restart <domæne> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Bygger og genstarter applikationen på et domæne og venter på resultatet (en stoppet applikation bygges, men forbliver stoppet): --deploy <domæne> [-no-wait]',
     'cli.commands.enable' => 'Aktiverer den konfigurerede applikation på et domæne: --enable <domæne>',
     'cli.commands.disable' => 'Deaktiverer applikationen på et domæne: --disable <domæne>',

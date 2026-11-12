@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'La suma de comprobación SHA-256 debe tener 64 caracteres hexadecimales.',
     'errorFetchFilename' => 'El nombre de archivo solo puede contener letras, dígitos y . _ + - (máx. 128 caracteres).',
     'errorUpdateVersion' => 'La versión debe tener el formato 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Solo el administrador puede activar los despliegues sin interrupción en este servidor.',
+    'errorReadyTimeout' => 'El plazo de disponibilidad debe ser un número entero de segundos entre %%min%% y %%max%%.',
+    'errorDrainSeconds' => 'El periodo de vaciado debe ser un número entero de segundos entre %%min%% y %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límite de memoria (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'La aplicación de ejemplo se ha escrito (un archivo) y la configuración se ha actualizado.',
     'messageFetchStarted' => 'La descarga ha comenzado. Sígala en el registro "Compilación y despliegue".',
     'messageUpdateStarted' => 'La actualización a Runway %%version%% ha comenzado. Su progreso se muestra a continuación.',
+    'messageSavedSwitching' => 'La configuración se ha guardado. La nueva versión se inicia junto a la que está en ejecución y toma el relevo cuando está lista; sígala en el registro "Compilación y despliegue".',
+    'messageSwitchStarted' => 'La nueva versión se inicia junto a la que está en ejecución y toma el relevo cuando está lista. Sígala en el registro "Compilación y despliegue".',
+    'messageAction_restartPlain' => 'La aplicación se está reiniciando in situ.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Lista las aplicaciones configuradas y su estado.',
     'cli.commands.status' => 'Muestra el estado de la aplicación de un dominio: --status <dominio>',
     'cli.commands.start' => 'Inicia la aplicación de un dominio: --start <dominio>',
     'cli.commands.stop' => 'Detiene la aplicación de un dominio; permanece detenida (incluso tras un reinicio del servidor o un despliegue) hasta --start o --restart: --stop <dominio>',
-    'cli.commands.restart' => 'Reinicia la aplicación de un dominio: --restart <dominio>',
+    'cli.commands.restart' => 'Reinicia la aplicación de un dominio; con los despliegues sin interrupción, la nueva versión se inicia junto a la que está en ejecución y el comando espera a la conmutación (-plain reinicia in situ): --restart <dominio> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Compila y reinicia la aplicación de un dominio y espera el resultado (una aplicación detenida se compila, pero permanece detenida): --deploy <dominio> [-no-wait]',
     'cli.commands.enable' => 'Activa la aplicación configurada de un dominio: --enable <dominio>',
     'cli.commands.disable' => 'Desactiva la aplicación de un dominio: --disable <dominio>',

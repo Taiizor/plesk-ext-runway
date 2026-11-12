@@ -10,9 +10,9 @@ import { useApi, useApiData } from './lib/hooks';
 import ErrorAlert from './components/ErrorAlert';
 
 const FIELDS = ['portMin', 'portMax', 'buildTimeout', 'memoryMb', 'cpuPercent', 'tasks',
-    'buildMemoryMb', 'buildCpuPercent', 'buildTasks', 'maxAppsPerSubscription'];
-/** Switches of the built-in updater (booleans). */
-const SWITCHES = ['updateCheck', 'updateAuto'];
+    'buildMemoryMb', 'buildCpuPercent', 'buildTasks', 'maxAppsPerSubscription', 'zeroDowntimeMaxReady', 'zeroDowntimeMaxDrain'];
+/** Switches (booleans): the built-in updater, zero-downtime deployments for customers. */
+const SWITCHES = ['updateCheck', 'updateAuto', 'zeroDowntimeCustomers'];
 
 /** Numeric strings become numbers, switches booleans; anything else is sent as typed (the server validates). */
 const toBody = values => {
@@ -36,7 +36,8 @@ const NumberField = props => <FormFieldText size="md" {...props} />;
 
 /**
  * Server-wide settings (administrators only): port range, default limits of new applications,
- * build limits, the number of applications per subscription and the built-in updater.
+ * build limits, the number of applications per subscription, zero-downtime deployments and the
+ * built-in updater.
  */
 const Settings = ({ baseUrl, statusMessages }) => {
     const api = useApi(baseUrl);
@@ -115,6 +116,23 @@ const Settings = ({ baseUrl, statusMessages }) => {
                         name="maxAppsPerSubscription"
                         label={<Translate content="Settings.maxAppsPerSubscription" />}
                         description={<Translate content="Settings.maxAppsPerSubscriptionHint" />}
+                    />
+                </Section>
+                <Section title={<Translate content="Settings.sectionZeroDowntime" />}>
+                    <FormFieldCheckbox
+                        name="zeroDowntimeCustomers"
+                        label={<Translate content="Settings.zeroDowntimeCustomers" />}
+                        description={<Translate content="Settings.zeroDowntimeCustomersHint" />}
+                    />
+                    <NumberField
+                        name="zeroDowntimeMaxReady"
+                        label={<Translate content="Settings.zeroDowntimeMaxReady" />}
+                        description={<Translate content="Settings.zeroDowntimeMaxReadyHint" />}
+                    />
+                    <NumberField
+                        name="zeroDowntimeMaxDrain"
+                        label={<Translate content="Settings.zeroDowntimeMaxDrain" />}
+                        description={<Translate content="Settings.zeroDowntimeMaxDrainHint" />}
                     />
                 </Section>
                 <Section title={<Translate content="Settings.sectionUpdates" />}>

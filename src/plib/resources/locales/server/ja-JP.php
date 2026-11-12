@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256 チェックサムは 64 桁の 16 進数でなければなりません。',
     'errorFetchFilename' => 'ファイル名に使用できるのは英字、数字、. _ + - のみです（最大 128 文字）。',
     'errorUpdateVersion' => 'バージョンは 1.2.3-1 のような形式で指定してください。',
+    'errorZeroDowntimeAdmin' => 'このサーバでゼロダウンタイムデプロイを有効にできるのは管理者のみです。',
+    'errorReadyTimeout' => '準備完了のタイムアウトは %%min%% から %%max%% までの整数（秒）で指定してください。',
+    'errorDrainSeconds' => 'ドレイン期間は %%min%% から %%max%% までの整数（秒）で指定してください。',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'メモリ上限（MiB）',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'サンプルアプリケーション（1 ファイル）を書き込み、設定を更新しました。',
     'messageFetchStarted' => 'ダウンロードを開始しました。「ビルドとデプロイ」ログで確認できます。',
     'messageUpdateStarted' => 'Runway %%version%% へのアップデートを開始しました。進行状況は下に表示されます。',
+    'messageSavedSwitching' => '設定を保存しました。新しいバージョンが実行中のバージョンと並行して起動し、準備ができ次第処理を引き継ぎます。「ビルドとデプロイ」ログで確認できます。',
+    'messageSwitchStarted' => '新しいバージョンが実行中のバージョンと並行して起動し、準備ができ次第処理を引き継ぎます。「ビルドとデプロイ」ログで確認できます。',
+    'messageAction_restartPlain' => 'アプリケーションをその場で再起動しています。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '設定済みのアプリケーションとその状態を一覧表示します。',
     'cli.commands.status' => 'ドメインのアプリケーションの状態を表示します: --status <ドメイン>',
     'cli.commands.start' => 'ドメインのアプリケーションを起動します: --start <ドメイン>',
     'cli.commands.stop' => 'ドメインのアプリケーションを停止します。サーバの再起動やデプロイがあっても、--start または --restart を実行するまで停止したままになります: --stop <ドメイン>',
-    'cli.commands.restart' => 'ドメインのアプリケーションを再起動します: --restart <ドメイン>',
+    'cli.commands.restart' => 'ドメインのアプリケーションを再起動します。ゼロダウンタイムデプロイでは、新しいバージョンが実行中のバージョンと並行して起動し、コマンドは切り替えの完了を待ちます（-plain はその場で再起動）: --restart <ドメイン> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'ドメインのアプリケーションをビルドして再起動し、結果を待ちます（停止済みのアプリケーションはビルドされますが停止したままです）: --deploy <ドメイン> [-no-wait]',
     'cli.commands.enable' => 'ドメインの設定済みアプリケーションを有効にします: --enable <ドメイン>',
     'cli.commands.disable' => 'ドメインのアプリケーションを無効にします: --disable <ドメイン>',

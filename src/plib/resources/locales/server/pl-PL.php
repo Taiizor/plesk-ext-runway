@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Suma kontrolna SHA-256 musi składać się z 64 znaków szesnastkowych.',
     'errorFetchFilename' => 'Nazwa pliku może zawierać tylko litery, cyfry oraz . _ + - (maks. 128 znaków).',
     'errorUpdateVersion' => 'Wersja musi mieć postać 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Na tym serwerze tylko administrator może włączyć wdrożenia bez przestojów.',
+    'errorReadyTimeout' => 'Limit czasu gotowości musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
+    'errorDrainSeconds' => 'Okres wygaszania musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit pamięci (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Przykładowa aplikacja została zapisana (jeden plik), a ustawienia zostały zaktualizowane.',
     'messageFetchStarted' => 'Pobieranie zostało rozpoczęte. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
     'messageUpdateStarted' => 'Rozpoczęto aktualizację Runway do wersji %%version%%. Postęp jest widoczny poniżej.',
+    'messageSavedSwitching' => 'Ustawienia zostały zapisane. Nowa wersja uruchamia się obok działającej i przejmie ruch, gdy będzie gotowa; śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+    'messageSwitchStarted' => 'Nowa wersja uruchamia się obok działającej i przejmie ruch, gdy będzie gotowa. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+    'messageAction_restartPlain' => 'Aplikacja jest ponownie uruchamiana w miejscu.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Wyświetla skonfigurowane aplikacje i ich stan.',
     'cli.commands.status' => 'Pokazuje stan aplikacji domeny: --status <domena>',
     'cli.commands.start' => 'Uruchamia aplikację domeny: --start <domena>',
     'cli.commands.stop' => 'Zatrzymuje aplikację domeny; pozostaje zatrzymana (także po ponownym uruchomieniu serwera lub wdrożeniu) do czasu użycia --start lub --restart: --stop <domena>',
-    'cli.commands.restart' => 'Ponownie uruchamia aplikację domeny: --restart <domena>',
+    'cli.commands.restart' => 'Ponownie uruchamia aplikację domeny; przy wdrożeniach bez przestojów nowa wersja uruchamia się obok działającej, a polecenie czeka na przełączenie (-plain uruchamia ponownie w miejscu): --restart <domena> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Kompiluje i ponownie uruchamia aplikację domeny oraz czeka na wynik (zatrzymana aplikacja jest kompilowana, ale pozostaje zatrzymana): --deploy <domena> [-no-wait]',
     'cli.commands.enable' => 'Włącza skonfigurowaną aplikację domeny: --enable <domena>',
     'cli.commands.disable' => 'Wyłącza aplikację domeny: --disable <domena>',

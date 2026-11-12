@@ -12,7 +12,9 @@
  * Commands:
  *   --list                                       configured applications and their state
  *   --status <domain>                            details of one application
- *   --start|--stop|--restart <domain>            service control
+ *   --start|--stop <domain>                      service control
+ *   --restart <domain> [-plain] [-no-wait]       restart; zero-downtime applications switch to a new
+ *                                                instance (waits for the job), -plain restarts in place
  *   --deploy <domain> [-no-wait]                 build and restart (waits for the job by default)
  *   --enable|--disable <domain>                  enable or disable a configured application
  *   --toolchains                                 installed toolchains per runtime
@@ -37,7 +39,7 @@ class Modules_Runway_Cli
         'status' => '<domain>',
         'start' => '<domain>',
         'stop' => '<domain>',
-        'restart' => '<domain>',
+        'restart' => '<domain> [-plain] [-no-wait]',
         'deploy' => '<domain> [-no-wait]',
         'enable' => '<domain>',
         'disable' => '<domain>',
@@ -50,6 +52,7 @@ class Modules_Runway_Cli
 
     /** @var array command => flags it accepts */
     private static $flags = [
+        'restart' => ['plain', 'no-wait'],
         'deploy' => ['no-wait'],
         'install-toolchain' => ['no-wait'],
         'update' => ['no-wait'],
@@ -113,8 +116,9 @@ class Modules_Runway_Cli
                     return $this->status($this->domain($command, $args));
                 case 'start':
                 case 'stop':
-                case 'restart':
                     return $this->action($this->domain($command, $args), $command);
+                case 'restart':
+                    return $this->restart($this->domain($command, $args), !empty($flags['plain']), empty($flags['no-wait']));
                 case 'deploy':
                     return $this->deploy($this->domain($command, $args), empty($flags['no-wait']));
                 case 'enable':
@@ -175,9 +179,11 @@ class Modules_Runway_Cli
                 !empty($config['toolchain']) ? (string)$config['toolchain'] : '-',
                 $listen,
                 isset($config['mode']) ? (string)$config['mode'] . (!empty($config['mountPath']) && $config['mode'] === Modules_Runway_App::MODE_PATH ? ' ' . $config['mountPath'] : '') : Modules_Runway_App::MODE_WEB,
-                $listen === Modules_Runway_App::LISTEN_TCP && !empty($config['port']) ? (string)(int)$config['port'] : '-',
+                $listen === Modules_Runway_App::LISTEN_TCP && !empty($config['port'])
+                    ? (string)(int)($state && !empty($state['live_port']) ? $state['live_port'] : $config['port']) : '-',
                 !empty($config['enabled']) ? 'yes' : 'no',
-                Modules_Runway_App::uiState($config, $state),
+                // "zd": zero-downtime deployments (docs/DESIGN.md section 12.10).
+                Modules_Runway_App::uiState($config, $state) . ($state && !empty($state['switchable']) ? ' zd' : ''),
             ];
         }
         if (!$rows) {
@@ -229,9 +235,17 @@ class Modules_Runway_Cli
         if ($config['listen'] === Modules_Runway_App::LISTEN_TCP) {
             $facts[] = ['Listen', 'tcp 127.0.0.1:' . (isset($status['port']) ? (int)$status['port'] : $config['port'])];
         } elseif ($config['listen'] === Modules_Runway_App::LISTEN_UNIX) {
-            $facts[] = ['Listen', 'unix ' . (isset($status['socket']) ? $status['socket'] : Modules_Runway_App::socketPath($domain))];
+            $socket = isset($status['socket']) ? (string)$status['socket'] : Modules_Runway_App::socketPath($domain);
+            if (!empty($status['proxy_socket'])) {
+                // Zero-downtime: the web server uses the root link to the live slot's socket.
+                $socket = $status['proxy_socket'] . ' -> ' . preg_replace('#^/run/runway/#', '', $socket);
+            }
+            $facts[] = ['Listen', 'unix ' . $socket];
         } else {
             $facts[] = ['Listen', 'none (worker)'];
+        }
+        foreach (self::zeroDowntimeFacts($status) as $fact) {
+            $facts[] = $fact;
         }
         if ($config['staticPaths']) {
             $facts[] = ['Static paths', implode(' ', $config['staticPaths'])];
@@ -286,6 +300,94 @@ class Modules_Runway_Cli
         Modules_Runway_Helper::call('app-action', ['domain_id' => (int)$domain->getId(), 'action' => $action]);
         $this->line(pm_Locale::lmsg('messageAction_' . $action));
         return self::EXIT_OK;
+    }
+
+    /**
+     * --restart <domain> [-plain] [-no-wait]: a running zero-downtime application starts the new
+     * version next to the old one (switch job; waits for it like --deploy unless -no-wait);
+     * -plain restarts in place, as do applications without the setting.
+     *
+     * @param pm_Domain $domain
+     * @param bool $plain
+     * @param bool $wait
+     * @return int
+     */
+    private function restart(pm_Domain $domain, $plain, $wait)
+    {
+        $this->requireConfigured($domain);
+        $payload = ['domain_id' => (int)$domain->getId(), 'action' => 'restart'];
+        if ($plain) {
+            $payload['plain'] = true;
+        }
+        $result = Modules_Runway_Helper::call('app-action', $payload);
+        if (empty($result['job'])) {
+            $this->line($plain ? pm_Locale::lmsg('messageAction_restartPlain') : pm_Locale::lmsg('messageAction_restart'));
+            return self::EXIT_OK;
+        }
+        $job = (string)$result['job'];
+        $this->line('The zero-downtime restart of ' . $domain->getName() . ' has started (job ' . $job . ').');
+        if (!$wait) {
+            return self::EXIT_OK;
+        }
+        $status = Modules_Runway_Helper::call('app-status', ['domain_id' => (int)$domain->getId()]);
+        $limit = (isset($status['ready_timeout']) ? (int)$status['ready_timeout'] : 60)
+            + (isset($status['drain_seconds']) ? (int)$status['drain_seconds'] : 10) + 300;
+        return $this->waitForJob($job, $limit);
+    }
+
+    /**
+     * Zero-downtime facts of --status: the setting, the slots and a running switch.
+     *
+     * @param array $status Helper app-status
+     * @return array [[label, value], ...]
+     */
+    private static function zeroDowntimeFacts(array $status)
+    {
+        $facts = [];
+        if (!isset($status['zero_downtime'])) {
+            return $facts;
+        }
+        $slot = isset($status['slot']) ? (string)$status['slot'] : '';
+        if (!empty($status['zero_downtime'])) {
+            $facts[] = ['Zero-downtime', $slot !== ''
+                ? 'on (slot ' . $slot . (!empty($status['switched_at']) ? ', switched ' . $status['switched_at'] : '') . ')'
+                : 'on (takes effect with the next successful restart)'];
+        } elseif ($slot !== '') {
+            $facts[] = ['Zero-downtime', 'off (slot ' . $slot . ' serves until the next restart)'];
+        } else {
+            $facts[] = ['Zero-downtime', 'off'];
+        }
+        if (!empty($status['slots']) && is_array($status['slots'])) {
+            $parts = [];
+            foreach ($status['slots'] as $name => $info) {
+                if (!is_array($info)) {
+                    continue;
+                }
+                $parts[] = ((string)$name === '' ? '1.0 unit' : (string)$name) . ' '
+                    . (isset($info['active_state']) ? (string)$info['active_state'] : '?')
+                    . (!empty($info['sub_state']) ? ' (' . $info['sub_state'] . ')' : '')
+                    . (!empty($info['endpoint']) ? ', ' . $info['endpoint'] : '')
+                    . (!empty($info['live']) ? ', live' : '');
+            }
+            $facts[] = ['Slots', implode('; ', $parts)];
+        }
+        $deploy = isset($status['deploy']) && is_array($status['deploy']) ? $status['deploy'] : [];
+        if (!empty($deploy['phase']) && in_array(isset($deploy['state']) ? $deploy['state'] : '', ['queued', 'running'], true)) {
+            $phases = [
+                'prepare' => 'preparing',
+                'starting' => 'starting the new version',
+                'waiting' => 'waiting for the new version',
+                'switching' => 'switching the traffic',
+                'draining' => 'draining the old version',
+                'stopping' => 'stopping the old version',
+            ];
+            $text = isset($phases[$deploy['phase']]) ? $phases[$deploy['phase']] : (string)$deploy['phase'];
+            if (!empty($deploy['phase_limit'])) {
+                $text .= ' (' . (isset($deploy['phase_elapsed']) ? (int)$deploy['phase_elapsed'] : 0) . '/' . (int)$deploy['phase_limit'] . ' s)';
+            }
+            $facts[] = ['Switch', $text];
+        }
+        return $facts;
     }
 
     /**

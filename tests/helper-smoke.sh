@@ -8,6 +8,10 @@
 # 10 minutes and run on domain events) removes helper apps of domains it does not know, so the
 # script creates the root-only flag /var/lib/runway/pause-reconcile while it runs (Reconcile
 # honours it for at most one hour) and removes it on exit.
+# The zero-downtime section runs request loops through an nginx test server on 127.0.0.1:18990
+# and 18991 during switches (a fake generated configuration of smoke.test carries the marker);
+# with /root/runway-helper-1.0.0 (copied by .github/scripts/plesk-e2e.sh) it also compares the
+# files of applications without the setting with those of the 1.0.0 helper.
 # The self-update section checks the built-in updater against a mock release server; with
 # RUNWAY_SMOKE_SELF_UPDATE=1 it also upgrades the installed extension to a repackaged
 # release+1 (irreversible: Plesk refuses the downgrade afterwards, so only on throw-away servers).
@@ -20,7 +24,13 @@ touch "$PAUSE_FLAG"
 UPD_PID=""
 UPD_DIR=""
 cleanup() {
-    rm -f "$PAUSE_FLAG" /etc/runway/update-source /etc/runway/allow-insecure-fetch
+    rm -f "$PAUSE_FLAG" /etc/runway/update-source /etc/runway/allow-insecure-fetch /var/lib/runway/test-switch-fault
+    # The zero-downtime section's nginx test server and fake generated configuration.
+    if [ -e /etc/nginx/conf.d/zz-runway-smoke-zd.conf ]; then
+        rm -f /etc/nginx/conf.d/zz-runway-smoke-zd.conf
+        systemctl reload nginx >/dev/null 2>&1
+    fi
+    rm -rf /var/www/vhosts/system/smoke.test
     [ -n "$UPD_PID" ] && kill "$UPD_PID" 2>/dev/null
     # The update cache holds mock releases (and a recorded failure of a mock version) once the
     # self-update section has started: never leave it behind, also not after an aborted run.
@@ -463,6 +473,395 @@ call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"https://127.0.0.1:8
 [ "$(wait_job deploy-$ID)" = "failed" ] && grep -q 'non-public address' /var/lib/runway/jobs/deploy-$ID.log && ok "fetch refuses loopback addresses" || bad "fetch loopback: $(tail -2 /var/lib/runway/jobs/deploy-$ID.log)"
 kill $HTTPD 2>/dev/null; wait $HTTPD 2>/dev/null
 rm -rf $SRV
+
+echo "== zero-downtime deployments (docs/DESIGN.md section 12)"
+# The fake domain smoke.test has no vhost: an nginx test server on 127.0.0.1 uses the switchable
+# snippets (tcp: the include on ZD_TCP_PORT, unix: the root link on ZD_UNIX_PORT), and a fake
+# generated configuration carries the marker the switch looks for. A request loop counts every
+# answer that is not 2xx while the switches run.
+ZD_ROOT=apps/smoke-zd
+ZD_APP=$HOME_DIR/$ZD_ROOT
+ZD_TCP_PORT=18990
+ZD_UNIX_PORT=18991
+ZD_NGINX=/etc/nginx/conf.d/zz-runway-smoke-zd.conf
+ZD_VHOSTS=$(awk '$1 == "HTTPD_VHOSTS_D" {print $2}' /etc/psa/psa.conf 2>/dev/null)
+ZD_CONF=${ZD_VHOSTS:-/var/www/vhosts}/system/smoke.test/conf
+ZD_TMP=$(mktemp -d /root/runway-zd-XXXXXX)
+ZD_FAULT=/var/lib/runway/test-switch-fault
+LOOP_PID=""
+zd_cleanup() {
+    [ -n "$LOOP_PID" ] && touch "$ZD_TMP/stop" && wait "$LOOP_PID" 2>/dev/null
+    rm -f "$ZD_NGINX" "$ZD_FAULT"
+    rm -rf "${ZD_CONF%/conf}" "$ZD_TMP"
+    systemctl reload nginx >/dev/null 2>&1
+}
+mkdir -p "$ZD_APP" "$ZD_CONF"
+printf 'module smokezd\n\ngo 1.22\n' > "$ZD_APP/go.mod"
+cat > "$ZD_APP/main.go" <<'EOF'
+package main
+
+import (
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+)
+
+func main() {
+	if d, err := time.ParseDuration(os.Getenv("ZD_DELAY")); err == nil {
+		time.Sleep(d)
+	}
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "zd %s", os.Getenv("RUNWAY_SLOT"))
+	})
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if os.Getenv("ZD_FAIL") != "" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprint(w, "ok")
+	})
+	var ln net.Listener
+	var err error
+	if sock := os.Getenv("RUNWAY_SOCKET"); sock != "" {
+		if p := os.Getenv("ZD_BIND"); p != "" {
+			// Like gunicorn and asyncio: remove whatever is at the path, then bind it.
+			os.Remove(p)
+			sock = p
+		}
+		ln, err = net.Listen("unix", sock)
+	} else {
+		ln, err = net.Listen("tcp", os.Getenv("LISTEN_ADDR"))
+	}
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("listening on", ln.Addr())
+	// SIGTERM closes the listener, and a unix listener unlinks its path (as Go servers, gunicorn
+	// and uvicorn do): an old slot must not break the active one.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM)
+	go func() {
+		<-stop
+		ln.Close()
+		os.Exit(0)
+	}()
+	http.Serve(ln, nil)
+}
+EOF
+chown -R "$USER_NAME":psacln "$ZD_APP"
+cat > "$ZD_TMP/loop.py" <<'PYEOF'
+import http.client, os, sys, threading, time
+port, out, stop = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+lock = threading.Lock()
+count = {"ok": 0, "bad": 0}
+bad = []
+def worker():
+    while not os.path.exists(stop):
+        try:
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            conn.request("GET", "/", headers={"Connection": "close"})
+            resp = conn.getresponse()
+            resp.read()
+            code = resp.status
+            conn.close()
+        except Exception as exc:
+            code = "ERR %s" % exc
+        with lock:
+            if isinstance(code, int) and 200 <= code < 300:
+                count["ok"] += 1
+            else:
+                count["bad"] += 1
+                if len(bad) < 5:
+                    bad.append("%s %s" % (time.strftime("%H:%M:%S"), code))
+threads = [threading.Thread(target=worker) for _ in range(3)]
+for t in threads:
+    t.start()
+for t in threads:
+    t.join()
+with open(out, "w") as fh:
+    fh.write("%d %d %s\n" % (count["ok"], count["bad"], "; ".join(bad)))
+PYEOF
+cat > "$ZD_NGINX" <<EOF
+# tests/helper-smoke.sh: the switchable snippets of the fake domain smoke.test (#$ID)
+server {
+    listen 127.0.0.1:$ZD_TCP_PORT;
+    location / {
+        set \$runway_upstream "unix:/run/runway/$ID.none:";
+        include /etc/runway/web/$ID.nginx[.]conf;
+        proxy_pass http://\$runway_upstream;
+        proxy_set_header Host smoke.test;
+    }
+}
+server {
+    listen 127.0.0.1:$ZD_UNIX_PORT;
+    location / {
+        proxy_pass http://unix:/run/runway/$ID.sock:;
+        proxy_set_header Host smoke.test;
+    }
+}
+EOF
+printf '# tests/helper-smoke.sh: generated configuration of smoke.test\n# Runway: zero-downtime #%s\ninclude /etc/runway/web/%s.nginx[.]conf;\nproxy_pass http://unix:/run/runway/%s.sock:;\n' "$ID" "$ID" "$ID" > "$ZD_CONF/nginx.conf"
+nginx -t >/dev/null 2>&1 && systemctl reload nginx && ok "nginx test server for the switchable snippets" || bad "nginx test server: $(nginx -t 2>&1 | tail -2)"
+
+zd_base() { # zd_base [ENV-JSON]: the payload of the test application (the variables are always sent)
+    local env=${1:-'{}'}
+    cat <<EOF
+"env": $env,
+"domain_id": $ID, "domain": "smoke.test", "sysuser": "$USER_NAME", "app_root": "$ZD_ROOT",
+"runtime": "go", "toolchain": "$GO_VERSION", "build_cmd": "go build -o bin/app .", "start_cmd": "./bin/app",
+"port": 0, "port_range": [29900, 29999], "enabled": true, "auto_deploy": false, "build_timeout": 600, "limits": {},
+"health_path": "/healthz", "ready_timeout": 20, "drain_seconds": 2
+EOF
+}
+zd_status() { call app-status "{\"domain_id\": $ID}"; }
+loop_start() { rm -f "$ZD_TMP/stop" "$ZD_TMP/loop.out"; python3 "$ZD_TMP/loop.py" "$1" "$ZD_TMP/loop.out" "$ZD_TMP/stop" & LOOP_PID=$!; sleep 1; }
+loop_stop() { # loop_stop NAME: every answer during the loop must be 2xx
+    local n_ok=0 n_bad=1 rest="no output of the request loop"
+    touch "$ZD_TMP/stop"; wait "$LOOP_PID" 2>/dev/null; LOOP_PID=""
+    [ -f "$ZD_TMP/loop.out" ] && read -r n_ok n_bad rest < "$ZD_TMP/loop.out"
+    [ "${n_bad:-1}" = "0" ] && [ "${n_ok:-0}" -gt 50 ] && ok "$1: $n_ok requests through nginx, none failed" || bad "$1: $n_ok ok, $n_bad failed ($rest)"
+}
+wait_listening() { for _ in $(seq 1 30); do [ "$(zd_status | field "['listener']")" = "ok" ] && return 0; sleep 1; done; return 1; }
+slot_now() { zd_status | field "['slot']"; }
+job_msg() { call job-status "{\"job\": \"deploy-$ID\"}" | jexpr "(d['state'], d.get('message'))"; }
+
+echo "-- tcp"
+out=$(call app-apply "{$(zd_base), \"listen\": \"tcp\", \"start\": false}")
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && wait_listening && ok "classic unit built and running (setting off)" || bad "classic unit: $(tail -4 /var/lib/runway/jobs/deploy-$ID.log)"
+ZD_PORT=$(echo "$out" | field "['port']")
+out=$(call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true, \"restart\": false}")
+[ "$(echo "$out" | jexpr "(d['switchable'], d['job'], d['state']['slot'], d['state']['port_a'] == $ZD_PORT, d['state']['port_b'] not in (0, $ZD_PORT))")" = "(True, None, '', True, True)" ] && ok "turning it on: switchable, slot b gets its own port, nothing restarted" || bad "turning on: $out"
+[ "$(grep -c "^set \$runway_upstream 127.0.0.1:$ZD_PORT;$" /etc/runway/web/$ID.nginx.conf 2>/dev/null)" = "1" ] && [ "$(stat -c '%U %a' /etc/runway/web/$ID.nginx.conf)" = "root 644" ] && ok "include file names the classic unit's port (root 0644)" || bad "include: $(cat /etc/runway/web/$ID.nginx.conf 2>&1)"
+grep -q "^SocketBindAllow=tcp:$(echo "$out" | field "['state']['port_b']")$" /etc/systemd/system/runway-app-$ID-b.service && grep -q '^RUNWAY_SLOT="b"' /etc/runway/env/$ID-b.env \
+    && grep -q '^SyslogIdentifier=runway-app-999-b$' /etc/systemd/system/runway-app-$ID-b.service && ok "slot units: own port, RUNWAY_SLOT, journal identifier" || bad "slot unit b: $(grep -E 'SocketBind|Syslog' /etc/systemd/system/runway-app-$ID-b.service)"
+grep -q '^TimeoutStopSec=300$' /etc/systemd/system/runway-deploy-$ID.service && ok "deploy unit of a switchable app: TimeoutStopSec covers an interrupted switch" || bad "deploy unit: $(grep Timeout /etc/systemd/system/runway-deploy-$ID.service)"
+[ "$(systemctl is-enabled runway-converge.service 2>&1)" = "enabled" ] && ok "boot unit runway-converge.service installed" || bad "runway-converge.service: $(systemctl is-enabled runway-converge.service 2>&1)"
+loop_start $ZD_TCP_PORT
+out=$(call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}")
+[ "$(echo "$out" | field "['job']")" = "deploy-$ID" ] && [ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "b" ] && ok "first switch: the classic unit to slot b" || bad "first switch: $out $(job_msg)"
+[ ! -e /etc/systemd/system/runway-app-$ID.service ] && [ ! -e /etc/runway/env/$ID.env ] && ok "the classic unit was retired" || bad "classic unit left over"
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "a" ] && ok "restart switches to slot a" || bad "restart: $(job_msg)"
+# Turning it off from slot a, which holds the classic unit's port: the classic unit gets a new
+# port. A later apply with the panel's old port and no restart (the Reconcile that follows) keeps
+# the port the classic unit listens on (docs/DESIGN.md section 12.8); then it is turned on again.
+call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": false}" >/dev/null
+st=$(wait_job deploy-$ID)
+OFF_PORT=$(zd_status | field "['port']")
+[ "$st" = "succeeded" ] && [ "$(slot_now)" = "" ] && [ "$OFF_PORT" != "$ZD_PORT" ] && grep -q "gets port $OFF_PORT" /var/lib/runway/jobs/deploy-$ID.log \
+    && [ ! -e /etc/systemd/system/runway-app-$ID-a.service ] && ok "turning it off from slot a: the classic unit gets port $OFF_PORT (slot a held $ZD_PORT), the slots are retired" \
+    || bad "turning off from slot a: $st $(job_msg) port $OFF_PORT"
+out=$(call app-apply "{$(zd_base), \"port\": $ZD_PORT, \"listen\": \"tcp\", \"zero_downtime\": false, \"restart\": false}")
+[ "$(echo "$out" | jexpr "(d['port'], d['switchable'], d['job'])")" = "($OFF_PORT, False, None)" ] && grep -q "^PORT=\"$OFF_PORT\"$" /etc/runway/env/$ID.env \
+    && [ "$(curl -s --max-time 5 http://127.0.0.1:$OFF_PORT/)" = "zd " ] && ok "a re-apply with the panel's old port keeps the port the classic unit listens on" \
+    || bad "re-apply after turning off: $out $(grep '^PORT=' /etc/runway/env/$ID.env)"
+call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true, \"restart\": false}" >/dev/null
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "b" ] && [ "$(systemctl is-active runway-app-$ID-a)" != "active" ] && ok "build & restart switches back to slot b, slot a stops" || bad "deploy switch: $(job_msg)"
+call app-apply "{$(zd_base '{"ZD_FAIL": "1"}'), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$st" = "failed" ] && job_msg | grep -q 'was not ready within 20 s (HTTP 503 from /healthz)' && [ "$(slot_now)" = "b" ] && [ "$(systemctl is-active runway-app-$ID-a)" != "active" ] \
+    && ok "a new version that fails its health check is stopped, the old one keeps serving" || bad "failed health: $st $(job_msg)"
+STANDBY=$(zd_status | jexpr "d['slots']['a']['endpoint'].split(':')[1]")
+runuser -u nobody -- python3 -c "import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1', $STANDBY)); s.listen(); time.sleep(60)" &
+SQUAT=$!
+sleep 1
+[ "$(zd_status | field "['standby_listener']")" = "foreign" ] && ok "status reports a foreign holder of the standby port" || bad "standby: $(zd_status | jexpr "d.get('standby_listener')")"
+call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "a" ] && grep -q 'gets port' /var/lib/runway/jobs/deploy-$ID.log \
+    && [ "$(zd_status | jexpr "d['port'] != $STANDBY")" = "True" ] && ok "a held standby port moves to another port, the switch succeeds" || bad "squatted standby: $(job_msg)"
+kill $SQUAT 2>/dev/null; wait $SQUAT 2>/dev/null
+LIVE=$(slot_now)
+echo "kill:moved" > "$ZD_FAULT"
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+sleep 2
+for _ in $(seq 1 60); do case "$(systemctl is-active runway-deploy-$ID.service)" in active|activating|deactivating) sleep 1 ;; *) break ;; esac; done
+rm -f "$ZD_FAULT"
+st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json')); print((d['slot'], (d.get('switch') or {}).get('phase')))")
+[ "$st" = "('$LIVE', 'switching')" ] && ok "a job killed after the traffic moved leaves its intent record" || bad "killed job state: $st"
+"$H" _converge
+st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json')); print((d['slot'], d.get('switch')))")
+[ "$st" != "('$LIVE', None)" ] && [ "$(echo "$st" | cut -c3)" != "$LIVE" ] && [ "$(systemctl is-active runway-app-$ID-$LIVE)" != "active" ] \
+    && journalctl -u runway-app-$ID.service -n 20 --no-pager | grep -q 'settled an interrupted switch' && ok "the convergence completes the switch from the pointer ($st)" || bad "convergence after kill: $st"
+loop_stop "tcp: turning on, restart, build, failed health, held standby port, killed job"
+call app-apply "{$(zd_base '{"ZD_DELAY": "6s"}'), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
+for _ in $(seq 1 40); do [ "$(call job-status "{\"job\": \"deploy-$ID\"}" | field "['phase']" 2>/dev/null)" = "waiting" ] && break; sleep 0.5; done
+call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}" | grep -q 'A deployment is running' && ok "a save is refused while a switch runs" || bad "app-apply during a switch was not refused"
+call app-action "{\"domain_id\": $ID, \"action\": \"stop\"}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$st" = "succeeded" ] && job_msg | grep -q 'stopped during the switch' && [ "$(systemctl is-active runway-app-$ID-a runway-app-$ID-b | sort -u | tr '\n' ' ')" = "inactive " ] \
+    && [ "$(zd_status | field "['stopped']")" = "True" ] && ok "Stop during a switch stops both versions and persists" || bad "stop during switch: $st $(job_msg) $(systemctl is-active runway-app-$ID-a runway-app-$ID-b)"
+call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" >/dev/null
+wait_listening && ok "Start runs the live slot again" || bad "start after stop: $(zd_status | jexpr "(d['slot'], d['listener'])")"
+
+echo "-- unix"
+out=$(call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": true}")
+st=$(wait_job deploy-$ID)
+wait_listening && [ "$(slot_now)" != "" ] && [ "$(readlink /run/runway/$ID.sock)" = "$ID/$(slot_now).sock" ] && [ "$(stat -c '%U' /run/runway/$ID.sock)" = "root" ] \
+    && ok "listen mode change: plain restart, the root link names the live slot ($(readlink /run/runway/$ID.sock))" || bad "unix apply: $st $out $(ls -la /run/runway/ 2>&1)"
+grep -q "^L /run/runway/$ID.sock - - - - $ID/$(slot_now).sock$" /etc/tmpfiles.d/runway-$ID.conf && ok "tmpfiles entry recreates the root link at boot" || bad "tmpfiles: $(cat /etc/tmpfiles.d/runway-$ID.conf)"
+runuser -u "$USER_NAME" -- rm -f /run/runway/$ID.sock 2>/dev/null; [ -L /run/runway/$ID.sock ] && ok "the customer cannot remove the root link" || bad "the customer removed the root link"
+loop_start $ZD_UNIX_PORT
+for round in 1 2; do
+    before=$(slot_now)
+    call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+    [ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" != "$before" ] && ok "unix restart $round: slot $before to slot $(slot_now)" || bad "unix restart $round: $(job_msg)"
+done
+OLD=$([ "$(slot_now)" = "a" ] && echo b || echo a)
+[ ! -e /run/runway/$ID/$OLD.sock ] && [ -S /run/runway/$ID/$(slot_now).sock ] && ok "the old slot unlinked its own socket on exit, the live one stays" || bad "sockets: $(ls -la /run/runway/$ID)"
+LIVE=$(slot_now)
+echo "kill:moved" > "$ZD_FAULT"
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+sleep 2
+for _ in $(seq 1 60); do case "$(systemctl is-active runway-deploy-$ID.service)" in active|activating|deactivating) sleep 1 ;; *) break ;; esac; done
+rm -f "$ZD_FAULT"
+"$H" _converge
+[ "$(slot_now)" != "$LIVE" ] && [ "$(readlink /run/runway/$ID.sock)" = "$ID/$(slot_now).sock" ] && [ "$(systemctl is-active runway-app-$ID-$LIVE)" != "active" ] \
+    && grep -q "$ID/$(slot_now).sock" /etc/tmpfiles.d/runway-$ID.conf && ok "unix: the convergence completes a switch whose job was killed after the link moved" || bad "unix convergence: $(slot_now) $(readlink /run/runway/$ID.sock)"
+loop_stop "unix: two restarts and a killed job"
+STANDBY=$([ "$(slot_now)" = "a" ] && echo b || echo a)
+runuser -u "$USER_NAME" -- ln -sfn /run/runway/elsewhere.sock /run/runway/$ID/$STANDBY.sock
+[ "$(zd_status | jexpr "(d['tampered'], 'replaced by a symbolic link' in d['tampered_detail'])")" = "(True, True)" ] && [ ! -L /run/runway/$ID/$STANDBY.sock ] \
+    && [ "$(systemctl is-active runway-app-$ID-a runway-app-$ID-b | sort -u | tr '\n' ' ')" = "inactive " ] && ok "a symbolic link at a slot socket is contained (both slots stopped)" || bad "slot tampering: $(zd_status | jexpr "(d['tampered'], d.get('tampered_detail'))")"
+call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" >/dev/null
+wait_listening && [ "$(zd_status | field "['tampered']")" = "False" ] && ok "Start runs it again; the root link is accepted" || bad "start after slot tampering"
+LIVE=$(slot_now)
+systemctl stop runway-app-$ID-$LIVE
+rm -rf /run/runway/$ID /run/runway/$ID.sock
+systemd-tmpfiles --create /etc/tmpfiles.d/runway-$ID.conf
+[ "$(readlink /run/runway/$ID.sock)" = "$ID/$LIVE.sock" ] && [ "$(stat -c '%U:%G %a' /run/runway/$ID)" = "$USER_NAME:psaserv 2750" ] && ok "boot: systemd-tmpfiles recreates the directory and the root link" || bad "tmpfiles boot: $(ls -la /run/runway 2>&1)"
+systemctl start runway-app-$ID-$LIVE
+wait_listening && [ "$(curl -s --max-time 5 http://127.0.0.1:$ZD_UNIX_PORT/)" = "zd $LIVE" ] && ok "the live slot serves through the recreated link" || bad "after boot simulation: $(curl -s --max-time 5 http://127.0.0.1:$ZD_UNIX_PORT/)"
+loop_start $ZD_UNIX_PORT
+# Turning it off, with the job killed right after it committed the switch back to the classic unit:
+# the intent record keeps the application switchable until the convergence has settled it.
+LIVE=$(slot_now)
+echo "kill:committed" > "$ZD_FAULT"
+call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": false}" >/dev/null
+sleep 2
+for _ in $(seq 1 60); do case "$(systemctl is-active runway-deploy-$ID.service)" in active|activating|deactivating) sleep 1 ;; *) break ;; esac; done
+rm -f "$ZD_FAULT"
+st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json')); print((d['slot'], (d.get('switch') or {}).get('to'), d['zero_downtime']))")
+[ "$st" = "('', '', False)" ] && [ "$(systemctl is-active runway-app-$ID-$LIVE)" = "active" ] \
+    && [ "$(call apps-list '{}' | jexpr "[(a['switchable'], a['switching']) for a in d['apps'] if a['domain_id'] == $ID][0]")" = "(True, True)" ] \
+    && ok "a job killed after it committed the switch back to the classic unit leaves its intent record (still switchable)" || bad "killed turn-off: $st $(systemctl is-active runway-app-$ID-$LIVE)"
+"$H" _converge
+[ "$(slot_now)" = "" ] && [ "$(readlink /run/runway/$ID.sock)" = "$ID/app.sock" ] && [ "$(systemctl is-active runway-app-$ID-$LIVE)" != "active" ] \
+    && [ "$(systemctl is-enabled runway-app-$ID.service)" = "enabled" ] && [ ! -e /etc/systemd/system/runway-app-$ID-a.service ] && [ ! -e /etc/runway/env/$ID-b.env ] \
+    && grep -q "^L /run/runway/$ID.sock - - - - $ID/app.sock$" /etc/tmpfiles.d/runway-$ID.conf \
+    && [ "$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json')); print((d.get('switch'), d['port_a'], d['port_b']))")" = "(None, 0, 0)" ] \
+    && ok "the convergence settles it: the classic unit serves and is enabled, the old slot stops, the slots are retired" \
+    || bad "convergence of the killed turn-off: $(slot_now) $(readlink /run/runway/$ID.sock) $(systemctl is-active runway-app-$ID-$LIVE) $(ls /etc/systemd/system | grep "runway-app-$ID" | tr '\n' ' ')"
+loop_stop "unix: turning it off (job killed after the commit)"
+printf '# tests/helper-smoke.sh: the 1.0 snippet again\nproxy_pass http://unix:/run/runway/%s/app.sock:;\n' "$ID" > "$ZD_CONF/nginx.conf"
+"$H" _converge
+[ ! -e /run/runway/$ID.sock ] && [ "$(grep -v '^#' /etc/tmpfiles.d/runway-$ID.conf)" = "d /run/runway/$ID 2750 $USER_NAME psaserv -" ] \
+    && [ "$(ls /etc/systemd/system | grep -c "^runway-app-$ID")" = "1" ] && ! grep -q 'RUNWAY_SLOT' /etc/runway/env/$ID.env && ok "back to the 1.0 layout once the snippet no longer uses the link" || bad "1.0 layout: $(ls -la /run/runway; cat /etc/tmpfiles.d/runway-$ID.conf)"
+printf '# tests/helper-smoke.sh: generated configuration of smoke.test\n# Runway: zero-downtime #%s\nproxy_pass http://unix:/run/runway/%s.sock:;\n' "$ID" "$ID" > "$ZD_CONF/nginx.conf"
+call app-apply "{$(zd_base "{\"ZD_BIND\": \"/run/runway/$ID/app.sock\"}"), \"listen\": \"unix\", \"zero_downtime\": true, \"restart\": false}" >/dev/null
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$st" = "failed" ] && job_msg | grep -q "listens on /run/runway/$ID/app.sock instead of \$RUNWAY_SOCKET" && [ "$(slot_now)" = "" ] && ok "a new version that binds app.sock fails the first switch at once" || bad "app.sock hijack: $st $(job_msg)"
+wait_listening && [ "$(curl -s --max-time 5 http://127.0.0.1:$ZD_UNIX_PORT/)" = "zd " ] && ok "the classic unit serves again (restarted in place when its socket was taken)" || bad "classic after hijack attempt: $(zd_status | jexpr "(d['slot'], d['listener'])")"
+# A listen mode change while the classic unit is still the live instance: one plain restart, no
+# switch (docs/DESIGN.md section 12.5).
+out=$(call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}")
+[ "$(echo "$out" | jexpr "(d['job'], d['state']['slot'], d['state']['restart_plain'])")" = "(None, '', False)" ] && wait_listening \
+    && ok "a listen mode change while the classic unit is live restarts it in place" || bad "listen change with the classic unit: $out"
+out=$(call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": true}")
+[ "$(echo "$out" | jexpr "(d['job'], d['state']['slot'])")" = "(None, '')" ] && wait_listening && ok "and back to unix, again in place" || bad "back to unix with the classic unit: $out"
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "b" ] && ok "without the hardcoded path the switch succeeds" || bad "switch after hijack test: $(job_msg)"
+journalctl -u runway-app-$ID.service -u runway-app-$ID-a.service -u runway-app-$ID-b.service -n 200 --no-pager -o short-iso | grep -q 'runway-app-999-b\[' \
+    && [ "$(call app-logs "{\"domain_id\": $ID, \"kind\": \"app\", \"lines\": 200}" | jexpr "'runway-app-999-b[' in d['log'] and 'switched from' in d['log']")" = "True" ] && ok "app-logs merges the slots' journals and Runway's notes" || bad "app-logs of the slots"
+# A running slot that becomes a worker, with a build command: the build's restart runs the classic
+# unit in place (the slots are retired); then back to unix with a live slot.
+out=$(call app-apply "{$(zd_base), \"listen\": \"none\", \"mode\": \"worker\", \"start_cmd\": \"exec sleep 600\", \"start\": false}")
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$(echo "$out" | jexpr "(d['switchable'], d['state']['zero_downtime'], d['state']['restart_plain'])")" = "(False, False, True)" ] \
+    && [ "$st" = "succeeded" ] && [ "$(slot_now)" = "" ] && [ "$(systemctl is-active runway-app-$ID.service)" = "active" ] \
+    && [ ! -e /etc/systemd/system/runway-app-$ID-b.service ] && ok "a running slot that becomes a worker: the deployment restarts the classic unit, the slots are retired" \
+    || bad "worker after a live slot: $st $(job_msg) $out"
+call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": true}" >/dev/null
+wait_listening
+call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "b" ] || bad "back to unix with a slot: $(job_msg)"
+call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": true, \"suspended\": true}" >/dev/null
+[ "$(systemctl is-active runway-app-$ID-a runway-app-$ID-b | sort -u | tr '\n' ' ')" = "inactive " ] && [ "$(systemctl is-enabled runway-app-$ID-a runway-app-$ID-b | sort -u | tr '\n' ' ')" = "disabled " ] \
+    && ok "suspension stops and disables both slots" || bad "suspend: $(systemctl is-active runway-app-$ID-a runway-app-$ID-b)"
+res=$(python3 - "$USER_NAME" <<'PYEOF'
+# Every slot renders its own endpoint, also into the runtime conventions (Java, .NET).
+import importlib.machinery, importlib.util, pwd, sys
+loader = importlib.machinery.SourceFileLoader("helper", "/opt/runway/bin/runway-helper")
+spec = importlib.util.spec_from_loader("helper", loader)
+helper = importlib.util.module_from_spec(spec)
+loader.exec_module(helper)
+pw = pwd.getpwnam(sys.argv[1])
+found = []
+for runtime, listen in (("java", "tcp"), ("dotnet", "tcp"), ("dotnet", "unix")):
+    state, _ = helper.validate_app({"domain_id": 995, "domain": "slots.test", "sysuser": sys.argv[1], "app_root": "apps/smoke-zd",
+                                    "runtime": runtime, "toolchain": "", "start_cmd": "./app", "port": 29995,
+                                    "port_range": [29900, 29999], "enabled": True, "listen": listen, "zero_downtime": True})
+    if listen == "tcp":
+        # As app-apply: slot a keeps the port, slot b gets its own. Unix mode allocates no slot ports.
+        state.update({"port_a": 29995, "port_b": 29994})
+    for slot in ("a", "b"):
+        env = helper.render_env_file(helper.slot_view(state, slot), pw)
+        port = "29995" if slot == "a" else "29994"
+        found.append(all(line in env for line in (
+            ['SERVER_PORT="%s"' % port, 'QUARKUS_HTTP_PORT="%s"' % port, 'PORT="%s"' % port] if runtime == "java" else
+            ['ASPNETCORE_URLS="http://127.0.0.1:%s"' % port] if listen == "tcp" else
+            ['ASPNETCORE_URLS="http://unix:/run/runway/995/%s.sock"' % slot, 'RUNWAY_SOCKET="/run/runway/995/%s.sock"' % slot]))
+            and 'RUNWAY_SLOT="%s"' % slot in env)
+print(found)
+PYEOF
+)
+[ "$res" = "[True, True, True, True, True, True]" ] && ok "each slot renders its own port or socket into SERVER_PORT, QUARKUS_HTTP_PORT and ASPNETCORE_URLS" || bad "slot endpoints of Java/.NET: $res"
+if [ -f /root/runway-helper-1.0.0 ]; then
+    # Applications without the setting render byte-identical files: compare with the 1.0.0 helper.
+    res=$(python3 - "$USER_NAME" "$HOME_DIR" <<'PYEOF'
+import importlib.machinery, importlib.util, json, pwd, sys
+def load(name, path):
+    loader = importlib.machinery.SourceFileLoader(name, path)
+    spec = importlib.util.spec_from_loader(name, loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+old = load("helper_old", "/root/runway-helper-1.0.0")
+new = load("helper_new", "/opt/runway/bin/runway-helper")
+user, home = sys.argv[1], sys.argv[2]
+pw = pwd.getpwnam(user)
+diffs = []
+for listen in ("tcp", "unix", "none"):
+    payload = {"domain_id": 996, "domain": "same.test", "sysuser": user, "app_root": "apps/smoke-zd", "runtime": "go",
+               "toolchain": "", "build_cmd": "go build", "start_cmd": "./bin/app", "port": 29996, "port_range": [29900, 29999],
+               "enabled": True, "auto_deploy": True, "build_timeout": 600, "limits": {"memory_mb": 256}, "listen": listen,
+               "health_path": "/h", "env": {"A": "x y"}}
+    s_old, _ = old.validate_app(dict(payload))
+    s_new, _ = new.validate_app(dict(payload))
+    for name in ("render_env_file", "render_app_unit"):
+        if getattr(old, name)(s_old, pw) != getattr(new, name)(s_new, pw):
+            diffs.append("%s %s" % (listen, name))
+    for name in ("render_deploy_service", "render_deploy_path"):
+        if getattr(old, name)(s_old) != getattr(new, name)(s_new):
+            diffs.append("%s %s" % (listen, name))
+print("same" if not diffs else "different: " + ", ".join(diffs))
+PYEOF
+)
+    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte" || bad "1.0 rendering: $res"
+else
+    echo "SKIP  byte-identical 1.0 rendering (no /root/runway-helper-1.0.0; plesk-e2e.sh smoke copies it from git)"
+fi
+call app-remove "{\"domain_id\": $ID}" >/dev/null
+left=$(ls /etc/systemd/system/runway-app-$ID* /etc/runway/env/$ID* /etc/runway/web/$ID.* /etc/tmpfiles.d/runway-$ID.conf /run/runway/$ID.sock /run/runway/$ID 2>/dev/null | tr '\n' ' ')
+[ -z "$left" ] && ok "app-remove deletes both slots, their env files, the root link and the include files" || bad "left after app-remove: $left"
+zd_cleanup
 
 echo "== reconcile pause flag"
 [ "$(call apps-list '{}' | field "['reconcile_paused']")" = "True" ] && ok "apps-list reports the reconcile pause" || bad "reconcile pause not reported"

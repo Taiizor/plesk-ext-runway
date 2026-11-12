@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'A SHA-256 ellenőrző összegnek 64 hexadecimális karakterből kell állnia.',
     'errorFetchFilename' => 'A fájlnév csak betűket, számjegyeket és . _ + - karaktereket tartalmazhat (legfeljebb 128 karakter).',
     'errorUpdateVersion' => 'A verziónak 1.2.3-1 formátumúnak kell lennie.',
+    'errorZeroDowntimeAdmin' => 'Ezen a kiszolgálón csak a rendszergazda kapcsolhatja be a leállás nélküli üzembe helyezést.',
+    'errorReadyTimeout' => 'A készenléti időkorlát csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
+    'errorDrainSeconds' => 'A kiürítési idő csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memóriakorlát (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'A mintaalkalmazás létrejött (egy fájl), a beállítások frissültek.',
     'messageFetchStarted' => 'A letöltés elindult. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
     'messageUpdateStarted' => 'Elindult a Runway frissítése a(z) %%version%% verzióra. Az előrehaladása alább látható.',
+    'messageSavedSwitching' => 'A beállítások mentve. Az új verzió a futó mellett indul el, és amint készen áll, átveszi a forgalmat; az „Összeállítás és üzembe helyezés” naplóban követheti.',
+    'messageSwitchStarted' => 'Az új verzió a futó mellett indul el, és amint készen áll, átveszi a forgalmat. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
+    'messageAction_restartPlain' => 'Az alkalmazás helyben újraindul.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'A beállított alkalmazások és állapotuk listázása.',
     'cli.commands.status' => 'Egy domain alkalmazása állapotának megjelenítése: --status <domain>',
     'cli.commands.start' => 'Egy domain alkalmazásának indítása: --start <domain>',
     'cli.commands.stop' => 'Egy domain alkalmazásának leállítása; a --start vagy a --restart parancsig leállítva marad (a kiszolgáló újraindítása vagy üzembe helyezés után is): --stop <domain>',
-    'cli.commands.restart' => 'Egy domain alkalmazásának újraindítása: --restart <domain>',
+    'cli.commands.restart' => 'Egy domain alkalmazásának újraindítása; leállás nélküli üzembe helyezésnél az új verzió a futó mellett indul el, és a parancs megvárja a váltást (a -plain helyben indít újra): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Egy domain alkalmazásának összeállítása és újraindítása, az eredmény megvárásával (a leállított alkalmazást összeállítja, de leállítva hagyja): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'Egy domain beállított alkalmazásának engedélyezése: --enable <domain>',
     'cli.commands.disable' => 'Egy domain alkalmazásának letiltása: --disable <domain>',

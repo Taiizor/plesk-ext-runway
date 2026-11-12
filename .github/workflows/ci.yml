@@ -182,6 +182,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # helper-smoke compares the files of applications without zero-downtime deployments with
+      # those of the 1.0.0 helper, which plesk-e2e.sh takes from this tag (the checkout has none).
+      - name: Fetch the v1.0.0 tag
+        if: matrix.name == 'helper'
+        run: git fetch --no-tags --depth=1 origin +refs/tags/v1.0.0:refs/tags/v1.0.0
+
       - uses: actions/download-artifact@v8
         with:
           name: runway-package

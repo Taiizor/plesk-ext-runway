@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'Die SHA-256-Prüfsumme muss aus 64 Hexadezimalzeichen bestehen.',
     'errorFetchFilename' => 'Der Dateiname darf nur Buchstaben, Ziffern und . _ + - enthalten (max. 128 Zeichen).',
     'errorUpdateVersion' => 'Die Version muss das Format 1.2.3-1 haben.',
+    'errorZeroDowntimeAdmin' => 'Nur der Administrator kann auf diesem Server Zero-Downtime-Bereitstellungen aktivieren.',
+    'errorReadyTimeout' => 'Das Bereitschafts-Timeout muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
+    'errorDrainSeconds' => 'Die Auslaufzeit muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Speicherlimit (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Die Beispielanwendung wurde geschrieben (eine Datei) und die Einstellungen wurden aktualisiert.',
     'messageFetchStarted' => 'Der Download wurde gestartet. Verfolgen Sie ihn im Protokoll „Build & Bereitstellung“.',
     'messageUpdateStarted' => 'Das Update auf Runway %%version%% wurde gestartet. Sein Fortschritt wird unten angezeigt.',
+    'messageSavedSwitching' => 'Die Einstellungen wurden gespeichert. Die neue Version startet neben der laufenden und übernimmt, sobald sie bereit ist; verfolgen Sie den Vorgang im Protokoll „Build & Bereitstellung“.',
+    'messageSwitchStarted' => 'Die neue Version startet neben der laufenden und übernimmt, sobald sie bereit ist. Verfolgen Sie den Vorgang im Protokoll „Build & Bereitstellung“.',
+    'messageAction_restartPlain' => 'Die Anwendung wird direkt neu gestartet.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listet die konfigurierten Anwendungen und ihren Status auf.',
     'cli.commands.status' => 'Zeigt den Status der Anwendung einer Domain: --status <domain>',
     'cli.commands.start' => 'Startet die Anwendung einer Domain: --start <domain>',
     'cli.commands.stop' => 'Stoppt die Anwendung einer Domain; sie bleibt gestoppt (auch nach einem Server-Neustart oder einer Bereitstellung), bis --start oder --restart aufgerufen wird: --stop <domain>',
-    'cli.commands.restart' => 'Startet die Anwendung einer Domain neu: --restart <domain>',
+    'cli.commands.restart' => 'Startet die Anwendung einer Domain neu; bei Zero-Downtime-Bereitstellungen startet die neue Version neben der laufenden und der Befehl wartet auf die Umschaltung (-plain startet direkt neu): --restart <domain> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Baut die Anwendung einer Domain, startet sie neu und wartet auf das Ergebnis (eine gestoppte Anwendung wird gebaut, bleibt aber gestoppt): --deploy <domain> [-no-wait]',
     'cli.commands.enable' => 'Aktiviert die konfigurierte Anwendung einer Domain: --enable <domain>',
     'cli.commands.disable' => 'Deaktiviert die Anwendung einer Domain: --disable <domain>',

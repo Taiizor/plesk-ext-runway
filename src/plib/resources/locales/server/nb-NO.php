@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256-kontrollsummen må bestå av 64 heksadesimale tegn.',
     'errorFetchFilename' => 'Filnavnet kan bare inneholde bokstaver, sifre og . _ + - (maks. 128 tegn).',
     'errorUpdateVersion' => 'Versjonen må ha formen 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'På denne serveren kan bare administratoren slå på utrulling uten nedetid.',
+    'errorReadyTimeout' => 'Tidsavbruddet for klarhet må være et helt antall sekunder mellom %%min%% og %%max%%.',
+    'errorDrainSeconds' => 'Tømmeperioden må være et helt antall sekunder mellom %%min%% og %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnegrense (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Eksempelapplikasjonen ble opprettet (én fil), og innstillingene ble oppdatert.',
     'messageFetchStarted' => 'Nedlastingen har startet. Følg med i loggen "Bygg og utrulling".',
     'messageUpdateStarted' => 'Oppdateringen til Runway %%version%% har startet. Fremdriften vises nedenfor.',
+    'messageSavedSwitching' => 'Innstillingene ble lagret. Den nye versjonen starter ved siden av den som kjører, og tar over når den er klar; følg med i loggen "Bygg og utrulling".',
+    'messageSwitchStarted' => 'Den nye versjonen starter ved siden av den som kjører, og tar over når den er klar. Følg med i loggen "Bygg og utrulling".',
+    'messageAction_restartPlain' => 'Applikasjonen starter på nytt på stedet.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Viser de konfigurerte applikasjonene og tilstanden deres.',
     'cli.commands.status' => 'Viser tilstanden til applikasjonen på et domene: --status <domene>',
     'cli.commands.start' => 'Starter applikasjonen på et domene: --start <domene>',
     'cli.commands.stop' => 'Stopper applikasjonen på et domene; den forblir stoppet (også etter en omstart av serveren eller en utrulling) til --start eller --restart: --stop <domene>',
-    'cli.commands.restart' => 'Starter applikasjonen på et domene på nytt: --restart <domene>',
+    'cli.commands.restart' => 'Starter applikasjonen på et domene på nytt; med utrulling uten nedetid starter den nye versjonen ved siden av den som kjører, og kommandoen venter på byttet (-plain starter på nytt på stedet): --restart <domene> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Bygger og starter applikasjonen på et domene på nytt og venter på resultatet (en stoppet applikasjon bygges, men forblir stoppet): --deploy <domene> [-no-wait]',
     'cli.commands.enable' => 'Aktiverer den konfigurerte applikasjonen på et domene: --enable <domene>',
     'cli.commands.disable' => 'Deaktiverer applikasjonen på et domene: --disable <domene>',

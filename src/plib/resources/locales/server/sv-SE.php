@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'SHA-256-kontrollsumman måste bestå av 64 hexadecimala tecken.',
     'errorFetchFilename' => 'Filnamnet får endast innehålla bokstäver, siffror och . _ + - (max 128 tecken).',
     'errorUpdateVersion' => 'Versionen måste ha formatet 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'På den här servern kan endast administratören aktivera driftsättningar utan avbrott.',
+    'errorReadyTimeout' => 'Tidsgränsen för beredskap måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
+    'errorDrainSeconds' => 'Tömningsperioden måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnesgräns (MiB)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'Exempelapplikationen skapades (en fil) och inställningarna uppdaterades.',
     'messageFetchStarted' => 'Nedladdningen har startat. Följ förloppet i loggen "Bygge och driftsättning".',
     'messageUpdateStarted' => 'Uppdateringen till Runway %%version%% har startat. Förloppet visas nedan.',
+    'messageSavedSwitching' => 'Inställningarna sparades. Den nya versionen startar bredvid den som körs och tar över när den är redo; följ förloppet i loggen "Bygge och driftsättning".',
+    'messageSwitchStarted' => 'Den nya versionen startar bredvid den som körs och tar över när den är redo. Följ förloppet i loggen "Bygge och driftsättning".',
+    'messageAction_restartPlain' => 'Applikationen startas om på plats.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listar de konfigurerade applikationerna och deras status.',
     'cli.commands.status' => 'Visar status för en domäns applikation: --status <domän>',
     'cli.commands.start' => 'Startar en domäns applikation: --start <domän>',
     'cli.commands.stop' => 'Stoppar en domäns applikation; den förblir stoppad (även efter en omstart av servern eller en driftsättning) tills --start eller --restart körs: --stop <domän>',
-    'cli.commands.restart' => 'Startar om en domäns applikation: --restart <domän>',
+    'cli.commands.restart' => 'Startar om en domäns applikation; med driftsättningar utan avbrott startar den nya versionen bredvid den som körs och kommandot väntar på växlingen (-plain startar om på plats): --restart <domän> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Bygger och startar om en domäns applikation och väntar på resultatet (en stoppad applikation byggs men förblir stoppad): --deploy <domän> [-no-wait]',
     'cli.commands.enable' => 'Aktiverar en domäns konfigurerade applikation: --enable <domän>',
     'cli.commands.disable' => 'Inaktiverar en domäns applikation: --disable <domän>',

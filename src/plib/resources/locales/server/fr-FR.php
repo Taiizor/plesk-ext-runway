@@ -61,6 +61,9 @@ return [
     'errorFetchSha256' => 'La somme de contrôle SHA-256 doit comporter 64 caractères hexadécimaux.',
     'errorFetchFilename' => 'Le nom de fichier ne peut contenir que des lettres, des chiffres et . _ + - (128 caractères max.).',
     'errorUpdateVersion' => 'La version doit être au format 1.2.3-1.',
+    'errorZeroDowntimeAdmin' => 'Seul l\'administrateur peut activer les déploiements sans interruption sur ce serveur.',
+    'errorReadyTimeout' => 'Le délai de disponibilité doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
+    'errorDrainSeconds' => 'La durée de vidage doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de mémoire (Mio)',
@@ -83,13 +86,16 @@ return [
     'messageSampleWrittenOne' => 'L\'exemple d\'application a été écrit (un fichier) et les paramètres ont été mis à jour.',
     'messageFetchStarted' => 'Le téléchargement a démarré. Suivez-le dans le journal « Compilation et déploiement ».',
     'messageUpdateStarted' => 'La mise à jour vers Runway %%version%% a démarré. Sa progression est affichée ci-dessous.',
+    'messageSavedSwitching' => 'Les paramètres ont été enregistrés. La nouvelle version démarre à côté de celle en cours d\'exécution et prend le relais dès qu\'elle est prête ; suivez-la dans le journal « Compilation et déploiement ».',
+    'messageSwitchStarted' => 'La nouvelle version démarre à côté de celle en cours d\'exécution et prend le relais dès qu\'elle est prête. Suivez-la dans le journal « Compilation et déploiement ».',
+    'messageAction_restartPlain' => 'L\'application redémarre sur place.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liste les applications configurées et leur état.',
     'cli.commands.status' => 'Affiche l\'état de l\'application d\'un domaine : --status <domaine>',
     'cli.commands.start' => 'Démarre l\'application d\'un domaine : --start <domaine>',
     'cli.commands.stop' => 'Arrête l\'application d\'un domaine ; elle reste arrêtée (même après un redémarrage du serveur ou un déploiement) jusqu\'à --start ou --restart : --stop <domaine>',
-    'cli.commands.restart' => 'Redémarre l\'application d\'un domaine : --restart <domaine>',
+    'cli.commands.restart' => 'Redémarre l\'application d\'un domaine ; avec les déploiements sans interruption, la nouvelle version démarre à côté de celle en cours d\'exécution et la commande attend la bascule (-plain redémarre sur place) : --restart <domaine> [-plain] [-no-wait]',
     'cli.commands.deploy' => 'Compile et redémarre l\'application d\'un domaine et attend le résultat (une application arrêtée est compilée mais reste arrêtée) : --deploy <domaine> [-no-wait]',
     'cli.commands.enable' => 'Active l\'application configurée d\'un domaine : --enable <domaine>',
     'cli.commands.disable' => 'Désactive l\'application d\'un domaine : --disable <domaine>',

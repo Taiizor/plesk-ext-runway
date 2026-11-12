@@ -32,6 +32,12 @@ class Modules_Runway_App
 
     const MAX_STATIC_PATHS = 20;
 
+    /** Zero-downtime deployments (docs/DESIGN.md section 12): defaults and lower limits of the timeouts. */
+    const READY_TIMEOUT_DEFAULT = 60;
+    const DRAIN_SECONDS_DEFAULT = 10;
+    const READY_TIMEOUT_MIN = 5;
+    const DRAIN_SECONDS_MIN = 0;
+
     /**
      * Plesk stores domain settings in dom_param.val, a varchar(5000); MariaDB in Plesk's default
      * (non-strict) sql_mode silently truncates longer values, which would turn the app into "not
@@ -145,6 +151,11 @@ class Modules_Runway_App
             'startCmd' => $commands['start'],
             'autoDeploy' => true,
             'port' => 0,
+            'zeroDowntime' => false,
+            'readyTimeout' => self::READY_TIMEOUT_DEFAULT,
+            'drainSeconds' => self::DRAIN_SECONDS_DEFAULT,
+            // Helper-owned: the web server snippet uses the zero-downtime pointer (app-apply's result).
+            'switchable' => false,
         ] + self::adminLimits($domain);
     }
 
@@ -288,12 +299,15 @@ class Modules_Runway_App
                 'mode' => $mode === self::MODE_PATH ? self::MODE_PATH : self::MODE_WEB,
                 'mountPath' => $mode === self::MODE_PATH && isset($data['mountPath']) ? (string)$data['mountPath'] : '',
                 'staticPaths' => isset($data['staticPaths']) && is_array($data['staticPaths']) ? array_values($data['staticPaths']) : [],
+                // Zero-downtime deployments: the snippet uses the helper's pointer (root link or include).
+                'switchable' => !empty($data['switchable']),
+                'domainId' => (int)$domain->getId(),
             ];
             if ($extra['mode'] === self::MODE_PATH && !self::isValidUrlPrefix($extra['mountPath'])) {
                 return null;
             }
             if ($listen === self::LISTEN_UNIX) {
-                return ['socket' => self::socketPath($domain)] + $extra;
+                return ['socket' => $extra['switchable'] ? self::linkPath($domain) : self::socketPath($domain)] + $extra;
             }
             $port = isset($data['port']) ? (int)$data['port'] : 0;
             return ($port >= 1024 && $port <= 65535) ? ['port' => $port] + $extra : null;
@@ -419,6 +433,39 @@ class Modules_Runway_App
     }
 
     /**
+     * @param pm_Domain $domain
+     * @return string The web server's path of a switchable unix application: the root-owned symlink
+     *                to the live slot's socket (docs/DESIGN.md section 12.6, must match the helper)
+     */
+    public static function linkPath(pm_Domain $domain)
+    {
+        return '/run/runway/' . (int)$domain->getId() . '.sock';
+    }
+
+    /**
+     * Whether the current user may turn zero-downtime deployments on: administrators always,
+     * customers when the server setting zeroDowntimeCustomers allows it (docs/DESIGN.md section 12.9).
+     *
+     * @param bool $isAdmin
+     * @return bool
+     */
+    public static function zeroDowntimeAllowed($isAdmin)
+    {
+        return $isAdmin || Modules_Runway_Settings::get('zeroDowntimeCustomers');
+    }
+
+    /**
+     * @return array ['ready' => int, 'drain' => int] Upper limits of readyTimeout and drainSeconds
+     */
+    public static function zeroDowntimeCaps()
+    {
+        return [
+            'ready' => Modules_Runway_Settings::get('zeroDowntimeMaxReady'),
+            'drain' => Modules_Runway_Settings::get('zeroDowntimeMaxDrain'),
+        ];
+    }
+
+    /**
      * Whether the domain is active in Plesk (not suspended or disabled).
      *
      * @param pm_Domain $domain
@@ -513,12 +560,17 @@ class Modules_Runway_App
     {
         $config = [];
         foreach (['enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths',
-                     'healthPath', 'buildCmd', 'startCmd', 'autoDeploy', 'port'] as $key) {
+                     'healthPath', 'buildCmd', 'startCmd', 'autoDeploy', 'port', 'zeroDowntime', 'readyTimeout',
+                     'drainSeconds', 'switchable'] as $key) {
             $config[$key] = $this->get($key);
         }
         $config['enabled'] = (bool)$config['enabled'];
         $config['autoDeploy'] = (bool)$config['autoDeploy'];
         $config['port'] = (int)$config['port'];
+        $config['zeroDowntime'] = (bool)$config['zeroDowntime'];
+        $config['readyTimeout'] = (int)$config['readyTimeout'];
+        $config['drainSeconds'] = (int)$config['drainSeconds'];
+        $config['switchable'] = (bool)$config['switchable'];
         $config['staticPaths'] = is_array($config['staticPaths']) ? array_values($config['staticPaths']) : [];
         return $config;
     }
@@ -583,6 +635,33 @@ class Modules_Runway_App
                     $data[$key] = $bool;
                 }
             }
+        }
+
+        // Zero-downtime deployments (docs/DESIGN.md section 12.9): customers may turn them on only
+        // when the administrator allows it; anybody may turn them off. The timeouts are capped by
+        // the server settings.
+        if ($has('zeroDowntime')) {
+            $bool = self::toBool($values['zeroDowntime']);
+            if ($bool === null) {
+                $errors['zeroDowntime'][] = pm_Locale::lmsg('errorInvalidValue');
+            } elseif ($bool && empty($this->data['zeroDowntime']) && !self::zeroDowntimeAllowed($isAdmin)) {
+                $errors['zeroDowntime'][] = pm_Locale::lmsg('errorZeroDowntimeAdmin');
+            } else {
+                $data['zeroDowntime'] = $bool;
+            }
+        }
+        $caps = self::zeroDowntimeCaps();
+        foreach (['readyTimeout' => [self::READY_TIMEOUT_MIN, $caps['ready'], 'errorReadyTimeout'],
+                     'drainSeconds' => [self::DRAIN_SECONDS_MIN, $caps['drain'], 'errorDrainSeconds']] as $key => $rule) {
+            if (!$has($key)) {
+                continue;
+            }
+            $raw = is_scalar($values[$key]) && !is_bool($values[$key]) ? trim((string)$values[$key]) : 'x';
+            if (!ctype_digit($raw) || (int)$raw < $rule[0] || (int)$raw > $rule[1]) {
+                $errors[$key][] = pm_Locale::lmsg($rule[2], ['min' => $rule[0], 'max' => $rule[1]]);
+                continue;
+            }
+            $data[$key] = (int)$raw;
         }
 
         // A toolchain id only makes sense for its runtime: reset it when the runtime changes.
@@ -923,6 +1002,11 @@ class Modules_Runway_App
             'mount_path' => $this->data['mode'] === self::MODE_PATH ? (string)$this->data['mountPath'] : '',
             'static_paths' => is_array($this->data['staticPaths']) ? array_values($this->data['staticPaths']) : [],
             'health_path' => $this->data['listen'] !== self::LISTEN_NONE ? (string)$this->data['healthPath'] : '',
+            // Zero-downtime deployments (docs/DESIGN.md section 12): never for workers; the
+            // timeouts within the current caps of the server settings.
+            'zero_downtime' => $this->data['listen'] !== self::LISTEN_NONE && !empty($this->data['zeroDowntime']),
+            'ready_timeout' => self::clampSetting($this->data, 'readyTimeout', self::READY_TIMEOUT_MIN, self::zeroDowntimeCaps()['ready'], self::READY_TIMEOUT_DEFAULT),
+            'drain_seconds' => self::clampSetting($this->data, 'drainSeconds', self::DRAIN_SECONDS_MIN, self::zeroDowntimeCaps()['drain'], self::DRAIN_SECONDS_DEFAULT),
             'build_timeout' => Modules_Runway_Settings::get('buildTimeout'),
             'limits' => [
                 'memory_mb' => (int)$this->data['memoryMb'],
@@ -941,6 +1025,20 @@ class Modules_Runway_App
             $payload['env'] = (object)$this->env;
         }
         return $payload;
+    }
+
+    /**
+     * @param array $data Configuration
+     * @param string $key
+     * @param int $min
+     * @param int $max
+     * @param int $default Used when the stored value is missing
+     * @return int The stored value within [$min, $max]
+     */
+    private static function clampSetting(array $data, $key, $min, $max, $default)
+    {
+        $value = isset($data[$key]) && is_numeric($data[$key]) ? (int)$data[$key] : $default;
+        return max($min, min($max, $value));
     }
 
     /**
@@ -981,6 +1079,8 @@ class Modules_Runway_App
         $payload['resume'] = (bool)$resume;
         $result = Modules_Runway_Helper::call('app-apply', $payload);
         $this->data['port'] = isset($result['port']) ? (int)$result['port'] : 0;
+        // The web server snippet follows the helper: the zero-downtime pointer while a slot runs.
+        $this->data['switchable'] = !empty($result['switchable']);
         $this->configured = true;
         $this->save();
         Modules_Runway_WebConfig::reconfigure($this->domain);
@@ -992,7 +1092,8 @@ class Modules_Runway_App
      * has a build command, it is built first; the deploy job (re)starts it only after a
      * successful build, so a running app keeps serving the previous version meanwhile.
      *
-     * @return array ['build' => bool (a build was requested), 'buildError' => string|null]
+     * @return array ['build' => bool (a build was requested), 'buildError' => string|null,
+     *               'job' => string|null (the deploy job of a build or of a zero-downtime switch)]
      * @throws Modules_Runway_Exception When the configuration could not be applied
      */
     public function applyAndDeploy()
@@ -1000,17 +1101,20 @@ class Modules_Runway_App
         $build = !empty($this->data['enabled'])
             && trim((string)$this->data['buildCmd']) !== ''
             && self::domainIsActive($this->domain);
-        $this->apply(!$build, !$build, true);
+        $result = $this->apply(!$build, !$build, true);
+        // Without a build, the restart of a zero-downtime application is a switch job of app-apply.
+        $job = isset($result['job']) && is_string($result['job']) && $result['job'] !== '' ? $result['job'] : null;
         $buildError = null;
         if ($build) {
             try {
-                Modules_Runway_Helper::call('app-deploy', ['domain_id' => (int)$this->domain->getId(), 'build' => true]);
+                $deploy = Modules_Runway_Helper::call('app-deploy', ['domain_id' => (int)$this->domain->getId(), 'build' => true]);
+                $job = isset($deploy['job']) ? (string)$deploy['job'] : null;
             } catch (Modules_Runway_Exception $e) {
                 // The configuration is saved at this point; only the build could not start.
                 $buildError = $e->getMessage();
             }
         }
-        return ['build' => $build, 'buildError' => $buildError];
+        return ['build' => $build, 'buildError' => $buildError, 'job' => $job];
     }
 
     /**
