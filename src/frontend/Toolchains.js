@@ -6,7 +6,7 @@ import {
     Alert, Button, Input, Label, List, ListEmptyView, Panel, Paragraph, RouterLink, Select, SelectOption, Tab, Tabs, Text,
     Toolbar, ToolbarExpander, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
-import { helperText, isObject, jobTitle } from './lib/format';
+import { helperText, isObject, isolate, jobTitle, runtimeName } from './lib/format';
 import { isBusy, POLL_BUSY_MS, POLL_IDLE_MS, useApi, useApiData, useLatest, usePolling } from './lib/hooks';
 import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
@@ -35,7 +35,7 @@ const InstallControl = ({ meta, available, installed, busy, disabled, onInstall,
     const fallback = (fresh[0] && fresh[0].id) || (list[0] && list[0].id) || '';
     const version = custom.trim() || selected || fallback;
     const chosen = list.filter(item => item.id === version)[0];
-    const versionLabel = chosen ? (chosen.label || chosen.id) : version;
+    const versionLabel = isolate(chosen ? (chosen.label || chosen.id) : version);
     return (
         <div>
             {available && available.error && (
@@ -55,7 +55,7 @@ const InstallControl = ({ meta, available, installed, busy, disabled, onInstall,
                 >
                     {list.map(item => (
                         <SelectOption key={item.id} value={item.id}>
-                            {installed.indexOf(item.id) === -1 ? (item.label || item.id) : translate('Toolchains.installedOption', { version: item.label || item.id })}
+                            {installed.indexOf(item.id) === -1 ? isolate(item.label || item.id) : translate('Toolchains.installedOption', { version: isolate(item.label || item.id) })}
                         </SelectOption>
                     ))}
                 </Select>
@@ -80,7 +80,7 @@ const InstallControl = ({ meta, available, installed, busy, disabled, onInstall,
                 </Button>
             </div>
             <div style={{ marginTop: '6px' }}>
-                <Text fontSize="sm"><Translate content="Toolchains.otherVersionHint" params={{ runtime: meta.label }} /></Text>
+                <Text fontSize="sm"><Translate content="Toolchains.otherVersionHint" params={{ runtime: runtimeName(translate, meta) }} /></Text>
             </div>
         </div>
     );
@@ -249,7 +249,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 title: <Translate content="Toolchains.columnVersion" />,
                 render: item => (
                     <div>
-                        <Text bold>{item.label || item.id}</Text>
+                        <Text bold>{isolate(item.label || item.id)}</Text>
                         {item.version && item.version !== item.id && <Text intent="muted">{` ${item.version}`}</Text>}
                     </div>
                 ),
@@ -324,7 +324,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 {meta.docs_url && (
                     <Paragraph>
                         <a href={meta.docs_url} target="_blank" rel="noopener noreferrer">
-                            <Translate content="Toolchains.docs" params={{ runtime: meta.label }} />
+                            <Translate content="Toolchains.docs" params={{ runtime: runtimeName(translate, meta) }} />
                         </a>
                     </Paragraph>
                 )}
@@ -336,7 +336,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                     </Panel>
                 )}
                 {kind === 'managed' && (
-                    <Panel title={<Translate content="Toolchains.installTitle" params={{ runtime: meta.label }} />}>
+                    <Panel title={<Translate content="Toolchains.installTitle" params={{ runtime: runtimeName(translate, meta) }} />}>
                         {installHelp && <Alert intent="info">{installHelp}</Alert>}
                         <InstallControl
                             meta={meta}
@@ -351,8 +351,8 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                     </Panel>
                 )}
                 {kind === 'detected' && (
-                    <Panel title={<Translate content="Toolchains.howToInstall" params={{ runtime: meta.label }} />}>
-                        <Paragraph>{installHelp || <Translate content="Toolchains.detectedHelp" params={{ runtime: meta.label }} />}</Paragraph>
+                    <Panel title={<Translate content="Toolchains.howToInstall" params={{ runtime: runtimeName(translate, meta) }} />}>
+                        <Paragraph>{installHelp || <Translate content="Toolchains.detectedHelp" params={{ runtime: runtimeName(translate, meta) }} />}</Paragraph>
                     </Panel>
                 )}
                 {/* Also with an empty list when loading it failed: the error and Reload must stay reachable. */}
@@ -407,7 +407,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
             <Tabs active={activeIndex + 1}>
                 {runtimes.map(meta => {
                     return (
-                        <Tab key={meta.key} title={meta.label} onActivate={() => setActive(meta.key)}>
+                        <Tab key={meta.key} title={runtimeName(translate, meta)} onActivate={() => setActive(meta.key)}>
                             {renderTab(meta)}
                         </Tab>
                     );
@@ -447,7 +447,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
             >
                 {confirm && confirm.type === 'remove' && (
                     <div>
-                        <Paragraph><Translate content="Toolchains.confirmRemove" params={{ version: confirm.label }} /></Paragraph>
+                        <Paragraph><Translate content="Toolchains.confirmRemove" params={{ version: isolate(confirm.label) }} /></Paragraph>
                         {confirm.domains.length > 0 && (
                             <Alert intent="warning">
                                 <Translate content="Toolchains.confirmRemoveInUse" params={{ domains: confirm.domains.join(', ') }} />

@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Arabic translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../ar.php; the frontend strings live in ../app/ar.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'ثبّت سلاسل الأدوات وشغّل التطبيقات كخدمات بدون Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'ابنِ وشغّل تطبيق Go أو Rust أو Bun أو Java أو .NET أو Python أو Ruby أو PHP أو تطبيقًا مبنيًا مسبقًا على هذا النطاق.',
+    'permissionName' => 'إدارة تطبيقات Runway',
+    'permissionDescription' => 'يسمح للعميل ببناء التطبيقات وتشغيلها كخدمات في الخلفية باستخدام Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'فشل البرنامج المساعد ذو الامتيازات: %%details%%',
+    'errorAccessDenied' => 'تم رفض الوصول.',
+    'errorNoDomain' => 'لم يتم العثور على النطاق.',
+    'errorNoHosting' => 'لا توجد استضافة ويب لهذا النطاق.',
+    'errorNotConfigured' => 'لم يتم تكوين التطبيق بعد. احفظ الإعدادات أولًا.',
+    'errorInvalidOperation' => 'عملية غير صالحة.',
+    'errorInvalidValue' => 'قيمة غير صالحة.',
+    'errorPostRequired' => 'يتطلب هذا الإجراء طلب POST.',
+    'errorInternal' => 'حدث خطأ داخلي. التفاصيل موجودة في سجل لوحة Plesk.',
+    'errorRuntime' => 'اختر بيئة تشغيل صالحة.',
+    'errorToolchain' => 'اختر إصدارًا صالحًا لسلسلة الأدوات.',
+    'errorAppRoot' => 'يجب أن يكون جذر التطبيق مسارًا داخل الاشتراك (أحرف وأرقام و . _ - @ + /)، بدون مقاطع "." أو "..".',
+    'errorBuildCmd' => 'أمر البناء طويل جدًا أو يحتوي على أحرف تحكم.',
+    'errorStartCmd' => 'يجب أن يكون أمر بدء التشغيل سطرًا واحدًا بدون أحرف تحكم (1000 حرف كحد أقصى).',
+    'errorStartCmdEmpty' => 'يلزم أمر بدء تشغيل لتمكين التطبيق.',
+    'errorLimit' => 'يجب أن يكون %%name%% عددًا صحيحًا ضمن المدى المسموح به.',
+    'errorEnvLine' => 'السطر %%line%%: استخدم الصيغة KEY=value.',
+    'errorEnvKey' => 'السطر %%line%%: "%%key%%" ليس اسم متغير صالحًا.',
+    'errorEnvReserved' => 'المتغير %%key%% يديره Runway ولا يمكن تعيينه.',
+    'errorEnvLoader' => 'لا يمكن تعيين %%key%% هنا؛ ضعه في أمر بدء التشغيل (مثلًا %%key%%=... ./app).',
+    'errorEnvValue' => 'يجب ألا تحتوي قيمة %%key%% على فواصل أسطر أو أحرف تحكم.',
+    'errorEnvTooMany' => 'عدد متغيرات البيئة كبير جدًا (200 كحد أقصى).',
+    'errorListen' => 'اختر وضع استماع صالحًا.',
+    'errorMode' => 'اختر وضع تطبيق صالحًا.',
+    'errorMountPath' => 'يجب أن يكون مسار URL مسارًا مثل /api (أحرف وأرقام و . _ ~ -).',
+    'errorStaticPaths' => 'يجب أن تكون المسارات الثابتة قائمة من مسارات URL.',
+    'errorStaticPath' => '"%%path%%" ليس مسار URL صالحًا (مثال: /assets).',
+    'errorStaticPathsTooMany' => 'الحد الأقصى لعدد المسارات الثابتة هو %%max%%.',
+    'errorStaticPathsTooLong' => 'الطول الإجمالي للمسارات الثابتة كبير جدًا (%%max%% حرف كحد أقصى).',
+    'errorConfigTooLarge' => 'الطول الإجمالي للإعدادات كبير جدًا (%%length%% من أصل %%max%% حرف كحد أقصى): قصّر الأوامر أو المسارات.',
+    'errorHealthPath' => 'يجب أن يكون مسار فحص السلامة مسار URL مثل /healthz.',
+    'errorPortRange' => 'يجب ألا يكون المنفذ الأول أكبر من المنفذ الأخير.',
+    'errorSettingRange' => 'أدخل عددًا صحيحًا بين %%min%% و%%max%%.',
+    'errorListenMode' => 'لا يملك العامل في الخلفية مستمعًا: اختر "لا شيء" كوضع استماع، أو وضع ويب بمنفذ TCP أو مقبس Unix.',
+    'errorMountPathReserved' => 'المسار %%path%% مستخدَم من قبل Plesk (إحصائيات الويب أو التحقق من الشهادات) ولا يمكن تمريره عبر الوكيل.',
+    'errorMaxApps' => 'وصل هذا الاشتراك بالفعل إلى الحد الأقصى لعدد التطبيقات الممكّنة (%%max%%).',
+    'errorFetchUrl' => 'أدخل عنوان https:// (2048 حرفًا كحد أقصى، بدون مسافات).',
+    'errorFetchHttps' => 'يمكن تنزيل عناوين https:// فقط.',
+    'errorSampleNotEmpty' => 'جذر التطبيق ليس فارغًا. أكّد السماح للتطبيق النموذجي بالكتابة فوق الملفات. %%details%%',
+    'errorSampleUnix' => 'لا يمكن لخادم PHP الافتراضي (php -S) الاستماع على مقبس Unix: ثبّت سلسلة أدوات FrankenPHP أو اختر TCP.',
+    'errorFetchSha256' => 'يجب أن يتكون المجموع الاختباري SHA-256 من 64 حرفًا سداسيًا عشريًا.',
+    'errorFetchFilename' => 'يمكن أن يحتوي اسم الملف على أحرف وأرقام و . _ + - فقط (128 حرفًا كحد أقصى).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'حد الذاكرة (MiB)',
+    'fieldCpuPercent' => 'حد المعالج (%)',
+    'fieldTasks' => 'حد العمليات / مؤشرات الترابط',
+
+    // Messages
+    'messageSavedEnabled' => 'تم حفظ الإعدادات وجارٍ (إعادة) تشغيل التطبيق.',
+    'messageSavedBuilding' => 'تم حفظ الإعدادات. جارٍ بناء التطبيق، وسيتم تشغيله أو إعادة تشغيله عند نجاح البناء؛ تابع ذلك في سجل "البناء والنشر".',
+    'messageSavedBuildNotStarted' => 'تم حفظ الإعدادات، لكن تعذّر بدء البناء: %%details%%',
+    'messageSavedDisabled' => 'تم حفظ الإعدادات. التطبيق معطّل.',
+    'messageAction_start' => 'جارٍ بدء تشغيل التطبيق.',
+    'messageAction_stop' => 'تم إيقاف التطبيق. سيبقى متوقفًا حتى تبدأ تشغيله مرة أخرى.',
+    'messageAction_restart' => 'جارٍ إعادة تشغيل التطبيق.',
+    'messageDeployStarted' => 'بدأ البناء. تابعه في سجل "البناء والنشر".',
+    'messageRemoved' => 'تمت إزالة التطبيق.',
+    'messageJobStarted' => 'بدأت المهمة. يظهر تقدمها أدناه.',
+    'messageToolchainRemoved' => 'تمت إزالة %%version%%.',
+    'messageSampleWritten' => 'تمت كتابة التطبيق النموذجي (عدد الملفات: %%count%%) وتم تحديث الإعدادات.',
+    'messageSampleWrittenOne' => 'تمت كتابة التطبيق النموذجي (ملف واحد) وتم تحديث الإعدادات.',
+    'messageFetchStarted' => 'بدأ التنزيل. تابعه في سجل "البناء والنشر".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'يسرد التطبيقات المكوّنة وحالتها.',
+    'cli.commands.status' => 'يعرض حالة تطبيق نطاق ما: --status <domain>',
+    'cli.commands.start' => 'يبدأ تشغيل تطبيق نطاق ما: --start <domain>',
+    'cli.commands.stop' => 'يوقف تطبيق نطاق ما؛ يبقى متوقفًا (حتى بعد إعادة تشغيل الخادم أو النشر) إلى أن يُنفَّذ --start أو --restart: --stop <domain>',
+    'cli.commands.restart' => 'يعيد تشغيل تطبيق نطاق ما: --restart <domain>',
+    'cli.commands.deploy' => 'يبني تطبيق نطاق ما ويعيد تشغيله وينتظر النتيجة (التطبيق المتوقف يُبنى لكنه يبقى متوقفًا): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'يمكّن التطبيق المكوّن لنطاق ما: --enable <domain>',
+    'cli.commands.disable' => 'يعطّل تطبيق نطاق ما: --disable <domain>',
+    'cli.commands.toolchains' => 'يسرد سلاسل الأدوات المثبّتة والنطاقات التي تستخدمها.',
+    'cli.commands.install-toolchain' => 'يثبّت سلسلة أدوات وينتظر النتيجة: --install-toolchain <runtime> <version> [-no-wait]',
+    'cli.commands.reconcile' => 'يزامن خدمات التطبيقات مع Plesk (النطاقات المحذوفة أو المعاد تسميتها أو المعلّقة).',
+];

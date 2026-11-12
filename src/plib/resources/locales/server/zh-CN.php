@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Chinese (Simplified) translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../zh-CN.php; the frontend strings live in ../app/zh-CN.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => '安装工具链，无需 Docker 即可将应用程序作为服务运行。',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => '在此域名上构建并运行 Go、Rust、Bun、Java、.NET、Python、Ruby、PHP 或预构建的应用程序。',
+    'permissionName' => 'Runway 应用程序管理',
+    'permissionDescription' => '允许客户使用 Runway 构建应用程序并将其作为后台服务运行。',
+
+    // Errors
+    'errorHelperFailed' => '特权辅助程序执行失败：%%details%%',
+    'errorAccessDenied' => '访问被拒绝。',
+    'errorNoDomain' => '未找到该域名。',
+    'errorNoHosting' => '该域名没有 web 主机。',
+    'errorNotConfigured' => '应用程序尚未配置。请先保存设置。',
+    'errorInvalidOperation' => '无效的操作。',
+    'errorInvalidValue' => '无效的值。',
+    'errorPostRequired' => '此操作需要 POST 请求。',
+    'errorInternal' => '发生内部错误。详细信息请查看 Plesk 面板日志。',
+    'errorRuntime' => '请选择有效的运行时。',
+    'errorToolchain' => '请选择有效的工具链版本。',
+    'errorAppRoot' => '应用程序根目录必须是订阅内的路径（字母、数字以及 . _ - @ + /），且不能包含“.”或“..”路径段。',
+    'errorBuildCmd' => '构建命令过长或包含控制字符。',
+    'errorStartCmd' => '启动命令必须为单行且不含控制字符（最多 1000 个字符）。',
+    'errorStartCmdEmpty' => '启用应用程序需要填写启动命令。',
+    'errorLimit' => '%%name%% 必须是允许范围内的整数。',
+    'errorEnvLine' => '第 %%line%% 行：请使用 KEY=value 格式。',
+    'errorEnvKey' => '第 %%line%% 行：“%%key%%”不是有效的变量名。',
+    'errorEnvReserved' => '%%key%% 由 Runway 管理，无法设置。',
+    'errorEnvLoader' => '%%key%% 不能在此设置；请将其放入启动命令（例如 %%key%%=... ./app）。',
+    'errorEnvValue' => '%%key%% 的值不能包含换行符或控制字符。',
+    'errorEnvTooMany' => '环境变量过多（最多 200 个）。',
+    'errorListen' => '请选择有效的监听模式。',
+    'errorMode' => '请选择有效的应用程序模式。',
+    'errorMountPath' => 'URL 路径必须是类似 /api 的路径（字母、数字以及 . _ ~ -）。',
+    'errorStaticPaths' => '静态路径必须是 URL 路径列表。',
+    'errorStaticPath' => '“%%path%%”不是有效的 URL 路径（例如：/assets）。',
+    'errorStaticPathsTooMany' => '最多允许 %%max%% 个静态路径。',
+    'errorStaticPathsTooLong' => '静态路径的总长度过长（最多 %%max%% 个字符）。',
+    'errorConfigTooLarge' => '设置的总长度过长（%%length%% 个字符，最多 %%max%% 个）：请缩短命令或路径。',
+    'errorHealthPath' => '健康检查路径必须是类似 /healthz 的 URL 路径。',
+    'errorPortRange' => '起始端口不能大于结束端口。',
+    'errorSettingRange' => '请输入 %%min%% 到 %%max%% 之间的整数。',
+    'errorListenMode' => '后台工作进程没有监听器：监听模式请选择“无”，或选择使用 TCP 端口或 Unix 套接字的 Web 模式。',
+    'errorMountPathReserved' => '%%path%% 已被 Plesk 使用（网站统计或证书验证），无法代理。',
+    'errorMaxApps' => '此订阅已达到已启用应用程序的数量上限（%%max%%）。',
+    'errorFetchUrl' => '请输入 https:// URL（最多 2048 个字符，不含空格）。',
+    'errorFetchHttps' => '只能下载 https:// URL。',
+    'errorSampleNotEmpty' => '应用程序根目录不为空。请确认允许示例应用程序覆盖文件。%%details%%',
+    'errorSampleUnix' => '默认的 PHP 服务器（php -S）无法在 Unix 套接字上监听：请安装 FrankenPHP 工具链或选择 TCP。',
+    'errorFetchSha256' => 'SHA-256 校验和必须是 64 个十六进制字符。',
+    'errorFetchFilename' => '文件名只能包含字母、数字以及 . _ + -（最多 128 个字符）。',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => '内存限制（MiB）',
+    'fieldCpuPercent' => 'CPU 限制（%）',
+    'fieldTasks' => '进程/线程限制',
+
+    // Messages
+    'messageSavedEnabled' => '设置已保存，应用程序正在（重新）启动。',
+    'messageSavedBuilding' => '设置已保存。应用程序正在构建，构建成功后将（重新）启动；请在“构建与部署”日志中查看进度。',
+    'messageSavedBuildNotStarted' => '设置已保存，但无法启动构建：%%details%%',
+    'messageSavedDisabled' => '设置已保存。应用程序已禁用。',
+    'messageAction_start' => '应用程序正在启动。',
+    'messageAction_stop' => '应用程序已停止。在您再次启动之前，它将保持停止状态。',
+    'messageAction_restart' => '应用程序正在重新启动。',
+    'messageDeployStarted' => '构建已开始。请在“构建与部署”日志中查看进度。',
+    'messageRemoved' => '应用程序已移除。',
+    'messageJobStarted' => '任务已开始。进度显示在下方。',
+    'messageToolchainRemoved' => '%%version%% 已移除。',
+    'messageSampleWritten' => '示例应用程序已写入（%%count%% 个文件），设置已更新。',
+    'messageSampleWrittenOne' => '示例应用程序已写入（1 个文件），设置已更新。',
+    'messageFetchStarted' => '下载已开始。请在“构建与部署”日志中查看进度。',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => '列出已配置的应用程序及其状态。',
+    'cli.commands.status' => '显示某个域名的应用程序状态：--status <域名>',
+    'cli.commands.start' => '启动某个域名的应用程序：--start <域名>',
+    'cli.commands.stop' => '停止某个域名的应用程序；在执行 --start 或 --restart 之前（即使服务器重启或部署之后），它将保持停止状态：--stop <域名>',
+    'cli.commands.restart' => '重新启动某个域名的应用程序：--restart <域名>',
+    'cli.commands.deploy' => '构建并重新启动某个域名的应用程序，并等待结果（已停止的应用程序只会构建，仍保持停止状态）：--deploy <域名> [-no-wait]',
+    'cli.commands.enable' => '启用某个域名的已配置应用程序：--enable <域名>',
+    'cli.commands.disable' => '禁用某个域名的应用程序：--disable <域名>',
+    'cli.commands.toolchains' => '列出已安装的工具链以及使用它们的域名。',
+    'cli.commands.install-toolchain' => '安装工具链并等待结果：--install-toolchain <运行时> <版本> [-no-wait]',
+    'cli.commands.reconcile' => '使应用程序服务与 Plesk 保持一致（已删除、已重命名或已挂起的域名）。',
+];

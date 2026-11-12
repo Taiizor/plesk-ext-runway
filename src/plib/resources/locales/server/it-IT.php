@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Italian translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../it-IT.php; the frontend strings live in ../app/it-IT.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Installa toolchain ed esegui applicazioni come servizi, senza Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Esegui la build e avvia un\'applicazione Go, Rust, Bun, Java, .NET, Python, Ruby, PHP o precompilata su questo dominio.',
+    'permissionName' => 'Gestione delle applicazioni Runway',
+    'permissionDescription' => 'Consente al cliente di eseguire la build e avviare applicazioni come servizi in background con Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Errore dell\'helper privilegiato: %%details%%',
+    'errorAccessDenied' => 'Accesso negato.',
+    'errorNoDomain' => 'Dominio non trovato.',
+    'errorNoHosting' => 'Il dominio non ha un hosting web.',
+    'errorNotConfigured' => 'L\'applicazione non è ancora configurata. Salva prima le impostazioni.',
+    'errorInvalidOperation' => 'Operazione non valida.',
+    'errorInvalidValue' => 'Valore non valido.',
+    'errorPostRequired' => 'Questa azione richiede il metodo POST.',
+    'errorInternal' => 'Si è verificato un errore interno. I dettagli sono nel log del pannello Plesk.',
+    'errorRuntime' => 'Scegli un runtime valido.',
+    'errorToolchain' => 'Scegli una versione di toolchain valida.',
+    'errorAppRoot' => 'La root dell\'applicazione deve essere un percorso all\'interno dell\'abbonamento (lettere, cifre e . _ - @ + /), senza segmenti "." o "..".',
+    'errorBuildCmd' => 'Il comando di build è troppo lungo o contiene caratteri di controllo.',
+    'errorStartCmd' => 'Il comando di avvio deve essere una sola riga senza caratteri di controllo (max 1000 caratteri).',
+    'errorStartCmdEmpty' => 'Per abilitare l\'applicazione è necessario un comando di avvio.',
+    'errorLimit' => 'Il campo %%name%% deve contenere un numero intero nell\'intervallo consentito.',
+    'errorEnvLine' => 'Riga %%line%%: usa il formato CHIAVE=valore.',
+    'errorEnvKey' => 'Riga %%line%%: "%%key%%" non è un nome di variabile valido.',
+    'errorEnvReserved' => '%%key%% è gestita da Runway e non può essere impostata.',
+    'errorEnvLoader' => '%%key%% non può essere impostata qui; inseriscila nel comando di avvio (es. %%key%%=... ./app).',
+    'errorEnvValue' => 'Il valore di %%key%% non deve contenere interruzioni di riga o caratteri di controllo.',
+    'errorEnvTooMany' => 'Troppe variabili d\'ambiente (massimo 200).',
+    'errorListen' => 'Scegli una modalità di ascolto valida.',
+    'errorMode' => 'Scegli una modalità valida per l\'applicazione.',
+    'errorMountPath' => 'Il percorso URL deve essere un percorso come /api (lettere, cifre e . _ ~ -).',
+    'errorStaticPaths' => 'I percorsi statici devono essere un elenco di percorsi URL.',
+    'errorStaticPath' => '"%%path%%" non è un percorso URL valido (esempio: /assets).',
+    'errorStaticPathsTooMany' => 'Sono consentiti al massimo %%max%% percorsi statici.',
+    'errorStaticPathsTooLong' => 'I percorsi statici sono troppo lunghi nel complesso (al massimo %%max%% caratteri).',
+    'errorConfigTooLarge' => 'Le impostazioni sono troppo lunghe nel complesso (%%length%% caratteri su un massimo di %%max%%): abbrevia i comandi o i percorsi.',
+    'errorHealthPath' => 'Il percorso dell\'health check deve essere un percorso URL come /healthz.',
+    'errorPortRange' => 'La prima porta non può essere maggiore dell\'ultima.',
+    'errorSettingRange' => 'Inserisci un numero intero compreso tra %%min%% e %%max%%.',
+    'errorListenMode' => 'Un worker in background non ha un listener: scegli "Nulla" come modalità di ascolto, oppure una modalità web con una porta TCP o un socket Unix.',
+    'errorMountPathReserved' => '%%path%% è utilizzato da Plesk (statistiche web o convalida dei certificati) e non può essere inoltrato tramite proxy.',
+    'errorMaxApps' => 'Questo abbonamento ha già raggiunto il numero massimo di applicazioni abilitate (%%max%%).',
+    'errorFetchUrl' => 'Inserisci un URL https:// (max 2048 caratteri, senza spazi).',
+    'errorFetchHttps' => 'È possibile scaricare solo URL https://.',
+    'errorSampleNotEmpty' => 'La root dell\'applicazione non è vuota. Conferma che l\'applicazione di esempio possa sovrascrivere i file. %%details%%',
+    'errorSampleUnix' => 'Il server PHP predefinito (php -S) non può essere in ascolto su un socket Unix: installa una toolchain FrankenPHP o scegli TCP.',
+    'errorFetchSha256' => 'Il checksum SHA-256 deve essere composto da 64 caratteri esadecimali.',
+    'errorFetchFilename' => 'Il nome del file può contenere solo lettere, cifre e . _ + - (max 128 caratteri).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limite di memoria (MiB)',
+    'fieldCpuPercent' => 'Limite CPU (%)',
+    'fieldTasks' => 'Limite di processi / thread',
+
+    // Messages
+    'messageSavedEnabled' => 'Le impostazioni sono state salvate e l\'applicazione è in fase di (ri)avvio.',
+    'messageSavedBuilding' => 'Le impostazioni sono state salvate. È in corso la build dell\'applicazione, che verrà (ri)avviata se la build riesce; segui l\'avanzamento nel log "Build e implementazione".',
+    'messageSavedBuildNotStarted' => 'Le impostazioni sono state salvate, ma non è stato possibile avviare la build: %%details%%',
+    'messageSavedDisabled' => 'Le impostazioni sono state salvate. L\'applicazione è disabilitata.',
+    'messageAction_start' => 'L\'applicazione è in fase di avvio.',
+    'messageAction_stop' => 'L\'applicazione è stata arrestata. Resta arrestata finché non la avvii di nuovo.',
+    'messageAction_restart' => 'L\'applicazione è in fase di riavvio.',
+    'messageDeployStarted' => 'La build è iniziata. Segui l\'avanzamento nel log "Build e implementazione".',
+    'messageRemoved' => 'L\'applicazione è stata rimossa.',
+    'messageJobStarted' => 'Il job è iniziato. L\'avanzamento è mostrato qui sotto.',
+    'messageToolchainRemoved' => 'La versione %%version%% è stata rimossa.',
+    'messageSampleWritten' => 'L\'applicazione di esempio è stata creata (%%count%% file) e le impostazioni sono state aggiornate.',
+    'messageSampleWrittenOne' => 'L\'applicazione di esempio è stata creata (un file) e le impostazioni sono state aggiornate.',
+    'messageFetchStarted' => 'Il download è iniziato. Segui l\'avanzamento nel log "Build e implementazione".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Elenca le applicazioni configurate e il loro stato.',
+    'cli.commands.status' => 'Mostra lo stato dell\'applicazione di un dominio: --status <dominio>',
+    'cli.commands.start' => 'Avvia l\'applicazione di un dominio: --start <dominio>',
+    'cli.commands.stop' => 'Arresta l\'applicazione di un dominio; resta arrestata (anche dopo un riavvio del server o un\'implementazione) fino a --start o --restart: --stop <dominio>',
+    'cli.commands.restart' => 'Riavvia l\'applicazione di un dominio: --restart <dominio>',
+    'cli.commands.deploy' => 'Esegue la build dell\'applicazione di un dominio, la riavvia e attende il risultato (un\'applicazione arrestata viene sottoposta a build ma resta arrestata): --deploy <dominio> [-no-wait]',
+    'cli.commands.enable' => 'Abilita l\'applicazione configurata di un dominio: --enable <dominio>',
+    'cli.commands.disable' => 'Disabilita l\'applicazione di un dominio: --disable <dominio>',
+    'cli.commands.toolchains' => 'Elenca le toolchain installate e i domini che le utilizzano.',
+    'cli.commands.install-toolchain' => 'Installa una toolchain e attende il risultato: --install-toolchain <runtime> <versione> [-no-wait]',
+    'cli.commands.reconcile' => 'Allinea i servizi delle applicazioni a Plesk (domini eliminati, rinominati o sospesi).',
+];

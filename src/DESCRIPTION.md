@@ -31,5 +31,6 @@ files runs as the customer with resource limits, unit files never contain custom
 unit line runs as root, and services run with systemd sandboxing, memory/CPU/task limits, a port
 ownership check and a socket tampering check.
 
-Requires Plesk Obsidian 18.0.55 or later on Linux with systemd and python3. Source code, issues
-and documentation: https://github.com/Taiizor/plesk-ext-runway
+The interface is available in all 32 languages of Plesk. Requires Plesk Obsidian 18.0.55 or
+later on Linux with systemd and python3. Source code, issues and documentation:
+https://github.com/Taiizor/plesk-ext-runway

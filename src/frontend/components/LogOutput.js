@@ -46,7 +46,7 @@ const LogOutput = ({ text, empty }) => {
     return (
         <div>
             <style>{darkThemeFix}</style>
-            <pre ref={ref} className="runway-log" style={preStyle} onScroll={onScroll} data-testid="log-output">
+            <pre ref={ref} dir="ltr" className="runway-log" style={preStyle} onScroll={onScroll} data-testid="log-output">
                 {text ? text : (empty || <Translate content="Common.logEmpty" />)}
             </pre>
         </div>

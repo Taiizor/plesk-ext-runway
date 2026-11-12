@@ -3,9 +3,9 @@
 import { createElement } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Translate,
+    Alert, Button, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
-import { formatBytes } from './lib/format';
+import { formatBytes, isolate, runtimeName } from './lib/format';
 import { useApi, useApiData, usePolling } from './lib/hooks';
 import ErrorAlert from './components/ErrorAlert';
 import Facts from './components/Facts';
@@ -51,6 +51,7 @@ const endpoint = row => {
  */
 const Overview = ({ baseUrl }) => {
     const api = useApi(baseUrl);
+    const translate = useTranslate();
     const context = useApiData(() => api.get('context'), [api]);
     const overview = useApiData(() => api.get('overview'), [api]);
     usePolling(() => overview.reload(), OVERVIEW_POLL_MS, Boolean(overview.data));
@@ -93,8 +94,8 @@ const Overview = ({ baseUrl }) => {
                 const meta = runtimes[row.runtime];
                 return (
                     <span>
-                        {meta ? meta.label : row.runtime}
-                        {row.toolchain ? <Text intent="muted"> {row.toolchain}</Text> : null}
+                        {meta ? runtimeName(translate, meta) : row.runtime}
+                        {row.toolchain ? <Text intent="muted"> {isolate(row.toolchain)}</Text> : null}
                     </span>
                 );
             },

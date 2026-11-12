@@ -6,11 +6,15 @@ import {
     Alert, Button, Form, FormField, FormFieldCheckbox, FormFieldSelect, FormFieldText, Panel, Section, SelectOption, Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
-import { helperText, isObject, runtimeDefaults, unixSupported } from '../lib/format';
+import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
 const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
 const monospace = { fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: '12px' };
+// Commands, variables and paths are code: left-to-right also in right-to-left panel languages
+// (Arabic, Hebrew), where the form itself is mirrored.
+const codeInput = { style: monospace, spellCheck: false, dir: 'ltr' };
+const pathInput = { spellCheck: false, dir: 'ltr' };
 
 const text = value => (value === null || value === undefined ? '' : String(value));
 
@@ -203,7 +207,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                     description={meta && meta.hint ? helperText(translate, meta.hint_key, null, meta.hint) : <Translate content="Domain.form.runtimeHint" />}
                     required
                 >
-                    {runtimes.map(item => <SelectOption key={item.key} value={item.key}>{item.label}</SelectOption>)}
+                    {runtimes.map(item => <SelectOption key={item.key} value={item.key}>{runtimeName(translate, item)}</SelectOption>)}
                     {values.runtime && !meta ? <SelectOption value={values.runtime}>{values.runtime}</SelectOption> : null}
                 </FormFieldSelect>
                 {kind !== 'none' && (
@@ -215,7 +219,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         {!toolchainOptions.length ? <SelectOption value="">—</SelectOption> : null}
                         {toolchainOptions.map(item => (
                             <SelectOption key={item.id} value={item.id}>
-                                {item.missing ? <Translate content="Domain.form.toolchainMissing" params={{ version: item.id }} /> : item.label}
+                                {item.missing ? <Translate content="Domain.form.toolchainMissing" params={{ version: isolate(item.id) }} /> : isolate(item.label)}
                             </SelectOption>
                         ))}
                     </FormFieldSelect>
@@ -226,6 +230,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                     description={<Translate content="Domain.form.appRootHint" />}
                     size="xl"
                     required
+                    inputProps={pathInput}
                 />
                 <FormFieldSelect
                     name="mode"
@@ -260,6 +265,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                             description={<Translate content="Domain.form.mountPathHint" />}
                             placeholder="/api"
                             required
+                            inputProps={pathInput}
                         />
                     )}
                     {supportsBuild && (
@@ -270,7 +276,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                             multiline
                             rows={2}
                             size="fill"
-                            inputProps={{ style: monospace, spellCheck: false }}
+                            inputProps={codeInput}
                         />
                     )}
                     <FormFieldText
@@ -278,7 +284,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         label={<Translate content="Domain.form.startCmd" />}
                         description={worker ? <Translate content="Domain.form.startCmdWorkerHint" /> : <Translate content="Domain.form.startCmdHint" />}
                         size="fill"
-                        inputProps={{ style: monospace, spellCheck: false }}
+                        inputProps={codeInput}
                     />
                     <FormField>
                         <Button ghost icon="reset" onClick={useDefaults} disabled={!isObject(defaults[values.runtime])}>
@@ -294,7 +300,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         size="fill"
                         disabled={typeof data.env !== 'string'}
                         placeholder="KEY=value"
-                        inputProps={{ style: monospace, spellCheck: false }}
+                        inputProps={codeInput}
                     />
                     {!worker && (
                         <FormFieldText
@@ -305,7 +311,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                             rows={3}
                             size="xl"
                             placeholder={'/assets\n/images'}
-                            inputProps={{ style: monospace, spellCheck: false }}
+                            inputProps={codeInput}
                         />
                     )}
                     {!worker && (
@@ -314,6 +320,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                             label={<Translate content="Domain.form.healthPath" />}
                             description={<Translate content="Domain.form.healthPathHint" />}
                             placeholder="/healthz"
+                            inputProps={pathInput}
                         />
                     )}
                     <FormFieldCheckbox

@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Romanian translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../ro-RO.php; the frontend strings live in ../app/ro-RO.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Instalați toolchain-uri și rulați aplicații ca servicii, fără Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Compilați și rulați pe acest domeniu o aplicație Go, Rust, Bun, Java, .NET, Python, Ruby, PHP sau precompilată.',
+    'permissionName' => 'Gestionarea aplicațiilor Runway',
+    'permissionDescription' => 'Permite clientului să compileze și să ruleze aplicații ca servicii în fundal cu Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Programul auxiliar privilegiat a eșuat: %%details%%',
+    'errorAccessDenied' => 'Acces refuzat.',
+    'errorNoDomain' => 'Domeniul nu a fost găsit.',
+    'errorNoHosting' => 'Domeniul nu are găzduire web.',
+    'errorNotConfigured' => 'Aplicația nu este configurată încă. Salvați mai întâi setările.',
+    'errorInvalidOperation' => 'Operație nevalidă.',
+    'errorInvalidValue' => 'Valoare nevalidă.',
+    'errorPostRequired' => 'Această acțiune necesită o cerere POST.',
+    'errorInternal' => 'A apărut o eroare internă. Detaliile se află în jurnalul panoului Plesk.',
+    'errorRuntime' => 'Alegeți un mediu de execuție valid.',
+    'errorToolchain' => 'Alegeți o versiune validă de toolchain.',
+    'errorAppRoot' => 'Rădăcina aplicației trebuie să fie o cale din interiorul abonamentului (litere, cifre și . _ - @ + /), fără segmente „.” sau „..”.',
+    'errorBuildCmd' => 'Comanda de compilare este prea lungă sau conține caractere de control.',
+    'errorStartCmd' => 'Comanda de pornire trebuie să fie o singură linie fără caractere de control (max. 1000 de caractere).',
+    'errorStartCmdEmpty' => 'Pentru a activa aplicația este necesară o comandă de pornire.',
+    'errorLimit' => '%%name%% trebuie să fie un număr întreg din intervalul permis.',
+    'errorEnvLine' => 'Linia %%line%%: utilizați formatul CHEIE=valoare.',
+    'errorEnvKey' => 'Linia %%line%%: „%%key%%” nu este un nume de variabilă valid.',
+    'errorEnvReserved' => 'Variabila %%key%% este gestionată de Runway și nu poate fi setată.',
+    'errorEnvLoader' => 'Variabila %%key%% nu poate fi setată aici; puneți-o în comanda de pornire (de ex. %%key%%=... ./app).',
+    'errorEnvValue' => 'Valoarea variabilei %%key%% nu poate conține sfârșituri de linie sau caractere de control.',
+    'errorEnvTooMany' => 'Prea multe variabile de mediu (maximum 200).',
+    'errorListen' => 'Alegeți un mod de ascultare valid.',
+    'errorMode' => 'Alegeți un mod de aplicație valid.',
+    'errorMountPath' => 'Calea URL trebuie să fie o cale precum /api (litere, cifre și . _ ~ -).',
+    'errorStaticPaths' => 'Căile statice trebuie să fie o listă de căi URL.',
+    'errorStaticPath' => '„%%path%%” nu este o cale URL validă (exemplu: /assets).',
+    'errorStaticPathsTooMany' => 'Numărul maxim de căi statice este %%max%%.',
+    'errorStaticPathsTooLong' => 'Căile statice au în total prea multe caractere (maximum %%max%%).',
+    'errorConfigTooLarge' => 'Setările au în total prea multe caractere (%%length%%, maximum %%max%%): scurtați comenzile sau căile.',
+    'errorHealthPath' => 'Calea de verificare a stării trebuie să fie o cale URL precum /healthz.',
+    'errorPortRange' => 'Primul port nu poate fi mai mare decât ultimul port.',
+    'errorSettingRange' => 'Introduceți un număr întreg între %%min%% și %%max%%.',
+    'errorListenMode' => 'Un proces de fundal nu are ascultător: alegeți „Nimic” ca mod de ascultare sau un mod web cu port TCP ori socket Unix.',
+    'errorMountPathReserved' => 'Calea %%path%% este utilizată de Plesk (statistici web sau validarea certificatelor) și nu poate fi transmisă prin proxy.',
+    'errorMaxApps' => 'Acest abonament a atins deja numărul maxim de aplicații activate (%%max%%).',
+    'errorFetchUrl' => 'Introduceți un URL https:// (max. 2048 de caractere, fără spații).',
+    'errorFetchHttps' => 'Pot fi descărcate numai URL-uri https://.',
+    'errorSampleNotEmpty' => 'Rădăcina aplicației nu este goală. Confirmați că exemplul poate suprascrie fișiere. %%details%%',
+    'errorSampleUnix' => 'Serverul PHP implicit (php -S) nu poate asculta pe un socket Unix: instalați un toolchain FrankenPHP sau alegeți TCP.',
+    'errorFetchSha256' => 'Suma de control SHA-256 trebuie să aibă 64 de caractere hexazecimale.',
+    'errorFetchFilename' => 'Numele fișierului poate conține numai litere, cifre și . _ + - (max. 128 de caractere).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limita de memorie (MiB)',
+    'fieldCpuPercent' => 'Limita CPU (%)',
+    'fieldTasks' => 'Limita de procese / fire de execuție',
+
+    // Messages
+    'messageSavedEnabled' => 'Setările au fost salvate și aplicația este în curs de (re)pornire.',
+    'messageSavedBuilding' => 'Setările au fost salvate. Aplicația se compilează și va fi (re)pornită când compilarea reușește; urmăriți-o în jurnalul „Compilare și implementare”.',
+    'messageSavedBuildNotStarted' => 'Setările au fost salvate, dar compilarea nu a putut fi pornită: %%details%%',
+    'messageSavedDisabled' => 'Setările au fost salvate. Aplicația este dezactivată.',
+    'messageAction_start' => 'Aplicația pornește.',
+    'messageAction_stop' => 'Aplicația a fost oprită. Rămâne oprită până când o porniți din nou.',
+    'messageAction_restart' => 'Aplicația repornește.',
+    'messageDeployStarted' => 'Compilarea a început. Urmăriți-o în jurnalul „Compilare și implementare”.',
+    'messageRemoved' => 'Aplicația a fost eliminată.',
+    'messageJobStarted' => 'Sarcina a început. Progresul ei este afișat mai jos.',
+    'messageToolchainRemoved' => 'Versiunea %%version%% a fost eliminată.',
+    'messageSampleWritten' => 'Aplicația exemplu a fost creată (%%count%% fișiere) și setările au fost actualizate.',
+    'messageSampleWrittenOne' => 'Aplicația exemplu a fost creată (un fișier) și setările au fost actualizate.',
+    'messageFetchStarted' => 'Descărcarea a început. Urmăriți-o în jurnalul „Compilare și implementare”.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Listează aplicațiile configurate și starea lor.',
+    'cli.commands.status' => 'Afișează starea aplicației unui domeniu: --status <domeniu>',
+    'cli.commands.start' => 'Pornește aplicația unui domeniu: --start <domeniu>',
+    'cli.commands.stop' => 'Oprește aplicația unui domeniu; rămâne oprită (și după o repornire a serverului sau o implementare) până la --start sau --restart: --stop <domeniu>',
+    'cli.commands.restart' => 'Repornește aplicația unui domeniu: --restart <domeniu>',
+    'cli.commands.deploy' => 'Compilează și repornește aplicația unui domeniu și așteaptă rezultatul (o aplicație oprită este compilată, dar rămâne oprită): --deploy <domeniu> [-no-wait]',
+    'cli.commands.enable' => 'Activează aplicația configurată a unui domeniu: --enable <domeniu>',
+    'cli.commands.disable' => 'Dezactivează aplicația unui domeniu: --disable <domeniu>',
+    'cli.commands.toolchains' => 'Listează toolchain-urile instalate și domeniile care le utilizează.',
+    'cli.commands.install-toolchain' => 'Instalează un toolchain și așteaptă rezultatul: --install-toolchain <mediu-de-execuție> <versiune> [-no-wait]',
+    'cli.commands.reconcile' => 'Sincronizează serviciile aplicațiilor cu Plesk (domenii șterse, redenumite sau suspendate).',
+];

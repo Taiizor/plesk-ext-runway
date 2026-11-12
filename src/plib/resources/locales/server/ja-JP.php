@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Japanese translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../ja-JP.php; the frontend strings live in ../app/ja-JP.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'ツールチェーンをインストールし、Docker なしでアプリケーションをサービスとして実行します。',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'このドメインで Go、Rust、Bun、Java、.NET、Python、Ruby、PHP またはビルド済みのアプリケーションをビルドして実行します。',
+    'permissionName' => 'Runway アプリケーション管理',
+    'permissionDescription' => '顧客が Runway でアプリケーションをビルドし、バックグラウンドサービスとして実行できるようにします。',
+
+    // Errors
+    'errorHelperFailed' => '特権ヘルパが失敗しました: %%details%%',
+    'errorAccessDenied' => 'アクセスが拒否されました。',
+    'errorNoDomain' => 'ドメインが見つかりません。',
+    'errorNoHosting' => 'このドメインにはウェブホスティングがありません。',
+    'errorNotConfigured' => 'アプリケーションはまだ設定されていません。先に設定を保存してください。',
+    'errorInvalidOperation' => '無効な操作です。',
+    'errorInvalidValue' => '無効な値です。',
+    'errorPostRequired' => 'この操作には POST リクエストが必要です。',
+    'errorInternal' => '内部エラーが発生しました。詳細は Plesk パネルのログにあります。',
+    'errorRuntime' => '有効なランタイムを選択してください。',
+    'errorToolchain' => '有効なツールチェーンのバージョンを選択してください。',
+    'errorAppRoot' => 'アプリケーションルートはサブスクリプション内のパスでなければなりません（英字、数字、. _ - @ + /）。「.」や「..」のセグメントは使用できません。',
+    'errorBuildCmd' => 'ビルドコマンドが長すぎるか、制御文字が含まれています。',
+    'errorStartCmd' => '起動コマンドは、制御文字を含まない 1 行でなければなりません（最大 1000 文字）。',
+    'errorStartCmdEmpty' => 'アプリケーションを有効にするには起動コマンドが必要です。',
+    'errorLimit' => '%%name%% は許容範囲内の整数でなければなりません。',
+    'errorEnvLine' => '%%line%% 行目: KEY=value の形式で入力してください。',
+    'errorEnvKey' => '%%line%% 行目: 「%%key%%」は有効な変数名ではありません。',
+    'errorEnvReserved' => '%%key%% は Runway が管理しているため設定できません。',
+    'errorEnvLoader' => '%%key%% はここでは設定できません。起動コマンドに記述してください（例: %%key%%=... ./app）。',
+    'errorEnvValue' => '%%key%% の値に改行や制御文字を含めることはできません。',
+    'errorEnvTooMany' => '環境変数が多すぎます（最大 200 個）。',
+    'errorListen' => '有効なリッスンモードを選択してください。',
+    'errorMode' => '有効なアプリケーションモードを選択してください。',
+    'errorMountPath' => 'URL パスは /api のような形式でなければなりません（英字、数字、. _ ~ -）。',
+    'errorStaticPaths' => '静的パスは URL パスのリストでなければなりません。',
+    'errorStaticPath' => '「%%path%%」は有効な URL パスではありません（例: /assets）。',
+    'errorStaticPathsTooMany' => '静的パスは最大 %%max%% 個までです。',
+    'errorStaticPathsTooLong' => '静的パスの合計が長すぎます（最大 %%max%% 文字）。',
+    'errorConfigTooLarge' => '設定の合計が長すぎます（%%length%% 文字、最大 %%max%% 文字）。コマンドまたはパスを短くしてください。',
+    'errorHealthPath' => 'ヘルスチェックパスは /healthz のような URL パスでなければなりません。',
+    'errorPortRange' => '開始ポートは終了ポート以下にしてください。',
+    'errorSettingRange' => '%%min%% から %%max%% までの整数を入力してください。',
+    'errorListenMode' => 'バックグラウンドワーカにはリスナがありません。リッスンモードとして「なし」を選択するか、TCP ポートまたは Unix ソケットを使用するウェブモードを選択してください。',
+    'errorMountPathReserved' => '%%path%% は Plesk がウェブ統計または証明書の検証に使用しているため、プロキシできません。',
+    'errorMaxApps' => 'このサブスクリプションでは、有効なアプリケーションの数がすでに上限（%%max%%）に達しています。',
+    'errorFetchUrl' => 'https:// の URL を入力してください（最大 2048 文字、空白なし）。',
+    'errorFetchHttps' => 'ダウンロードできるのは https:// の URL のみです。',
+    'errorSampleNotEmpty' => 'アプリケーションルートが空ではありません。サンプルによるファイルの上書きを許可してください。%%details%%',
+    'errorSampleUnix' => 'デフォルトの PHP サーバ（php -S）は Unix ソケットでリッスンできません。FrankenPHP のツールチェーンをインストールするか、TCP を選択してください。',
+    'errorFetchSha256' => 'SHA-256 チェックサムは 64 桁の 16 進数でなければなりません。',
+    'errorFetchFilename' => 'ファイル名に使用できるのは英字、数字、. _ + - のみです（最大 128 文字）。',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'メモリ上限（MiB）',
+    'fieldCpuPercent' => 'CPU 上限（%）',
+    'fieldTasks' => 'プロセス / スレッド数の上限',
+
+    // Messages
+    'messageSavedEnabled' => '設定を保存しました。アプリケーションを（再）起動しています。',
+    'messageSavedBuilding' => '設定を保存しました。アプリケーションをビルド中で、ビルドが成功すると（再）起動されます。「ビルドとデプロイ」ログで確認できます。',
+    'messageSavedBuildNotStarted' => '設定を保存しましたが、ビルドを開始できませんでした: %%details%%',
+    'messageSavedDisabled' => '設定を保存しました。アプリケーションは無効です。',
+    'messageAction_start' => 'アプリケーションを起動しています。',
+    'messageAction_stop' => 'アプリケーションを停止しました。再度起動するまで停止したままになります。',
+    'messageAction_restart' => 'アプリケーションを再起動しています。',
+    'messageDeployStarted' => 'ビルドを開始しました。「ビルドとデプロイ」ログで確認できます。',
+    'messageRemoved' => 'アプリケーションを削除しました。',
+    'messageJobStarted' => 'ジョブを開始しました。進行状況は下に表示されます。',
+    'messageToolchainRemoved' => '%%version%% を削除しました。',
+    'messageSampleWritten' => 'サンプルアプリケーション（%%count%% ファイル）を書き込み、設定を更新しました。',
+    'messageSampleWrittenOne' => 'サンプルアプリケーション（1 ファイル）を書き込み、設定を更新しました。',
+    'messageFetchStarted' => 'ダウンロードを開始しました。「ビルドとデプロイ」ログで確認できます。',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => '設定済みのアプリケーションとその状態を一覧表示します。',
+    'cli.commands.status' => 'ドメインのアプリケーションの状態を表示します: --status <ドメイン>',
+    'cli.commands.start' => 'ドメインのアプリケーションを起動します: --start <ドメイン>',
+    'cli.commands.stop' => 'ドメインのアプリケーションを停止します。サーバの再起動やデプロイがあっても、--start または --restart を実行するまで停止したままになります: --stop <ドメイン>',
+    'cli.commands.restart' => 'ドメインのアプリケーションを再起動します: --restart <ドメイン>',
+    'cli.commands.deploy' => 'ドメインのアプリケーションをビルドして再起動し、結果を待ちます（停止済みのアプリケーションはビルドされますが停止したままです）: --deploy <ドメイン> [-no-wait]',
+    'cli.commands.enable' => 'ドメインの設定済みアプリケーションを有効にします: --enable <ドメイン>',
+    'cli.commands.disable' => 'ドメインのアプリケーションを無効にします: --disable <ドメイン>',
+    'cli.commands.toolchains' => 'インストール済みのツールチェーンと、それを使用しているドメインを一覧表示します。',
+    'cli.commands.install-toolchain' => 'ツールチェーンをインストールして結果を待ちます: --install-toolchain <ランタイム> <バージョン> [-no-wait]',
+    'cli.commands.reconcile' => 'アプリケーションサービスを Plesk の状態に合わせます（削除、名前変更、一時停止されたドメイン）。',
+];

@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Czech translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../cs-CZ.php; the frontend strings live in ../app/cs-CZ.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Instalujte sady nástrojů a spouštějte aplikace jako služby, bez Dockeru.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Sestavte a spusťte na této doméně aplikaci v prostředí Go, Rust, Bun, Java, .NET, Python, Ruby nebo PHP, případně předem sestavenou aplikaci.',
+    'permissionName' => 'Správa aplikací Runway',
+    'permissionDescription' => 'Umožňuje zákazníkovi sestavovat a spouštět aplikace jako služby na pozadí pomocí Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Privilegovaný pomocný program selhal: %%details%%',
+    'errorAccessDenied' => 'Přístup odepřen.',
+    'errorNoDomain' => 'Doména nebyla nalezena.',
+    'errorNoHosting' => 'Doména nemá webhosting.',
+    'errorNotConfigured' => 'Aplikace ještě není nakonfigurována. Nejprve uložte nastavení.',
+    'errorInvalidOperation' => 'Neplatná operace.',
+    'errorInvalidValue' => 'Neplatná hodnota.',
+    'errorPostRequired' => 'Tato akce vyžaduje požadavek POST.',
+    'errorInternal' => 'Došlo k interní chybě. Podrobnosti najdete v protokolu panelu Plesk.',
+    'errorRuntime' => 'Zvolte platné běhové prostředí.',
+    'errorToolchain' => 'Zvolte platnou verzi sady nástrojů.',
+    'errorAppRoot' => 'Kořenový adresář aplikace musí být cesta uvnitř předplatného (písmena, číslice a . _ - @ + /) bez segmentů „.“ a „..“.',
+    'errorBuildCmd' => 'Příkaz pro sestavení je příliš dlouhý nebo obsahuje řídicí znaky.',
+    'errorStartCmd' => 'Příkaz pro spuštění musí být na jednom řádku bez řídicích znaků (max. 1000 znaků).',
+    'errorStartCmdEmpty' => 'K povolení aplikace je vyžadován příkaz pro spuštění.',
+    'errorLimit' => '%%name%% musí být celé číslo v povoleném rozsahu.',
+    'errorEnvLine' => 'Řádek %%line%%: použijte formát KLÍČ=hodnota.',
+    'errorEnvKey' => 'Řádek %%line%%: „%%key%%“ není platný název proměnné.',
+    'errorEnvReserved' => 'Proměnnou %%key%% spravuje Runway a nelze ji nastavit.',
+    'errorEnvLoader' => 'Proměnnou %%key%% zde nelze nastavit; vložte ji do příkazu pro spuštění (např. %%key%%=... ./app).',
+    'errorEnvValue' => 'Hodnota proměnné %%key%% nesmí obsahovat zalomení řádků ani řídicí znaky.',
+    'errorEnvTooMany' => 'Příliš mnoho proměnných prostředí (maximálně 200).',
+    'errorListen' => 'Zvolte platný režim naslouchání.',
+    'errorMode' => 'Zvolte platný režim aplikace.',
+    'errorMountPath' => 'Cesta URL musí být platná cesta, např. /api (písmena, číslice a . _ ~ -).',
+    'errorStaticPaths' => 'Statické cesty musí být seznam cest URL.',
+    'errorStaticPath' => '„%%path%%“ není platná cesta URL (příklad: /assets).',
+    'errorStaticPathsTooMany' => 'Povoleno je nejvýše %%max%% statických cest.',
+    'errorStaticPathsTooLong' => 'Statické cesty jsou dohromady příliš dlouhé (nejvýše %%max%% znaků).',
+    'errorConfigTooLarge' => 'Nastavení je dohromady příliš dlouhé (%%length%% z nejvýše %%max%% znaků): zkraťte příkazy nebo cesty.',
+    'errorHealthPath' => 'Cesta kontroly stavu musí být cesta URL, např. /healthz.',
+    'errorPortRange' => 'První port nesmí být větší než poslední port.',
+    'errorSettingRange' => 'Zadejte celé číslo od %%min%% do %%max%%.',
+    'errorListenMode' => 'Proces na pozadí nenaslouchá: zvolte jako režim naslouchání „Nic“, nebo webový režim s portem TCP či unixovým socketem.',
+    'errorMountPathReserved' => 'Cestu %%path%% používá Plesk (webové statistiky nebo ověření certifikátu) a nelze ji směrovat přes proxy.',
+    'errorMaxApps' => 'Toto předplatné již má maximální počet povolených aplikací (%%max%%).',
+    'errorFetchUrl' => 'Zadejte adresu URL začínající https:// (max. 2048 znaků, bez mezer).',
+    'errorFetchHttps' => 'Stahovat lze pouze z adres https://.',
+    'errorSampleNotEmpty' => 'Kořenový adresář aplikace není prázdný. Potvrďte, že ukázka smí přepsat soubory. %%details%%',
+    'errorSampleUnix' => 'Výchozí server PHP (php -S) nemůže naslouchat na unixovém socketu: nainstalujte sadu nástrojů FrankenPHP nebo zvolte TCP.',
+    'errorFetchSha256' => 'Kontrolní součet SHA-256 musí mít 64 šestnáctkových znaků.',
+    'errorFetchFilename' => 'Název souboru smí obsahovat pouze písmena, číslice a . _ + - (max. 128 znaků).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limit paměti (MiB)',
+    'fieldCpuPercent' => 'Limit CPU (%)',
+    'fieldTasks' => 'Limit procesů / vláken',
+
+    // Messages
+    'messageSavedEnabled' => 'Nastavení bylo uloženo a aplikace se (znovu) spouští.',
+    'messageSavedBuilding' => 'Nastavení bylo uloženo. Aplikace se sestavuje a po úspěšném sestavení bude (znovu) spuštěna; průběh sledujte v protokolu „Sestavení a nasazení“.',
+    'messageSavedBuildNotStarted' => 'Nastavení bylo uloženo, ale sestavení se nepodařilo spustit: %%details%%',
+    'messageSavedDisabled' => 'Nastavení bylo uloženo. Aplikace je zakázána.',
+    'messageAction_start' => 'Aplikace se spouští.',
+    'messageAction_stop' => 'Aplikace byla zastavena. Zůstane zastavená, dokud ji znovu nespustíte.',
+    'messageAction_restart' => 'Aplikace se restartuje.',
+    'messageDeployStarted' => 'Sestavení bylo zahájeno. Průběh sledujte v protokolu „Sestavení a nasazení“.',
+    'messageRemoved' => 'Aplikace byla odebrána.',
+    'messageJobStarted' => 'Úloha byla zahájena. Její průběh je zobrazen níže.',
+    'messageToolchainRemoved' => 'Verze %%version%% byla odebrána.',
+    'messageSampleWritten' => 'Ukázková aplikace byla vytvořena (počet souborů: %%count%%) a nastavení bylo aktualizováno.',
+    'messageSampleWrittenOne' => 'Ukázková aplikace byla vytvořena (jeden soubor) a nastavení bylo aktualizováno.',
+    'messageFetchStarted' => 'Stahování bylo zahájeno. Průběh sledujte v protokolu „Sestavení a nasazení“.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Vypíše nakonfigurované aplikace a jejich stav.',
+    'cli.commands.status' => 'Zobrazí stav aplikace domény: --status <doména>',
+    'cli.commands.start' => 'Spustí aplikaci domény: --start <doména>',
+    'cli.commands.stop' => 'Zastaví aplikaci domény; zůstane zastavená (i po restartu serveru nebo nasazení), dokud nebude spuštěna pomocí --start nebo --restart: --stop <doména>',
+    'cli.commands.restart' => 'Restartuje aplikaci domény: --restart <doména>',
+    'cli.commands.deploy' => 'Sestaví a restartuje aplikaci domény a počká na výsledek (zastavená aplikace se sestaví, ale zůstane zastavená): --deploy <doména> [-no-wait]',
+    'cli.commands.enable' => 'Povolí nakonfigurovanou aplikaci domény: --enable <doména>',
+    'cli.commands.disable' => 'Zakáže aplikaci domény: --disable <doména>',
+    'cli.commands.toolchains' => 'Vypíše nainstalované sady nástrojů a domény, které je používají.',
+    'cli.commands.install-toolchain' => 'Nainstaluje sadu nástrojů a počká na výsledek: --install-toolchain <běhové-prostředí> <verze> [-no-wait]',
+    'cli.commands.reconcile' => 'Uvede služby aplikací do souladu s panelem Plesk (smazané, přejmenované nebo pozastavené domény).',
+];

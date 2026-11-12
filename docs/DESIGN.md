@@ -36,7 +36,7 @@ Runway/
       controllers/ApiController.php         # all JSON endpoints (see §6)
       hooks/{CustomButtons,WebServer,Permissions,ApiCli}.php
       library/                              # Modules_Runway_* : App, Access, Helper, WebConfig, Reconcile, Settings, Log, Runtime, Cli, EventListener.php
-      resources/locales/{en-US,tr-TR}.php   # loaders: server/<locale>.php (lmsg) + app/<locale>.php ('app' section for the frontend)
+      resources/locales/<locale>.php        # 32 Plesk locales; loaders: server/<locale>.php (lmsg) + app/<locale>.php ('app' section for the frontend)
       scripts/{pre-install,post-install,pre-uninstall,reconcile}.php
     sbin/runway-helper                      # python3 root helper (adapter-based)
   examples/{go,rust,bun,java,dotnet,python,ruby,php}-hello/  examples/python-fastapi/
@@ -284,7 +284,8 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 - Polling pauses when `document.hidden` except for 2 min after a user action; status updates
   every 6 s (2 s while a job runs). Confirmations use ui-library `Dialog`, never `window.confirm`.
 - Translations: `src/plib/resources/locales/*.php` key `'app' => [...]` nested per component
-  (`Overview.title`, ...). Turkish and English. Texts produced by the helper are translated through
+  (`Overview.title`, ...). Every Plesk locale (en-US is the reference, tr-TR hand-written, the
+  other 30 machine-translated and reviewed). Texts produced by the helper are translated through
   their keys (`hint_key`, `title_key`, `listener_code`, `health_code`) with the English text as
   fallback; the API client's own errors use `Common.requestFailed`/`Common.unexpectedResponse`.
 

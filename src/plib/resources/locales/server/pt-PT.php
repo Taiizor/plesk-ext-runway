@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Portuguese (Portugal) translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../pt-PT.php; the frontend strings live in ../app/pt-PT.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Instale cadeias de ferramentas e execute aplicações como serviços, sem Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Compile e execute uma aplicação Go, Rust, Bun, Java, .NET, Python, Ruby, PHP ou pré-compilada neste domínio.',
+    'permissionName' => 'Gestão de aplicações Runway',
+    'permissionDescription' => 'Permite ao cliente compilar e executar aplicações como serviços em segundo plano com o Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'O programa auxiliar privilegiado falhou: %%details%%',
+    'errorAccessDenied' => 'Acesso negado.',
+    'errorNoDomain' => 'O domínio não foi encontrado.',
+    'errorNoHosting' => 'O domínio não tem alojamento web.',
+    'errorNotConfigured' => 'A aplicação ainda não está configurada. Guarde primeiro as definições.',
+    'errorInvalidOperation' => 'Operação inválida.',
+    'errorInvalidValue' => 'Valor inválido.',
+    'errorPostRequired' => 'Esta ação requer um pedido POST.',
+    'errorInternal' => 'Ocorreu um erro interno. Os detalhes estão no registo do painel Plesk.',
+    'errorRuntime' => 'Escolha um ambiente de execução válido.',
+    'errorToolchain' => 'Escolha uma versão válida da cadeia de ferramentas.',
+    'errorAppRoot' => 'A raiz da aplicação deve ser um caminho dentro da subscrição (letras, dígitos e . _ - @ + /), sem segmentos "." ou "..".',
+    'errorBuildCmd' => 'O comando de compilação é demasiado longo ou contém caracteres de controlo.',
+    'errorStartCmd' => 'O comando de arranque deve ser uma única linha sem caracteres de controlo (máx. 1000 caracteres).',
+    'errorStartCmdEmpty' => 'É necessário um comando de arranque para ativar a aplicação.',
+    'errorLimit' => '%%name%% deve ser um número inteiro dentro do intervalo permitido.',
+    'errorEnvLine' => 'Linha %%line%%: use o formato CHAVE=valor.',
+    'errorEnvKey' => 'Linha %%line%%: "%%key%%" não é um nome de variável válido.',
+    'errorEnvReserved' => 'A variável %%key%% é gerida pelo Runway e não pode ser definida.',
+    'errorEnvLoader' => 'A variável %%key%% não pode ser definida aqui; coloque-a no comando de arranque (ex.: %%key%%=... ./app).',
+    'errorEnvValue' => 'O valor de %%key%% não pode conter quebras de linha nem caracteres de controlo.',
+    'errorEnvTooMany' => 'Demasiadas variáveis de ambiente (máximo 200).',
+    'errorListen' => 'Escolha um modo de escuta válido.',
+    'errorMode' => 'Escolha um modo de aplicação válido.',
+    'errorMountPath' => 'O caminho de URL deve ser um caminho como /api (letras, dígitos e . _ ~ -).',
+    'errorStaticPaths' => 'Os caminhos estáticos devem ser uma lista de caminhos de URL.',
+    'errorStaticPath' => '"%%path%%" não é um caminho de URL válido (exemplo: /assets).',
+    'errorStaticPathsTooMany' => 'São permitidos no máximo %%max%% caminhos estáticos.',
+    'errorStaticPathsTooLong' => 'Os caminhos estáticos são demasiado longos no total (no máximo %%max%% caracteres).',
+    'errorConfigTooLarge' => 'As definições são demasiado longas no total (%%length%% de um máximo de %%max%% caracteres): encurte os comandos ou os caminhos.',
+    'errorHealthPath' => 'O caminho da verificação de estado deve ser um caminho de URL como /healthz.',
+    'errorPortRange' => 'A primeira porta não pode ser superior à última.',
+    'errorSettingRange' => 'Introduza um número inteiro entre %%min%% e %%max%%.',
+    'errorListenMode' => 'Um worker em segundo plano não escuta em lado nenhum: escolha "Nada" como modo de escuta, ou um modo web com uma porta TCP ou um socket Unix.',
+    'errorMountPathReserved' => '%%path%% é utilizado pelo Plesk (estatísticas web ou validação de certificados) e não pode ser encaminhado por proxy.',
+    'errorMaxApps' => 'Esta subscrição já tem o número máximo de aplicações ativadas (%%max%%).',
+    'errorFetchUrl' => 'Introduza um URL https:// (máx. 2048 caracteres, sem espaços).',
+    'errorFetchHttps' => 'Só é possível transferir URLs https://.',
+    'errorSampleNotEmpty' => 'A raiz da aplicação não está vazia. Confirme que o exemplo pode substituir ficheiros. %%details%%',
+    'errorSampleUnix' => 'O servidor PHP predefinido (php -S) não consegue escutar num socket Unix: instale uma cadeia de ferramentas FrankenPHP ou escolha TCP.',
+    'errorFetchSha256' => 'A soma de verificação SHA-256 deve ter 64 caracteres hexadecimais.',
+    'errorFetchFilename' => 'O nome do ficheiro só pode conter letras, dígitos e . _ + - (máx. 128 caracteres).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limite de memória (MiB)',
+    'fieldCpuPercent' => 'Limite de CPU (%)',
+    'fieldTasks' => 'Limite de processos / threads',
+
+    // Messages
+    'messageSavedEnabled' => 'As definições foram guardadas e a aplicação está a ser (re)iniciada.',
+    'messageSavedBuilding' => 'As definições foram guardadas. A aplicação está a ser compilada e será (re)iniciada quando a compilação tiver êxito; acompanhe-a no registo "Compilação e implementação".',
+    'messageSavedBuildNotStarted' => 'As definições foram guardadas, mas não foi possível iniciar a compilação: %%details%%',
+    'messageSavedDisabled' => 'As definições foram guardadas. A aplicação está desativada.',
+    'messageAction_start' => 'A aplicação está a iniciar.',
+    'messageAction_stop' => 'A aplicação foi parada. Permanece parada até que a inicie novamente.',
+    'messageAction_restart' => 'A aplicação está a reiniciar.',
+    'messageDeployStarted' => 'A compilação começou. Acompanhe-a no registo "Compilação e implementação".',
+    'messageRemoved' => 'A aplicação foi removida.',
+    'messageJobStarted' => 'A tarefa começou. O progresso é apresentado abaixo.',
+    'messageToolchainRemoved' => 'A versão %%version%% foi removida.',
+    'messageSampleWritten' => 'A aplicação de exemplo foi criada (%%count%% ficheiros) e as definições foram atualizadas.',
+    'messageSampleWrittenOne' => 'A aplicação de exemplo foi criada (um ficheiro) e as definições foram atualizadas.',
+    'messageFetchStarted' => 'A transferência começou. Acompanhe-a no registo "Compilação e implementação".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Lista as aplicações configuradas e o respetivo estado.',
+    'cli.commands.status' => 'Mostra o estado da aplicação de um domínio: --status <domínio>',
+    'cli.commands.start' => 'Inicia a aplicação de um domínio: --start <domínio>',
+    'cli.commands.stop' => 'Para a aplicação de um domínio; permanece parada (mesmo após um reinício do sistema ou uma implementação) até --start ou --restart: --stop <domínio>',
+    'cli.commands.restart' => 'Reinicia a aplicação de um domínio: --restart <domínio>',
+    'cli.commands.deploy' => 'Compila e reinicia a aplicação de um domínio e aguarda o resultado (uma aplicação parada é compilada, mas permanece parada): --deploy <domínio> [-no-wait]',
+    'cli.commands.enable' => 'Ativa a aplicação configurada de um domínio: --enable <domínio>',
+    'cli.commands.disable' => 'Desativa a aplicação de um domínio: --disable <domínio>',
+    'cli.commands.toolchains' => 'Lista as cadeias de ferramentas instaladas e os domínios que as utilizam.',
+    'cli.commands.install-toolchain' => 'Instala uma cadeia de ferramentas e aguarda o resultado: --install-toolchain <ambiente-de-execução> <versão> [-no-wait]',
+    'cli.commands.reconcile' => 'Alinha os serviços das aplicações com o Plesk (domínios eliminados, renomeados ou suspensos).',
+];

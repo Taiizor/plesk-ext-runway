@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Filipino (Tagalog) translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../tl-PH.php; the frontend strings live in ../app/tl-PH.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Mag-install ng mga toolchain at patakbuhin ang mga application bilang mga serbisyo, nang walang Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Mag-build at magpatakbo ng Go, Rust, Bun, Java, .NET, Python, Ruby, PHP o prebuilt na application sa domain na ito.',
+    'permissionName' => 'Pamamahala ng mga application ng Runway',
+    'permissionDescription' => 'Pinapayagan ang customer na mag-build at magpatakbo ng mga application bilang mga background service gamit ang Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Nabigo ang privileged helper: %%details%%',
+    'errorAccessDenied' => 'Tinanggihan ang access.',
+    'errorNoDomain' => 'Hindi nahanap ang domain.',
+    'errorNoHosting' => 'Walang web hosting ang domain.',
+    'errorNotConfigured' => 'Hindi pa naka-configure ang application. I-save muna ang mga setting.',
+    'errorInvalidOperation' => 'Hindi wastong operasyon.',
+    'errorInvalidValue' => 'Hindi wastong value.',
+    'errorPostRequired' => 'Kailangan ng POST request ang pagkilos na ito.',
+    'errorInternal' => 'Nagkaroon ng internal na error. Nasa log ng Plesk panel ang mga detalye.',
+    'errorRuntime' => 'Pumili ng wastong runtime.',
+    'errorToolchain' => 'Pumili ng wastong bersyon ng toolchain.',
+    'errorAppRoot' => 'Ang application root ay dapat isang path sa loob ng subscription (mga letra, numero at . _ - @ + /), na walang "." o ".." na segment.',
+    'errorBuildCmd' => 'Masyadong mahaba ang build command o naglalaman ito ng mga control character.',
+    'errorStartCmd' => 'Ang start command ay dapat isang linya lamang na walang control character (max. 1000 character).',
+    'errorStartCmdEmpty' => 'Kailangan ng start command upang paganahin ang application.',
+    'errorLimit' => 'Ang %%name%% ay dapat isang buong numero sa loob ng pinapayagang saklaw.',
+    'errorEnvLine' => 'Linya %%line%%: gamitin ang format na KEY=value.',
+    'errorEnvKey' => 'Linya %%line%%: hindi wastong pangalan ng variable ang "%%key%%".',
+    'errorEnvReserved' => 'Pinamamahalaan ng Runway ang %%key%% at hindi ito maaaring itakda.',
+    'errorEnvLoader' => 'Hindi maaaring itakda ang %%key%% dito; ilagay ito sa start command (hal. %%key%%=... ./app).',
+    'errorEnvValue' => 'Ang value ng %%key%% ay hindi dapat maglaman ng mga line break o control character.',
+    'errorEnvTooMany' => 'Masyadong maraming environment variable (maximum 200).',
+    'errorListen' => 'Pumili ng wastong listen mode.',
+    'errorMode' => 'Pumili ng wastong application mode.',
+    'errorMountPath' => 'Ang mount path ay dapat isang URL path tulad ng /api (mga letra, numero at . _ ~ -).',
+    'errorStaticPaths' => 'Ang mga static path ay dapat isang listahan ng mga URL path.',
+    'errorStaticPath' => 'Hindi wastong URL path ang "%%path%%" (halimbawa: /assets).',
+    'errorStaticPathsTooMany' => 'Hanggang %%max%% static path lamang ang pinapayagan.',
+    'errorStaticPathsTooLong' => 'Masyadong mahaba ang mga static path kapag pinagsama (hanggang %%max%% character lamang).',
+    'errorConfigTooLarge' => 'Masyadong mahaba ang mga setting kapag pinagsama (%%length%% sa maximum na %%max%% character): paikliin ang mga command o path.',
+    'errorHealthPath' => 'Ang health check path ay dapat isang URL path tulad ng /healthz.',
+    'errorPortRange' => 'Ang unang port ay hindi dapat mas mataas kaysa sa huling port.',
+    'errorSettingRange' => 'Maglagay ng buong numero mula %%min%% hanggang %%max%%.',
+    'errorListenMode' => 'Walang listener ang background worker: piliin ang "Wala" bilang listen mode, o isang web mode na may TCP port o Unix socket.',
+    'errorMountPathReserved' => 'Ginagamit ng Plesk ang %%path%% (mga istatistika ng web o pagpapatunay ng certificate) at hindi ito maaaring i-proxy.',
+    'errorMaxApps' => 'Naabot na ng subscription na ito ang maximum na bilang ng mga pinaganang application (%%max%%).',
+    'errorFetchUrl' => 'Maglagay ng https:// URL (max. 2048 character, walang espasyo).',
+    'errorFetchHttps' => 'Mga https:// URL lamang ang maaaring i-download.',
+    'errorSampleNotEmpty' => 'May laman na ang application root. Kumpirmahin na maaaring i-overwrite ng sample ang mga file. %%details%%',
+    'errorSampleUnix' => 'Hindi makakapakinig sa Unix socket ang default na PHP server (php -S): mag-install ng FrankenPHP toolchain o piliin ang TCP.',
+    'errorFetchSha256' => 'Ang SHA-256 checksum ay dapat binubuo ng 64 hexadecimal character.',
+    'errorFetchFilename' => 'Ang pangalan ng file ay maaari lamang maglaman ng mga letra, numero at . _ + - (max. 128 character).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',
+    'fieldCpuPercent' => 'Limitasyon ng CPU (%)',
+    'fieldTasks' => 'Limitasyon ng proseso / thread',
+
+    // Messages
+    'messageSavedEnabled' => 'Na-save ang mga setting at sinisimulan o nire-restart ang application.',
+    'messageSavedBuilding' => 'Na-save ang mga setting. Bini-build ang application at sisimulan o ire-restart ito kapag nagtagumpay ang build; subaybayan ito sa log na "Build at deploy".',
+    'messageSavedBuildNotStarted' => 'Na-save ang mga setting, ngunit hindi masimulan ang build: %%details%%',
+    'messageSavedDisabled' => 'Na-save ang mga setting. Naka-disable ang application.',
+    'messageAction_start' => 'Sinisimulan ang application.',
+    'messageAction_stop' => 'Inihinto ang application. Mananatili itong nakahinto hanggang sa simulan ninyo itong muli.',
+    'messageAction_restart' => 'Nire-restart ang application.',
+    'messageDeployStarted' => 'Nagsimula na ang build. Subaybayan ito sa log na "Build at deploy".',
+    'messageRemoved' => 'Inalis ang application.',
+    'messageJobStarted' => 'Nagsimula na ang job. Makikita sa ibaba ang progreso nito.',
+    'messageToolchainRemoved' => 'Inalis ang %%version%%.',
+    'messageSampleWritten' => 'Naisulat ang sample application (%%count%% file) at na-update ang mga setting.',
+    'messageSampleWrittenOne' => 'Naisulat ang sample application (isang file) at na-update ang mga setting.',
+    'messageFetchStarted' => 'Nagsimula na ang pag-download. Subaybayan ito sa log na "Build at deploy".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Ilista ang mga naka-configure na application at ang status ng mga ito.',
+    'cli.commands.status' => 'Ipakita ang status ng application ng isang domain: --status <domain>',
+    'cli.commands.start' => 'Simulan ang application ng isang domain: --start <domain>',
+    'cli.commands.stop' => 'Ihinto ang application ng isang domain; mananatili itong nakahinto (kahit pagkatapos ng reboot o deployment) hanggang sa --start o --restart: --stop <domain>',
+    'cli.commands.restart' => 'I-restart ang application ng isang domain: --restart <domain>',
+    'cli.commands.deploy' => 'I-build at i-restart ang application ng isang domain at hintayin ang resulta (ang nakahintong application ay bini-build ngunit mananatiling nakahinto): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'Paganahin ang naka-configure na application ng isang domain: --enable <domain>',
+    'cli.commands.disable' => 'I-disable ang application ng isang domain: --disable <domain>',
+    'cli.commands.toolchains' => 'Ilista ang mga naka-install na toolchain at ang mga domain na gumagamit ng mga ito.',
+    'cli.commands.install-toolchain' => 'Mag-install ng toolchain at hintayin ang resulta: --install-toolchain <runtime> <bersyon> [-no-wait]',
+    'cli.commands.reconcile' => 'Itugma ang mga serbisyo ng application sa Plesk (mga domain na binura, pinalitan ng pangalan o na-suspend).',
+];

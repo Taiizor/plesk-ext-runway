@@ -67,6 +67,10 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
   or archives can be fetched from an HTTPS URL (optional SHA-256 check).
 - Trigger files for Git and CI deployments.
 
+**Languages**: the interface follows the panel language, in all 32 languages of Plesk. English and
+Turkish are written by hand; the other 30 were machine-translated and reviewed, and corrections
+from native speakers are welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+
 ## Requirements
 
 - Plesk Obsidian **18.0.55** or newer on Linux with **systemd**: Ubuntu 22.04/24.04, Debian 12,
@@ -441,7 +445,7 @@ Repository layout:
 ### Tests
 
 ```sh
-python tests/check_locales.py      # every locale key exists in English and Turkish
+python tests/check_locales.py      # every locale defines the keys and placeholders of en-US
 scripts/plesk-dev.sh test          # everything CI runs, against the local container
 bash tests/api-smoke.sh            # JSON API through the panel (RUNWAY_SMOKE_DEPLOY=1 also deploys)
 bash tests/runtime-e2e.sh          # sample app of every runtime, tcp + unix, through nginx; path

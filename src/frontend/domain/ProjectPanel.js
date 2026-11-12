@@ -7,7 +7,7 @@ import {
     Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
-import { isObject, unixPossible } from '../lib/format';
+import { isObject, runtimeName, unixPossible } from '../lib/format';
 import ErrorAlert from '../components/ErrorAlert';
 import Facts from '../components/Facts';
 import Mono from '../components/Mono';
@@ -95,7 +95,7 @@ const SampleDrawer = ({ isOpen, runtimes, initial, notEmpty, unixFor, busy, erro
             <ErrorAlert error={error && !error.fieldErrors ? error : null} />
             {askForce && <Alert intent="warning"><Translate content="Domain.project.sampleNotEmpty" /></Alert>}
             <FormFieldSelect name="runtime" label={<Translate content="Domain.form.runtime" />} required>
-                {runtimes.map(meta => <SelectOption key={meta.key} value={meta.key}>{meta.label}</SelectOption>)}
+                {runtimes.map(meta => <SelectOption key={meta.key} value={meta.key}>{runtimeName(translate, meta)}</SelectOption>)}
             </FormFieldSelect>
             <FormFieldSelect
                 name="listen"
@@ -168,12 +168,14 @@ const FetchDrawer = ({ isOpen, busy, error, onSubmit, onClose }) => {
                 placeholder="https://"
                 size="fill"
                 required
+                inputProps={{ spellCheck: false, dir: 'ltr' }}
             />
             <FormFieldText
                 name="sha256"
                 label={<Translate content="Domain.project.fetchSha256" />}
                 description={<Translate content="Domain.project.fetchSha256Hint" />}
                 size="fill"
+                inputProps={{ spellCheck: false, dir: 'ltr' }}
             />
             <FormFieldCheckbox
                 name="extract"
@@ -202,6 +204,7 @@ FetchDrawer.defaultProps = {
  * create a sample application or download a prebuilt binary.
  */
 const ProjectPanel = ({ data, runtimes, drawer, busy, error, onOpen, onClose, onSample, onFetch }) => {
+    const translate = useTranslate();
     // The helper answers {error} when it could not inspect the application root (unreadable for
     // the system user, timeout): that is not an empty directory.
     const inspectError = isObject(data.inspect) && typeof data.inspect.error === 'string' ? data.inspect.error : null;
@@ -226,7 +229,7 @@ const ProjectPanel = ({ data, runtimes, drawer, busy, error, onOpen, onClose, on
             ) : (
                 entries.length ? (
                     <div>
-                        {entries.slice(0, MAX_ENTRIES).map(name => <span key={name} style={chipStyle}>{name}</span>)}
+                        {entries.slice(0, MAX_ENTRIES).map(name => <span key={name} dir="ltr" style={chipStyle}>{name}</span>)}
                         {entryCount > Math.min(entries.length, MAX_ENTRIES) && (
                             <Text fontSize="sm">
                                 {inspect.more
@@ -245,7 +248,7 @@ const ProjectPanel = ({ data, runtimes, drawer, busy, error, onOpen, onClose, on
                 <div>
                     {detected.map(item => (
                         <div key={item.meta.key} style={{ marginBottom: '4px' }}>
-                            <Label intent={item.meta.key === config.runtime ? 'success' : 'info'} view="light">{item.meta.label}</Label>
+                            <Label intent={item.meta.key === config.runtime ? 'success' : 'info'} view="light">{runtimeName(translate, item.meta)}</Label>
                             {item.facts.length > 0 && <Text fontSize="sm">{` ${item.facts.join(' · ')}`}</Text>}
                         </div>
                     ))}

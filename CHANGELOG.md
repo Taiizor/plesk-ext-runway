@@ -40,7 +40,9 @@ was renamed to Runway (extension id `runway`, units `runway-*`, paths under `/op
 - `manage_runway_apps` permission for service plans and subscriptions.
 - Reconciliation with Plesk on domain deletion, rename, system user change and suspension
   (also of customer and reseller accounts), plus a scheduled reconcile every 10 minutes.
-- English and Turkish translations.
+- User interface in every Plesk language (32 locales): English and Turkish by hand, the other
+  30 machine-translated with a review pass. In the right-to-left languages (Arabic, Hebrew)
+  commands, paths, variables and logs stay left-to-right.
 - Examples for every runtime in `examples/`, CI (lint, package, end-to-end tests in the official
   Plesk container), CodeQL analysis, Dependabot and tag-based GitHub releases whose notes are
   generated from this file and the merged pull requests.

@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Swedish translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../sv-SE.php; the frontend strings live in ../app/sv-SE.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Installera verktygskedjor och kör applikationer som tjänster, utan Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Bygg och kör en Go-, Rust-, Bun-, Java-, .NET-, Python-, Ruby-, PHP- eller förkompilerad applikation på den här domänen.',
+    'permissionName' => 'Hantering av Runway-applikationer',
+    'permissionDescription' => 'Låter kunden bygga och köra applikationer som bakgrundstjänster med Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Det privilegierade hjälpprogrammet misslyckades: %%details%%',
+    'errorAccessDenied' => 'Åtkomst nekad.',
+    'errorNoDomain' => 'Domänen hittades inte.',
+    'errorNoHosting' => 'Domänen har inget webbhotell.',
+    'errorNotConfigured' => 'Applikationen är inte konfigurerad ännu. Spara inställningarna först.',
+    'errorInvalidOperation' => 'Ogiltig åtgärd.',
+    'errorInvalidValue' => 'Ogiltigt värde.',
+    'errorPostRequired' => 'Den här åtgärden kräver en POST-förfrågan.',
+    'errorInternal' => 'Ett internt fel uppstod. Detaljer finns i Plesk-panelens logg.',
+    'errorRuntime' => 'Välj en giltig körmiljö.',
+    'errorToolchain' => 'Välj en giltig version av verktygskedjan.',
+    'errorAppRoot' => 'Applikationsroten måste vara en sökväg inom abonnemanget (bokstäver, siffror och . _ - @ + /), utan segmenten "." eller "..".',
+    'errorBuildCmd' => 'Byggkommandot är för långt eller innehåller kontrolltecken.',
+    'errorStartCmd' => 'Startkommandot måste vara en enda rad utan kontrolltecken (max 1000 tecken).',
+    'errorStartCmdEmpty' => 'Ett startkommando krävs för att aktivera applikationen.',
+    'errorLimit' => '%%name%% måste vara ett heltal inom det tillåtna intervallet.',
+    'errorEnvLine' => 'Rad %%line%%: använd formatet NYCKEL=värde.',
+    'errorEnvKey' => 'Rad %%line%%: "%%key%%" är inte ett giltigt variabelnamn.',
+    'errorEnvReserved' => '%%key%% hanteras av Runway och kan inte anges.',
+    'errorEnvLoader' => '%%key%% kan inte anges här; lägg den i startkommandot (t.ex. %%key%%=... ./app).',
+    'errorEnvValue' => 'Värdet för %%key%% får inte innehålla radbrytningar eller kontrolltecken.',
+    'errorEnvTooMany' => 'För många miljövariabler (högst 200).',
+    'errorListen' => 'Välj ett giltigt lyssningsläge.',
+    'errorMode' => 'Välj ett giltigt applikationsläge.',
+    'errorMountPath' => 'URL-sökvägen måste vara en sökväg som /api (bokstäver, siffror och . _ ~ -).',
+    'errorStaticPaths' => 'Statiska sökvägar måste vara en lista med URL-sökvägar.',
+    'errorStaticPath' => '"%%path%%" är inte en giltig URL-sökväg (exempel: /assets).',
+    'errorStaticPathsTooMany' => 'Högst %%max%% statiska sökvägar tillåts.',
+    'errorStaticPathsTooLong' => 'De statiska sökvägarna är tillsammans för långa (högst %%max%% tecken).',
+    'errorConfigTooLarge' => 'Inställningarna är tillsammans för långa (%%length%% av högst %%max%% tecken): korta ned kommandona eller sökvägarna.',
+    'errorHealthPath' => 'Sökvägen för hälsokontrollen måste vara en URL-sökväg som /healthz.',
+    'errorPortRange' => 'Den första porten får inte vara större än den sista porten.',
+    'errorSettingRange' => 'Ange ett heltal mellan %%min%% och %%max%%.',
+    'errorListenMode' => 'En bakgrundsprocess har ingen lyssnare: välj "Inget" som lyssningsläge, eller ett webbläge med TCP-port eller Unix-socket.',
+    'errorMountPathReserved' => '%%path%% används av Plesk (webbstatistik eller certifikatvalidering) och kan inte vidarebefordras via proxy.',
+    'errorMaxApps' => 'Det här abonnemanget har redan nått det högsta tillåtna antalet aktiverade applikationer (%%max%%).',
+    'errorFetchUrl' => 'Ange en URL som börjar med https:// (max 2048 tecken, utan blanksteg).',
+    'errorFetchHttps' => 'Endast URL:er som börjar med https:// kan laddas ned.',
+    'errorSampleNotEmpty' => 'Applikationsroten är inte tom. Bekräfta att exemplet får skriva över filer. %%details%%',
+    'errorSampleUnix' => 'PHP:s standardserver (php -S) kan inte lyssna på en Unix-socket: installera en FrankenPHP-verktygskedja eller välj TCP.',
+    'errorFetchSha256' => 'SHA-256-kontrollsumman måste bestå av 64 hexadecimala tecken.',
+    'errorFetchFilename' => 'Filnamnet får endast innehålla bokstäver, siffror och . _ + - (max 128 tecken).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Minnesgräns (MiB)',
+    'fieldCpuPercent' => 'CPU-gräns (%)',
+    'fieldTasks' => 'Process-/trådgräns',
+
+    // Messages
+    'messageSavedEnabled' => 'Inställningarna sparades och applikationen startas (om).',
+    'messageSavedBuilding' => 'Inställningarna sparades. Applikationen byggs och startas (om) när bygget lyckas; följ förloppet i loggen "Bygge och driftsättning".',
+    'messageSavedBuildNotStarted' => 'Inställningarna sparades, men bygget kunde inte startas: %%details%%',
+    'messageSavedDisabled' => 'Inställningarna sparades. Applikationen är inaktiverad.',
+    'messageAction_start' => 'Applikationen startas.',
+    'messageAction_stop' => 'Applikationen stoppades. Den förblir stoppad tills du startar den igen.',
+    'messageAction_restart' => 'Applikationen startas om.',
+    'messageDeployStarted' => 'Bygget har startat. Följ förloppet i loggen "Bygge och driftsättning".',
+    'messageRemoved' => 'Applikationen togs bort.',
+    'messageJobStarted' => 'Jobbet har startat. Förloppet visas nedan.',
+    'messageToolchainRemoved' => '%%version%% togs bort.',
+    'messageSampleWritten' => 'Exempelapplikationen skapades (%%count%% filer) och inställningarna uppdaterades.',
+    'messageSampleWrittenOne' => 'Exempelapplikationen skapades (en fil) och inställningarna uppdaterades.',
+    'messageFetchStarted' => 'Nedladdningen har startat. Följ förloppet i loggen "Bygge och driftsättning".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Listar de konfigurerade applikationerna och deras status.',
+    'cli.commands.status' => 'Visar status för en domäns applikation: --status <domän>',
+    'cli.commands.start' => 'Startar en domäns applikation: --start <domän>',
+    'cli.commands.stop' => 'Stoppar en domäns applikation; den förblir stoppad (även efter en omstart av servern eller en driftsättning) tills --start eller --restart körs: --stop <domän>',
+    'cli.commands.restart' => 'Startar om en domäns applikation: --restart <domän>',
+    'cli.commands.deploy' => 'Bygger och startar om en domäns applikation och väntar på resultatet (en stoppad applikation byggs men förblir stoppad): --deploy <domän> [-no-wait]',
+    'cli.commands.enable' => 'Aktiverar en domäns konfigurerade applikation: --enable <domän>',
+    'cli.commands.disable' => 'Inaktiverar en domäns applikation: --disable <domän>',
+    'cli.commands.toolchains' => 'Listar de installerade verktygskedjorna och domänerna som använder dem.',
+    'cli.commands.install-toolchain' => 'Installerar en verktygskedja och väntar på resultatet: --install-toolchain <körmiljö> <version> [-no-wait]',
+    'cli.commands.reconcile' => 'Synkroniserar applikationstjänsterna med Plesk (borttagna, omdöpta eller avstängda domäner).',
+];

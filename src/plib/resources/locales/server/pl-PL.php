@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Polish translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../pl-PL.php; the frontend strings live in ../app/pl-PL.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Instaluj zestawy narzędzi i uruchamiaj aplikacje jako usługi, bez Dockera.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Kompiluj i uruchamiaj w tej domenie aplikacje Go, Rust, Bun, Java, .NET, Python, Ruby, PHP lub gotowe pliki binarne.',
+    'permissionName' => 'Zarządzanie aplikacjami Runway',
+    'permissionDescription' => 'Pozwala klientowi kompilować i uruchamiać aplikacje jako usługi w tle za pomocą Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Uprzywilejowany program pomocniczy zgłosił błąd: %%details%%',
+    'errorAccessDenied' => 'Odmowa dostępu.',
+    'errorNoDomain' => 'Nie znaleziono domeny.',
+    'errorNoHosting' => 'Domena nie ma hostingu WWW.',
+    'errorNotConfigured' => 'Aplikacja nie jest jeszcze skonfigurowana. Najpierw zapisz ustawienia.',
+    'errorInvalidOperation' => 'Nieprawidłowa operacja.',
+    'errorInvalidValue' => 'Nieprawidłowa wartość.',
+    'errorPostRequired' => 'Ta akcja wymaga żądania POST.',
+    'errorInternal' => 'Wystąpił błąd wewnętrzny. Szczegóły znajdują się w dzienniku panelu Plesk.',
+    'errorRuntime' => 'Wybierz prawidłowe środowisko uruchomieniowe.',
+    'errorToolchain' => 'Wybierz prawidłową wersję zestawu narzędzi.',
+    'errorAppRoot' => 'Katalog główny aplikacji musi być ścieżką wewnątrz subskrypcji (litery, cyfry oraz . _ - @ + /), bez segmentów „.” ani „..”.',
+    'errorBuildCmd' => 'Polecenie kompilacji jest za długie lub zawiera znaki sterujące.',
+    'errorStartCmd' => 'Polecenie startowe musi być pojedynczym wierszem bez znaków sterujących (maks. 1000 znaków).',
+    'errorStartCmdEmpty' => 'Do włączenia aplikacji wymagane jest polecenie startowe.',
+    'errorLimit' => '%%name%% musi być liczbą całkowitą z dozwolonego zakresu.',
+    'errorEnvLine' => 'Wiersz %%line%%: użyj formatu KLUCZ=wartość.',
+    'errorEnvKey' => 'Wiersz %%line%%: „%%key%%” nie jest prawidłową nazwą zmiennej.',
+    'errorEnvReserved' => 'Zmienna %%key%% jest zarządzana przez Runway i nie można jej ustawić.',
+    'errorEnvLoader' => 'Zmiennej %%key%% nie można ustawić tutaj; umieść ją w poleceniu startowym (np. %%key%%=... ./app).',
+    'errorEnvValue' => 'Wartość %%key%% nie może zawierać znaków nowego wiersza ani znaków sterujących.',
+    'errorEnvTooMany' => 'Za dużo zmiennych środowiskowych (maksymalnie 200).',
+    'errorListen' => 'Wybierz prawidłowy tryb nasłuchiwania.',
+    'errorMode' => 'Wybierz prawidłowy tryb aplikacji.',
+    'errorMountPath' => 'Ścieżka URL musi mieć postać taką jak /api (litery, cyfry oraz . _ ~ -).',
+    'errorStaticPaths' => 'Ścieżki statyczne muszą być listą ścieżek URL.',
+    'errorStaticPath' => '„%%path%%” nie jest prawidłową ścieżką URL (przykład: /assets).',
+    'errorStaticPathsTooMany' => 'Dozwolonych jest maksymalnie %%max%% ścieżek statycznych.',
+    'errorStaticPathsTooLong' => 'Ścieżki statyczne są łącznie za długie (maksymalnie %%max%% znaków).',
+    'errorConfigTooLarge' => 'Ustawienia są łącznie za długie (%%length%% z maksymalnie %%max%% znaków): skróć polecenia lub ścieżki.',
+    'errorHealthPath' => 'Ścieżka kontroli stanu musi być ścieżką URL, np. /healthz.',
+    'errorPortRange' => 'Pierwszy port nie może być większy niż ostatni port.',
+    'errorSettingRange' => 'Wprowadź liczbę całkowitą od %%min%% do %%max%%.',
+    'errorListenMode' => 'Proces w tle nie nasłuchuje: wybierz „Nic” jako tryb nasłuchiwania albo tryb WWW z portem TCP lub gniazdem uniksowym.',
+    'errorMountPathReserved' => 'Ścieżka %%path%% jest używana przez Plesk (statystyki WWW lub walidacja certyfikatów) i nie może być przekazywana przez proxy.',
+    'errorMaxApps' => 'Ta subskrypcja ma już maksymalną liczbę włączonych aplikacji (%%max%%).',
+    'errorFetchUrl' => 'Wprowadź adres URL https:// (maks. 2048 znaków, bez spacji).',
+    'errorFetchHttps' => 'Pobierać można tylko z adresów URL https://.',
+    'errorSampleNotEmpty' => 'Katalog główny aplikacji nie jest pusty. Potwierdź, że przykładowa aplikacja może nadpisać pliki. %%details%%',
+    'errorSampleUnix' => 'Domyślny serwer PHP (php -S) nie może nasłuchiwać na gnieździe uniksowym: zainstaluj zestaw narzędzi FrankenPHP lub wybierz TCP.',
+    'errorFetchSha256' => 'Suma kontrolna SHA-256 musi składać się z 64 znaków szesnastkowych.',
+    'errorFetchFilename' => 'Nazwa pliku może zawierać tylko litery, cyfry oraz . _ + - (maks. 128 znaków).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Limit pamięci (MiB)',
+    'fieldCpuPercent' => 'Limit CPU (%)',
+    'fieldTasks' => 'Limit procesów / wątków',
+
+    // Messages
+    'messageSavedEnabled' => 'Ustawienia zostały zapisane, a aplikacja jest (ponownie) uruchamiana.',
+    'messageSavedBuilding' => 'Ustawienia zostały zapisane. Aplikacja jest kompilowana i zostanie (ponownie) uruchomiona, gdy kompilacja się powiedzie; śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+    'messageSavedBuildNotStarted' => 'Ustawienia zostały zapisane, ale nie udało się rozpocząć kompilacji: %%details%%',
+    'messageSavedDisabled' => 'Ustawienia zostały zapisane. Aplikacja jest wyłączona.',
+    'messageAction_start' => 'Aplikacja jest uruchamiana.',
+    'messageAction_stop' => 'Aplikacja została zatrzymana. Pozostanie zatrzymana, dopóki nie uruchomisz jej ponownie.',
+    'messageAction_restart' => 'Aplikacja jest ponownie uruchamiana.',
+    'messageDeployStarted' => 'Kompilacja została rozpoczęta. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+    'messageRemoved' => 'Aplikacja została usunięta.',
+    'messageJobStarted' => 'Zadanie zostało rozpoczęte. Jego postęp jest wyświetlany poniżej.',
+    'messageToolchainRemoved' => 'Usunięto %%version%%.',
+    'messageSampleWritten' => 'Przykładowa aplikacja została zapisana (liczba plików: %%count%%), a ustawienia zostały zaktualizowane.',
+    'messageSampleWrittenOne' => 'Przykładowa aplikacja została zapisana (jeden plik), a ustawienia zostały zaktualizowane.',
+    'messageFetchStarted' => 'Pobieranie zostało rozpoczęte. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Wyświetla skonfigurowane aplikacje i ich stan.',
+    'cli.commands.status' => 'Pokazuje stan aplikacji domeny: --status <domena>',
+    'cli.commands.start' => 'Uruchamia aplikację domeny: --start <domena>',
+    'cli.commands.stop' => 'Zatrzymuje aplikację domeny; pozostaje zatrzymana (także po ponownym uruchomieniu serwera lub wdrożeniu) do czasu użycia --start lub --restart: --stop <domena>',
+    'cli.commands.restart' => 'Ponownie uruchamia aplikację domeny: --restart <domena>',
+    'cli.commands.deploy' => 'Kompiluje i ponownie uruchamia aplikację domeny oraz czeka na wynik (zatrzymana aplikacja jest kompilowana, ale pozostaje zatrzymana): --deploy <domena> [-no-wait]',
+    'cli.commands.enable' => 'Włącza skonfigurowaną aplikację domeny: --enable <domena>',
+    'cli.commands.disable' => 'Wyłącza aplikację domeny: --disable <domena>',
+    'cli.commands.toolchains' => 'Wyświetla zainstalowane zestawy narzędzi i domeny, które ich używają.',
+    'cli.commands.install-toolchain' => 'Instaluje zestaw narzędzi i czeka na wynik: --install-toolchain <środowisko> <wersja> [-no-wait]',
+    'cli.commands.reconcile' => 'Uzgadnia stan usług aplikacji z Plesk (usunięte, przemianowane lub zawieszone domeny).',
+];

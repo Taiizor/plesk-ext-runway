@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// German translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../de-DE.php; the frontend strings live in ../app/de-DE.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Toolchains installieren und Anwendungen ohne Docker als Dienste ausführen.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Eine Go-, Rust-, Bun-, Java-, .NET-, Python-, Ruby-, PHP- oder vorkompilierte Anwendung auf dieser Domain bauen und ausführen.',
+    'permissionName' => 'Verwaltung von Runway-Anwendungen',
+    'permissionDescription' => 'Erlaubt dem Kunden, mit Runway Anwendungen zu bauen und als Hintergrunddienste auszuführen.',
+
+    // Errors
+    'errorHelperFailed' => 'Das privilegierte Hilfsprogramm ist fehlgeschlagen: %%details%%',
+    'errorAccessDenied' => 'Zugriff verweigert.',
+    'errorNoDomain' => 'Die Domain wurde nicht gefunden.',
+    'errorNoHosting' => 'Die Domain hat kein Webhosting.',
+    'errorNotConfigured' => 'Die Anwendung ist noch nicht konfiguriert. Speichern Sie zuerst die Einstellungen.',
+    'errorInvalidOperation' => 'Ungültiger Vorgang.',
+    'errorInvalidValue' => 'Ungültiger Wert.',
+    'errorPostRequired' => 'Diese Aktion erfordert eine POST-Anfrage.',
+    'errorInternal' => 'Ein interner Fehler ist aufgetreten. Details finden Sie im Plesk-Panel-Protokoll.',
+    'errorRuntime' => 'Wählen Sie eine gültige Laufzeitumgebung.',
+    'errorToolchain' => 'Wählen Sie eine gültige Toolchain-Version.',
+    'errorAppRoot' => 'Der Anwendungsstamm muss ein Pfad innerhalb des Abonnements sein (Buchstaben, Ziffern und . _ - @ + /), ohne „.“- oder „..“-Segmente.',
+    'errorBuildCmd' => 'Der Build-Befehl ist zu lang oder enthält Steuerzeichen.',
+    'errorStartCmd' => 'Der Startbefehl muss aus einer einzigen Zeile ohne Steuerzeichen bestehen (max. 1000 Zeichen).',
+    'errorStartCmdEmpty' => 'Zum Aktivieren der Anwendung ist ein Startbefehl erforderlich.',
+    'errorLimit' => '%%name%% muss eine ganze Zahl innerhalb des zulässigen Bereichs sein.',
+    'errorEnvLine' => 'Zeile %%line%%: Verwenden Sie das Format SCHLÜSSEL=Wert.',
+    'errorEnvKey' => 'Zeile %%line%%: „%%key%%“ ist kein gültiger Variablenname.',
+    'errorEnvReserved' => '%%key%% wird von Runway verwaltet und kann nicht gesetzt werden.',
+    'errorEnvLoader' => '%%key%% kann hier nicht gesetzt werden; setzen Sie die Variable im Startbefehl (z. B. %%key%%=... ./app).',
+    'errorEnvValue' => 'Der Wert von %%key%% darf keine Zeilenumbrüche oder Steuerzeichen enthalten.',
+    'errorEnvTooMany' => 'Zu viele Umgebungsvariablen (maximal 200).',
+    'errorListen' => 'Wählen Sie einen gültigen Listen-Modus.',
+    'errorMode' => 'Wählen Sie einen gültigen Anwendungsmodus.',
+    'errorMountPath' => 'Der URL-Pfad muss wie /api aufgebaut sein (Buchstaben, Ziffern und . _ ~ -).',
+    'errorStaticPaths' => 'Statische Pfade müssen eine Liste von URL-Pfaden sein.',
+    'errorStaticPath' => '„%%path%%“ ist kein gültiger URL-Pfad (Beispiel: /assets).',
+    'errorStaticPathsTooMany' => 'Es sind höchstens %%max%% statische Pfade erlaubt.',
+    'errorStaticPathsTooLong' => 'Die statischen Pfade sind zusammen zu lang (höchstens %%max%% Zeichen).',
+    'errorConfigTooLarge' => 'Die Einstellungen sind zusammen zu lang (%%length%% von höchstens %%max%% Zeichen): Kürzen Sie die Befehle oder die Pfade.',
+    'errorHealthPath' => 'Der Health-Check-Pfad muss ein URL-Pfad wie /healthz sein.',
+    'errorPortRange' => 'Der erste Port darf nicht größer als der letzte Port sein.',
+    'errorSettingRange' => 'Geben Sie eine ganze Zahl zwischen %%min%% und %%max%% ein.',
+    'errorListenMode' => 'Ein Hintergrund-Worker hat keinen Listener: Wählen Sie als Listen-Modus „Nichts“ oder einen Web-Modus mit TCP-Port oder Unix-Socket.',
+    'errorMountPathReserved' => '%%path%% wird von Plesk verwendet (Webstatistiken oder Zertifikatsvalidierung) und kann nicht per Proxy weitergeleitet werden.',
+    'errorMaxApps' => 'Dieses Abonnement hat bereits die maximale Anzahl aktivierter Anwendungen (%%max%%).',
+    'errorFetchUrl' => 'Geben Sie eine https://-URL ein (max. 2048 Zeichen, ohne Leerzeichen).',
+    'errorFetchHttps' => 'Es können nur https://-URLs heruntergeladen werden.',
+    'errorSampleNotEmpty' => 'Der Anwendungsstamm ist nicht leer. Bestätigen Sie, dass das Beispiel Dateien überschreiben darf. %%details%%',
+    'errorSampleUnix' => 'Der Standard-PHP-Server (php -S) kann nicht auf einem Unix-Socket lauschen: Installieren Sie eine FrankenPHP-Toolchain oder wählen Sie TCP.',
+    'errorFetchSha256' => 'Die SHA-256-Prüfsumme muss aus 64 Hexadezimalzeichen bestehen.',
+    'errorFetchFilename' => 'Der Dateiname darf nur Buchstaben, Ziffern und . _ + - enthalten (max. 128 Zeichen).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Speicherlimit (MiB)',
+    'fieldCpuPercent' => 'CPU-Limit (%)',
+    'fieldTasks' => 'Prozess-/Thread-Limit',
+
+    // Messages
+    'messageSavedEnabled' => 'Die Einstellungen wurden gespeichert und die Anwendung wird (neu) gestartet.',
+    'messageSavedBuilding' => 'Die Einstellungen wurden gespeichert. Die Anwendung wird gebaut und nach erfolgreichem Build (neu) gestartet; verfolgen Sie den Vorgang im Protokoll „Build & Bereitstellung“.',
+    'messageSavedBuildNotStarted' => 'Die Einstellungen wurden gespeichert, aber der Build konnte nicht gestartet werden: %%details%%',
+    'messageSavedDisabled' => 'Die Einstellungen wurden gespeichert. Die Anwendung ist deaktiviert.',
+    'messageAction_start' => 'Die Anwendung wird gestartet.',
+    'messageAction_stop' => 'Die Anwendung wurde gestoppt. Sie bleibt gestoppt, bis Sie sie erneut starten.',
+    'messageAction_restart' => 'Die Anwendung wird neu gestartet.',
+    'messageDeployStarted' => 'Der Build wurde gestartet. Verfolgen Sie ihn im Protokoll „Build & Bereitstellung“.',
+    'messageRemoved' => 'Die Anwendung wurde entfernt.',
+    'messageJobStarted' => 'Der Job wurde gestartet. Sein Fortschritt wird unten angezeigt.',
+    'messageToolchainRemoved' => '%%version%% wurde entfernt.',
+    'messageSampleWritten' => 'Die Beispielanwendung wurde geschrieben (%%count%% Dateien) und die Einstellungen wurden aktualisiert.',
+    'messageSampleWrittenOne' => 'Die Beispielanwendung wurde geschrieben (eine Datei) und die Einstellungen wurden aktualisiert.',
+    'messageFetchStarted' => 'Der Download wurde gestartet. Verfolgen Sie ihn im Protokoll „Build & Bereitstellung“.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Listet die konfigurierten Anwendungen und ihren Status auf.',
+    'cli.commands.status' => 'Zeigt den Status der Anwendung einer Domain: --status <domain>',
+    'cli.commands.start' => 'Startet die Anwendung einer Domain: --start <domain>',
+    'cli.commands.stop' => 'Stoppt die Anwendung einer Domain; sie bleibt gestoppt (auch nach einem Server-Neustart oder einer Bereitstellung), bis --start oder --restart aufgerufen wird: --stop <domain>',
+    'cli.commands.restart' => 'Startet die Anwendung einer Domain neu: --restart <domain>',
+    'cli.commands.deploy' => 'Baut die Anwendung einer Domain, startet sie neu und wartet auf das Ergebnis (eine gestoppte Anwendung wird gebaut, bleibt aber gestoppt): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'Aktiviert die konfigurierte Anwendung einer Domain: --enable <domain>',
+    'cli.commands.disable' => 'Deaktiviert die Anwendung einer Domain: --disable <domain>',
+    'cli.commands.toolchains' => 'Listet die installierten Toolchains und die Domains auf, die sie verwenden.',
+    'cli.commands.install-toolchain' => 'Installiert eine Toolchain und wartet auf das Ergebnis: --install-toolchain <laufzeitumgebung> <version> [-no-wait]',
+    'cli.commands.reconcile' => 'Gleicht die Anwendungsdienste mit Plesk ab (gelöschte, umbenannte oder gesperrte Domains).',
+];

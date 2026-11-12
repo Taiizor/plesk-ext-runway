@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Hungarian translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../hu-HU.php; the frontend strings live in ../app/hu-HU.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Telepítsen eszközláncokat, és futtasson alkalmazásokat szolgáltatásként, Docker nélkül.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Állítson össze és futtasson Go, Rust, Bun, Java, .NET, Python, Ruby, PHP vagy előre lefordított alkalmazást ezen a domainen.',
+    'permissionName' => 'Runway-alkalmazások kezelése',
+    'permissionDescription' => 'Lehetővé teszi az ügyfélnek, hogy a Runway segítségével alkalmazásokat állítson össze és futtasson háttérszolgáltatásként.',
+
+    // Errors
+    'errorHelperFailed' => 'A privilegizált segédprogram hibát jelzett: %%details%%',
+    'errorAccessDenied' => 'Hozzáférés megtagadva.',
+    'errorNoDomain' => 'A domain nem található.',
+    'errorNoHosting' => 'A domainhez nem tartozik webtárhely.',
+    'errorNotConfigured' => 'Az alkalmazás még nincs beállítva. Először mentse a beállításokat.',
+    'errorInvalidOperation' => 'Érvénytelen művelet.',
+    'errorInvalidValue' => 'Érvénytelen érték.',
+    'errorPostRequired' => 'Ehhez a művelethez POST-kérés szükséges.',
+    'errorInternal' => 'Belső hiba történt. A részletek a Plesk panel naplójában találhatók.',
+    'errorRuntime' => 'Válasszon érvényes futtatókörnyezetet.',
+    'errorToolchain' => 'Válasszon érvényes eszközláncverziót.',
+    'errorAppRoot' => 'Az alkalmazás gyökérkönyvtárának az előfizetésen belüli elérési útnak kell lennie (betűk, számjegyek és . _ - @ + /), „.” vagy „..” szegmensek nélkül.',
+    'errorBuildCmd' => 'Az összeállítási parancs túl hosszú, vagy vezérlőkaraktereket tartalmaz.',
+    'errorStartCmd' => 'Az indítási parancsnak egyetlen, vezérlőkarakterek nélküli sornak kell lennie (legfeljebb 1000 karakter).',
+    'errorStartCmdEmpty' => 'Az alkalmazás engedélyezéséhez indítási parancs szükséges.',
+    'errorLimit' => 'A(z) „%%name%%” értéke csak a megengedett tartományba eső egész szám lehet.',
+    'errorEnvLine' => '%%line%%. sor: használja a KULCS=érték formátumot.',
+    'errorEnvKey' => '%%line%%. sor: a(z) „%%key%%” nem érvényes változónév.',
+    'errorEnvReserved' => 'A(z) %%key%% változót a Runway kezeli, nem állítható be.',
+    'errorEnvLoader' => 'A(z) %%key%% itt nem állítható be; tegye az indítási parancsba (pl. %%key%%=... ./app).',
+    'errorEnvValue' => 'A(z) %%key%% értéke nem tartalmazhat sortörést vagy vezérlőkaraktert.',
+    'errorEnvTooMany' => 'Túl sok környezeti változó (legfeljebb 200).',
+    'errorListen' => 'Válasszon érvényes figyelési módot.',
+    'errorMode' => 'Válasszon érvényes alkalmazásmódot.',
+    'errorMountPath' => 'Az URL-útvonalnak /api formájúnak kell lennie (betűk, számjegyek és . _ ~ -).',
+    'errorStaticPaths' => 'A statikus útvonalaknak URL-útvonalak listájának kell lenniük.',
+    'errorStaticPath' => 'A(z) „%%path%%” nem érvényes URL-útvonal (példa: /assets).',
+    'errorStaticPathsTooMany' => 'Legfeljebb %%max%% statikus útvonal adható meg.',
+    'errorStaticPathsTooLong' => 'A statikus útvonalak együtt túl hosszúak (legfeljebb %%max%% karakter).',
+    'errorConfigTooLarge' => 'A beállítások együtt túl hosszúak (%%length%% karakter a megengedett %%max%% helyett): rövidítse a parancsokat vagy az útvonalakat.',
+    'errorHealthPath' => 'Az állapot-ellenőrzés útvonalának /healthz formájú URL-útvonalnak kell lennie.',
+    'errorPortRange' => 'Az első port nem lehet nagyobb az utolsó portnál.',
+    'errorSettingRange' => 'Adjon meg egy egész számot %%min%% és %%max%% között.',
+    'errorListenMode' => 'A háttérfolyamatnak nincs figyelője: válassza figyelési módként a „Semmi” lehetőséget, vagy egy webes módot TCP-porttal vagy Unix-sockettel.',
+    'errorMountPathReserved' => 'A(z) %%path%% útvonalat a Plesk használja (webstatisztika vagy tanúsítvány-ellenőrzés), ezért nem továbbítható proxyval.',
+    'errorMaxApps' => 'Ez az előfizetés már elérte az engedélyezett alkalmazások maximális számát (%%max%%).',
+    'errorFetchUrl' => 'Adjon meg egy https:// URL-címet (legfeljebb 2048 karakter, szóközök nélkül).',
+    'errorFetchHttps' => 'Csak https:// URL-címekről lehet letölteni.',
+    'errorSampleNotEmpty' => 'Az alkalmazás gyökérkönyvtára nem üres. Erősítse meg, hogy a mintaalkalmazás felülírhat fájlokat. %%details%%',
+    'errorSampleUnix' => 'Az alapértelmezett PHP-kiszolgáló (php -S) nem tud Unix-socketen figyelni: telepítsen FrankenPHP-eszközláncot, vagy válassza a TCP-t.',
+    'errorFetchSha256' => 'A SHA-256 ellenőrző összegnek 64 hexadecimális karakterből kell állnia.',
+    'errorFetchFilename' => 'A fájlnév csak betűket, számjegyeket és . _ + - karaktereket tartalmazhat (legfeljebb 128 karakter).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Memóriakorlát (MiB)',
+    'fieldCpuPercent' => 'CPU-korlát (%)',
+    'fieldTasks' => 'Folyamat- és szálkorlát',
+
+    // Messages
+    'messageSavedEnabled' => 'A beállítások mentve, az alkalmazás (újra)indítása folyamatban.',
+    'messageSavedBuilding' => 'A beállítások mentve. Az alkalmazás összeállítása folyamatban; ha sikerül, az alkalmazás (újra)indul. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
+    'messageSavedBuildNotStarted' => 'A beállítások mentve, de az összeállítást nem sikerült elindítani: %%details%%',
+    'messageSavedDisabled' => 'A beállítások mentve. Az alkalmazás le van tiltva.',
+    'messageAction_start' => 'Az alkalmazás indul.',
+    'messageAction_stop' => 'Az alkalmazás leállt. Leállítva marad, amíg újra el nem indítja.',
+    'messageAction_restart' => 'Az alkalmazás újraindul.',
+    'messageDeployStarted' => 'Az összeállítás elindult. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
+    'messageRemoved' => 'Az alkalmazás eltávolítva.',
+    'messageJobStarted' => 'A feladat elindult. Az előrehaladása alább látható.',
+    'messageToolchainRemoved' => '%%version%% eltávolítva.',
+    'messageSampleWritten' => 'A mintaalkalmazás létrejött (%%count%% fájl), a beállítások frissültek.',
+    'messageSampleWrittenOne' => 'A mintaalkalmazás létrejött (egy fájl), a beállítások frissültek.',
+    'messageFetchStarted' => 'A letöltés elindult. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'A beállított alkalmazások és állapotuk listázása.',
+    'cli.commands.status' => 'Egy domain alkalmazása állapotának megjelenítése: --status <domain>',
+    'cli.commands.start' => 'Egy domain alkalmazásának indítása: --start <domain>',
+    'cli.commands.stop' => 'Egy domain alkalmazásának leállítása; a --start vagy a --restart parancsig leállítva marad (a kiszolgáló újraindítása vagy üzembe helyezés után is): --stop <domain>',
+    'cli.commands.restart' => 'Egy domain alkalmazásának újraindítása: --restart <domain>',
+    'cli.commands.deploy' => 'Egy domain alkalmazásának összeállítása és újraindítása, az eredmény megvárásával (a leállított alkalmazást összeállítja, de leállítva hagyja): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'Egy domain beállított alkalmazásának engedélyezése: --enable <domain>',
+    'cli.commands.disable' => 'Egy domain alkalmazásának letiltása: --disable <domain>',
+    'cli.commands.toolchains' => 'A telepített eszközláncok és az azokat használó domainek listázása.',
+    'cli.commands.install-toolchain' => 'Eszközlánc telepítése az eredmény megvárásával: --install-toolchain <futtatókörnyezet> <verzió> [-no-wait]',
+    'cli.commands.reconcile' => 'Az alkalmazásszolgáltatások összehangolása a Plesk adataival (törölt, átnevezett vagy felfüggesztett domainek).',
+];

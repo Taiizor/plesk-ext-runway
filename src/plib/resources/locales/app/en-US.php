@@ -68,6 +68,7 @@ return [
         ],
         'binary' => [
             'hint' => 'Upload an executable compiled for Linux (or fetch it from a URL) and set the start command.',
+            'label' => 'Prebuilt binary',
         ],
     ],
     'Overview' => [

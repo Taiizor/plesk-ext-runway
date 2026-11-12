@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Norwegian Bokmål translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../nb-NO.php; the frontend strings live in ../app/nb-NO.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Installer verktøykjeder og kjør applikasjoner som tjenester, uten Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Bygg og kjør en Go-, Rust-, Bun-, Java-, .NET-, Python-, Ruby-, PHP- eller ferdigbygd applikasjon på dette domenet.',
+    'permissionName' => 'Administrasjon av Runway-applikasjoner',
+    'permissionDescription' => 'Lar kunden bygge og kjøre applikasjoner som bakgrunnstjenester med Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Det privilegerte hjelpeprogrammet feilet: %%details%%',
+    'errorAccessDenied' => 'Tilgang nektet.',
+    'errorNoDomain' => 'Domenet ble ikke funnet.',
+    'errorNoHosting' => 'Domenet har ikke webhotell.',
+    'errorNotConfigured' => 'Applikasjonen er ikke konfigurert ennå. Lagre innstillingene først.',
+    'errorInvalidOperation' => 'Ugyldig operasjon.',
+    'errorInvalidValue' => 'Ugyldig verdi.',
+    'errorPostRequired' => 'Denne handlingen krever en POST-forespørsel.',
+    'errorInternal' => 'Det oppstod en intern feil. Detaljer finnes i Plesk-panelets logg.',
+    'errorRuntime' => 'Velg et gyldig kjøretidsmiljø.',
+    'errorToolchain' => 'Velg en gyldig verktøykjedeversjon.',
+    'errorAppRoot' => 'Applikasjonsroten må være en bane inne i abonnementet (bokstaver, sifre og . _ - @ + /), uten segmentene "." eller "..".',
+    'errorBuildCmd' => 'Byggkommandoen er for lang eller inneholder kontrolltegn.',
+    'errorStartCmd' => 'Startkommandoen må være én enkelt linje uten kontrolltegn (maks. 1000 tegn).',
+    'errorStartCmdEmpty' => 'En startkommando er påkrevd for å aktivere applikasjonen.',
+    'errorLimit' => '%%name%% må være et heltall innenfor det tillatte området.',
+    'errorEnvLine' => 'Linje %%line%%: bruk formatet NØKKEL=verdi.',
+    'errorEnvKey' => 'Linje %%line%%: "%%key%%" er ikke et gyldig variabelnavn.',
+    'errorEnvReserved' => '%%key%% administreres av Runway og kan ikke settes.',
+    'errorEnvLoader' => '%%key%% kan ikke settes her; legg den i startkommandoen (f.eks. %%key%%=... ./app).',
+    'errorEnvValue' => 'Verdien til %%key%% kan ikke inneholde linjeskift eller kontrolltegn.',
+    'errorEnvTooMany' => 'For mange miljøvariabler (maksimalt 200).',
+    'errorListen' => 'Velg en gyldig lyttemodus.',
+    'errorMode' => 'Velg en gyldig applikasjonsmodus.',
+    'errorMountPath' => 'URL-banen må være en bane som /api (bokstaver, sifre og . _ ~ -).',
+    'errorStaticPaths' => 'Statiske baner må være en liste over URL-baner.',
+    'errorStaticPath' => '"%%path%%" er ikke en gyldig URL-bane (eksempel: /assets).',
+    'errorStaticPathsTooMany' => 'Maksimalt %%max%% statiske baner er tillatt.',
+    'errorStaticPathsTooLong' => 'De statiske banene er for lange til sammen (maksimalt %%max%% tegn).',
+    'errorConfigTooLarge' => 'Innstillingene er for lange til sammen (%%length%% av maksimalt %%max%% tegn): forkort kommandoene eller banene.',
+    'errorHealthPath' => 'Banen for helsesjekk må være en URL-bane som /healthz.',
+    'errorPortRange' => 'Den første porten kan ikke være større enn den siste porten.',
+    'errorSettingRange' => 'Angi et heltall mellom %%min%% og %%max%%.',
+    'errorListenMode' => 'En bakgrunnsprosess har ingen lytter: velg "Ingenting" som lyttemodus, eller en webmodus med en TCP-port eller en Unix-socket.',
+    'errorMountPathReserved' => '%%path%% brukes av Plesk (webstatistikk eller sertifikatvalidering) og kan ikke sendes via proxy.',
+    'errorMaxApps' => 'Dette abonnementet har allerede maksimalt antall aktiverte applikasjoner (%%max%%).',
+    'errorFetchUrl' => 'Angi en https://-URL (maks. 2048 tegn, uten mellomrom).',
+    'errorFetchHttps' => 'Bare https://-URL-er kan lastes ned.',
+    'errorSampleNotEmpty' => 'Applikasjonsroten er ikke tom. Bekreft at eksemplet kan overskrive filer. %%details%%',
+    'errorSampleUnix' => 'PHPs standardserver (php -S) kan ikke lytte på en Unix-socket: installer en FrankenPHP-verktøykjede eller velg TCP.',
+    'errorFetchSha256' => 'SHA-256-kontrollsummen må bestå av 64 heksadesimale tegn.',
+    'errorFetchFilename' => 'Filnavnet kan bare inneholde bokstaver, sifre og . _ + - (maks. 128 tegn).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Minnegrense (MiB)',
+    'fieldCpuPercent' => 'CPU-grense (%)',
+    'fieldTasks' => 'Prosess-/trådgrense',
+
+    // Messages
+    'messageSavedEnabled' => 'Innstillingene ble lagret, og applikasjonen startes (på nytt).',
+    'messageSavedBuilding' => 'Innstillingene ble lagret. Applikasjonen bygges og startes (på nytt) når bygget lykkes; følg med i loggen "Bygg og utrulling".',
+    'messageSavedBuildNotStarted' => 'Innstillingene ble lagret, men bygget kunne ikke startes: %%details%%',
+    'messageSavedDisabled' => 'Innstillingene ble lagret. Applikasjonen er deaktivert.',
+    'messageAction_start' => 'Applikasjonen starter.',
+    'messageAction_stop' => 'Applikasjonen ble stoppet. Den forblir stoppet til du starter den igjen.',
+    'messageAction_restart' => 'Applikasjonen starter på nytt.',
+    'messageDeployStarted' => 'Bygget har startet. Følg med i loggen "Bygg og utrulling".',
+    'messageRemoved' => 'Applikasjonen ble fjernet.',
+    'messageJobStarted' => 'Jobben har startet. Fremdriften vises nedenfor.',
+    'messageToolchainRemoved' => '%%version%% ble fjernet.',
+    'messageSampleWritten' => 'Eksempelapplikasjonen ble opprettet (%%count%% filer), og innstillingene ble oppdatert.',
+    'messageSampleWrittenOne' => 'Eksempelapplikasjonen ble opprettet (én fil), og innstillingene ble oppdatert.',
+    'messageFetchStarted' => 'Nedlastingen har startet. Følg med i loggen "Bygg og utrulling".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Viser de konfigurerte applikasjonene og tilstanden deres.',
+    'cli.commands.status' => 'Viser tilstanden til applikasjonen på et domene: --status <domene>',
+    'cli.commands.start' => 'Starter applikasjonen på et domene: --start <domene>',
+    'cli.commands.stop' => 'Stopper applikasjonen på et domene; den forblir stoppet (også etter en omstart av serveren eller en utrulling) til --start eller --restart: --stop <domene>',
+    'cli.commands.restart' => 'Starter applikasjonen på et domene på nytt: --restart <domene>',
+    'cli.commands.deploy' => 'Bygger og starter applikasjonen på et domene på nytt og venter på resultatet (en stoppet applikasjon bygges, men forblir stoppet): --deploy <domene> [-no-wait]',
+    'cli.commands.enable' => 'Aktiverer den konfigurerte applikasjonen på et domene: --enable <domene>',
+    'cli.commands.disable' => 'Deaktiverer applikasjonen på et domene: --disable <domene>',
+    'cli.commands.toolchains' => 'Viser de installerte verktøykjedene og domenene som bruker dem.',
+    'cli.commands.install-toolchain' => 'Installerer en verktøykjede og venter på resultatet: --install-toolchain <kjøretidsmiljø> <versjon> [-no-wait]',
+    'cli.commands.reconcile' => 'Bringer applikasjonstjenestene i samsvar med Plesk (slettede, omdøpte eller suspenderte domener).',
+];

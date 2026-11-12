@@ -11,9 +11,9 @@ const style = {
 
 /**
  * Inline monospace text (paths, commands, variables) in the normal text color; the panel's
- * own <code> style is red.
+ * own <code> style is red. Always left-to-right, also in right-to-left panel languages.
  */
-const Mono = ({ children }) => <span style={style}>{children}</span>;
+const Mono = ({ children }) => <span dir="ltr" style={style}>{children}</span>;
 
 Mono.propTypes = {
     children: PropTypes.node,

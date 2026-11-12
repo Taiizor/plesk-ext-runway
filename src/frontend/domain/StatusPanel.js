@@ -157,7 +157,9 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
                 <StateLabel state={state} size="lg" />
                 {deploying && <Label intent="info" size="lg" view="light"><Translate content="Domain.status.deploying" /></Label>}
                 {configured && url && !worker && (
-                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 'auto' }}>
+                    // marginInlineStart: the far end of the row in left-to-right and right-to-left
+                    // panel languages (Arabic, Hebrew).
+                    <a href={url} target="_blank" rel="noopener noreferrer" style={{ marginInlineStart: 'auto' }}>
                         <Translate content="Domain.status.openSite" />
                     </a>
                 )}

@@ -150,9 +150,17 @@ export const firstString = (...values) => {
 };
 
 /**
+ * Wraps a name, version, address or path in Unicode first-strong isolates (U+2068 ... U+2069),
+ * so that it keeps its own direction inside right-to-left text: ".NET" or "/api" would otherwise
+ * show as "NET." or "api/" in Arabic and Hebrew. Invisible in left-to-right languages.
+ */
+export const isolate = value => (value === null || value === undefined || value === '' ? value : `\u2068${value}\u2069`);
+
+/**
  * A text produced by the helper in the user's language: the locale key `key` (with `params`)
  * when the locale has it, else the helper's English `fallback` (docs/DESIGN.md section 7:
- * hint_key, title_key, listener_code, health_code).
+ * hint_key, title_key, listener_code, health_code). Parameters (names, versions, addresses)
+ * are isolated, see isolate().
  */
 // Runtime hints of the helper metadata (hint_key, install_help_key):
 // i18n-keys: Runtime.go.hint Runtime.rust.hint Runtime.rust.installHelp Runtime.bun.hint Runtime.java.hint
@@ -164,7 +172,7 @@ export const helperText = (translate, key, params, fallback) => {
     }
     const values = {};
     Object.keys(isPlainObject(params) ? params : {}).forEach(name => {
-        values[name] = String(params[name]);
+        values[name] = isolate(String(params[name]));
     });
     const text = translate(key, values, fallback || '');
     return (typeof text === 'string' && text !== key) || Array.isArray(text) ? text : (fallback || '');
@@ -177,6 +185,19 @@ export const helperText = (translate, key, params, fallback) => {
 export const jobTitle = (translate, job) => (
     job && job.title_key ? helperText(translate, `Common.jobTitle.${job.title_key}`, job.title_params, job.title || '') : ((job && job.title) || '')
 );
+
+/**
+ * Display name of a runtime (helper metadata `meta`), isolated: the product names as they are,
+ * "Prebuilt binary" in the user's language.
+ */
+// i18n-keys: Runtime.binary.label
+export const runtimeName = (translate, meta) => {
+    if (!meta) {
+        return '';
+    }
+    const label = meta.key === 'binary' ? helperText(translate, 'Runtime.binary.label', null, meta.label) : meta.label;
+    return isolate(label || meta.key);
+};
 
 /** Plain object check (not null, not an array). */
 export const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);

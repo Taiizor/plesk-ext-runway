@@ -66,6 +66,7 @@ return [
         ],
         'binary' => [
             'hint' => 'Linux için derlenmiş bir çalıştırılabilir dosya yükleyin (veya bir URL\'den indirin) ve başlatma komutunu ayarlayın.',
+            'label' => 'Önceden derlenmiş dosya',
         ],
     ],
     'Overview' => [
@@ -290,7 +291,7 @@ return [
             'enabled' => 'Uygulamayı etkinleştir',
             'enabledHint' => 'Etkinleştirildiğinde uygulama bir servis olarak çalışır ve alan adı onun üzerinden sunulur (nginx istekleri uygulamaya aktarır).',
             'runtime' => 'Çalışma ortamı',
-            'runtimeHint' => 'Önceden derlenmiş bir Linux dosyası yüklüyorsanız "Prebuilt binary" seçin.',
+            'runtimeHint' => 'Önceden derlenmiş bir Linux dosyası yüklüyorsanız "Önceden derlenmiş dosya" seçeneğini seçin.',
             'toolchain' => 'Araç zinciri',
             'interpreter' => 'Yorumlayıcı',
             'toolchainHint' => 'Araç zincirlerini sunucu yöneticisi kurar.',

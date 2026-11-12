@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Thai translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../th-TH.php; the frontend strings live in ../app/th-TH.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'ติดตั้งชุดเครื่องมือและรันแอปพลิเคชันเป็นบริการ โดยไม่ต้องใช้ Docker',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'บิลด์และรันแอปพลิเคชัน Go, Rust, Bun, Java, .NET, Python, Ruby, PHP หรือแอปพลิเคชันที่บิลด์ไว้แล้วบนโดเมนนี้',
+    'permissionName' => 'การจัดการแอปพลิเคชัน Runway',
+    'permissionDescription' => 'อนุญาตให้ลูกค้าบิลด์และรันแอปพลิเคชันเป็นบริการเบื้องหลังด้วย Runway',
+
+    // Errors
+    'errorHelperFailed' => 'ตัวช่วยที่มีสิทธิ์พิเศษทำงานล้มเหลว: %%details%%',
+    'errorAccessDenied' => 'การเข้าถึงถูกปฏิเสธ',
+    'errorNoDomain' => 'ไม่พบโดเมน',
+    'errorNoHosting' => 'โดเมนนี้ไม่มีเว็บโฮสติ้ง',
+    'errorNotConfigured' => 'ยังไม่ได้กำหนดค่าแอปพลิเคชัน โปรดบันทึกการตั้งค่าก่อน',
+    'errorInvalidOperation' => 'การดำเนินการไม่ถูกต้อง',
+    'errorInvalidValue' => 'ค่าไม่ถูกต้อง',
+    'errorPostRequired' => 'การดำเนินการนี้ต้องใช้คำขอแบบ POST',
+    'errorInternal' => 'เกิดข้อผิดพลาดภายใน รายละเอียดอยู่ในล็อกของแผงควบคุม Plesk',
+    'errorRuntime' => 'โปรดเลือกรันไทม์ที่ถูกต้อง',
+    'errorToolchain' => 'โปรดเลือกเวอร์ชันชุดเครื่องมือที่ถูกต้อง',
+    'errorAppRoot' => 'รูทของแอปพลิเคชันต้องเป็นเส้นทางภายในการสมัครใช้บริการ (ตัวอักษร ตัวเลข และ . _ - @ + /) และต้องไม่มีส่วน "." หรือ ".."',
+    'errorBuildCmd' => 'คำสั่งบิลด์ยาวเกินไปหรือมีอักขระควบคุม',
+    'errorStartCmd' => 'คำสั่งเริ่มทำงานต้องเป็นบรรทัดเดียวและไม่มีอักขระควบคุม (สูงสุด 1000 อักขระ)',
+    'errorStartCmdEmpty' => 'ต้องระบุคำสั่งเริ่มทำงานเพื่อเปิดใช้งานแอปพลิเคชัน',
+    'errorLimit' => '%%name%% ต้องเป็นจำนวนเต็มภายในช่วงที่อนุญาต',
+    'errorEnvLine' => 'บรรทัด %%line%%: โปรดใช้รูปแบบ KEY=value',
+    'errorEnvKey' => 'บรรทัด %%line%%: "%%key%%" ไม่ใช่ชื่อตัวแปรที่ถูกต้อง',
+    'errorEnvReserved' => '%%key%% ถูกจัดการโดย Runway และไม่สามารถตั้งค่าได้',
+    'errorEnvLoader' => 'ไม่สามารถตั้งค่า %%key%% ที่นี่ได้ โปรดใส่ไว้ในคำสั่งเริ่มทำงานแทน (เช่น %%key%%=... ./app)',
+    'errorEnvValue' => 'ค่าของ %%key%% ต้องไม่มีการขึ้นบรรทัดใหม่หรืออักขระควบคุม',
+    'errorEnvTooMany' => 'ตัวแปรสภาพแวดล้อมมีจำนวนมากเกินไป (สูงสุด 200 ตัว)',
+    'errorListen' => 'โปรดเลือกโหมดการรับฟังที่ถูกต้อง',
+    'errorMode' => 'โปรดเลือกโหมดแอปพลิเคชันที่ถูกต้อง',
+    'errorMountPath' => 'เส้นทาง URL ต้องอยู่ในรูปแบบเช่น /api (ตัวอักษร ตัวเลข และ . _ ~ -)',
+    'errorStaticPaths' => 'เส้นทางสแตติกต้องเป็นรายการของเส้นทาง URL',
+    'errorStaticPath' => '"%%path%%" ไม่ใช่เส้นทาง URL ที่ถูกต้อง (ตัวอย่าง: /assets)',
+    'errorStaticPathsTooMany' => 'อนุญาตให้มีเส้นทางสแตติกได้สูงสุด %%max%% รายการ',
+    'errorStaticPathsTooLong' => 'เส้นทางสแตติกรวมกันยาวเกินไป (สูงสุด %%max%% อักขระ)',
+    'errorConfigTooLarge' => 'การตั้งค่ารวมกันยาวเกินไป (%%length%% จากสูงสุด %%max%% อักขระ): โปรดย่อคำสั่งหรือเส้นทางให้สั้นลง',
+    'errorHealthPath' => 'เส้นทางตรวจสอบสุขภาพต้องเป็นเส้นทาง URL เช่น /healthz',
+    'errorPortRange' => 'พอร์ตแรกต้องไม่มากกว่าพอร์ตสุดท้าย',
+    'errorSettingRange' => 'โปรดป้อนจำนวนเต็มระหว่าง %%min%% ถึง %%max%%',
+    'errorListenMode' => 'เวิร์กเกอร์เบื้องหลังไม่มีตัวรับฟัง: โปรดเลือก "ไม่มี" เป็นโหมดการรับฟัง หรือเลือกโหมดเว็บที่ใช้พอร์ต TCP หรือซ็อกเก็ต Unix',
+    'errorMountPathReserved' => '%%path%% ถูกใช้โดย Plesk (สถิติเว็บหรือการตรวจสอบใบรับรอง) และไม่สามารถพร็อกซีได้',
+    'errorMaxApps' => 'การสมัครใช้บริการนี้มีแอปพลิเคชันที่เปิดใช้งานครบจำนวนสูงสุดแล้ว (%%max%%)',
+    'errorFetchUrl' => 'โปรดป้อน URL แบบ https:// (สูงสุด 2048 อักขระ และไม่มีช่องว่าง)',
+    'errorFetchHttps' => 'ดาวน์โหลดได้เฉพาะ URL แบบ https:// เท่านั้น',
+    'errorSampleNotEmpty' => 'รูทของแอปพลิเคชันไม่ว่างเปล่า โปรดยืนยันว่าอนุญาตให้แอปตัวอย่างเขียนทับไฟล์ได้ %%details%%',
+    'errorSampleUnix' => 'เซิร์ฟเวอร์ PHP ตามค่าเริ่มต้น (php -S) ไม่สามารถรับฟังผ่านซ็อกเก็ต Unix ได้: โปรดติดตั้งชุดเครื่องมือ FrankenPHP หรือเลือก TCP',
+    'errorFetchSha256' => 'เช็กซัม SHA-256 ต้องเป็นอักขระเลขฐานสิบหก 64 ตัว',
+    'errorFetchFilename' => 'ชื่อไฟล์ใช้ได้เฉพาะตัวอักษร ตัวเลข และ . _ + - เท่านั้น (สูงสุด 128 อักขระ)',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'ขีดจำกัดหน่วยความจำ (MiB)',
+    'fieldCpuPercent' => 'ขีดจำกัด CPU (%)',
+    'fieldTasks' => 'ขีดจำกัดโปรเซส / เธรด',
+
+    // Messages
+    'messageSavedEnabled' => 'บันทึกการตั้งค่าแล้ว และกำลังเริ่มหรือรีสตาร์ทแอปพลิเคชัน',
+    'messageSavedBuilding' => 'บันทึกการตั้งค่าแล้ว กำลังบิลด์แอปพลิเคชัน และจะเริ่มหรือรีสตาร์ทเมื่อบิลด์สำเร็จ ติดตามได้ในล็อก "บิลด์และดีพลอย"',
+    'messageSavedBuildNotStarted' => 'บันทึกการตั้งค่าแล้ว แต่ไม่สามารถเริ่มการบิลด์ได้: %%details%%',
+    'messageSavedDisabled' => 'บันทึกการตั้งค่าแล้ว แอปพลิเคชันถูกปิดใช้งาน',
+    'messageAction_start' => 'แอปพลิเคชันกำลังเริ่มทำงาน',
+    'messageAction_stop' => 'หยุดแอปพลิเคชันแล้ว แอปจะหยุดอยู่จนกว่าคุณจะเริ่มอีกครั้ง',
+    'messageAction_restart' => 'แอปพลิเคชันกำลังรีสตาร์ท',
+    'messageDeployStarted' => 'การบิลด์เริ่มแล้ว ติดตามได้ในล็อก "บิลด์และดีพลอย"',
+    'messageRemoved' => 'ลบแอปพลิเคชันออกแล้ว',
+    'messageJobStarted' => 'งานเริ่มแล้ว ความคืบหน้าแสดงอยู่ด้านล่าง',
+    'messageToolchainRemoved' => 'ลบ %%version%% ออกแล้ว',
+    'messageSampleWritten' => 'สร้างแอปพลิเคชันตัวอย่าง (%%count%% ไฟล์) และอัปเดตการตั้งค่าแล้ว',
+    'messageSampleWrittenOne' => 'สร้างแอปพลิเคชันตัวอย่าง (1 ไฟล์) และอัปเดตการตั้งค่าแล้ว',
+    'messageFetchStarted' => 'การดาวน์โหลดเริ่มแล้ว ติดตามได้ในล็อก "บิลด์และดีพลอย"',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'แสดงรายการแอปพลิเคชันที่กำหนดค่าไว้พร้อมสถานะ',
+    'cli.commands.status' => 'แสดงสถานะของแอปพลิเคชันของโดเมน: --status <โดเมน>',
+    'cli.commands.start' => 'เริ่มแอปพลิเคชันของโดเมน: --start <โดเมน>',
+    'cli.commands.stop' => 'หยุดแอปพลิเคชันของโดเมน โดยจะหยุดอยู่ (แม้หลังรีบูตหรือดีพลอย) จนกว่าจะใช้ --start หรือ --restart: --stop <โดเมน>',
+    'cli.commands.restart' => 'รีสตาร์ทแอปพลิเคชันของโดเมน: --restart <โดเมน>',
+    'cli.commands.deploy' => 'บิลด์และรีสตาร์ทแอปพลิเคชันของโดเมน แล้วรอผลลัพธ์ (แอปพลิเคชันที่หยุดอยู่จะถูกบิลด์แต่ยังคงหยุดอยู่): --deploy <โดเมน> [-no-wait]',
+    'cli.commands.enable' => 'เปิดใช้งานแอปพลิเคชันที่กำหนดค่าไว้ของโดเมน: --enable <โดเมน>',
+    'cli.commands.disable' => 'ปิดใช้งานแอปพลิเคชันของโดเมน: --disable <โดเมน>',
+    'cli.commands.toolchains' => 'แสดงรายการชุดเครื่องมือที่ติดตั้งไว้และโดเมนที่ใช้ชุดเครื่องมือเหล่านั้น',
+    'cli.commands.install-toolchain' => 'ติดตั้งชุดเครื่องมือ แล้วรอผลลัพธ์: --install-toolchain <รันไทม์> <เวอร์ชัน> [-no-wait]',
+    'cli.commands.reconcile' => 'ปรับบริการของแอปพลิเคชันให้สอดคล้องกับ Plesk (โดเมนที่ถูกลบ เปลี่ยนชื่อ หรือระงับ)',
+];

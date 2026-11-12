@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Korean translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../ko-KR.php; the frontend strings live in ../app/ko-KR.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Docker 없이 툴체인을 설치하고 애플리케이션을 서비스로 실행합니다.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => '이 도메인에서 Go, Rust, Bun, Java, .NET, Python, Ruby, PHP 또는 사전 빌드된 애플리케이션을 빌드하고 실행합니다.',
+    'permissionName' => 'Runway 애플리케이션 관리',
+    'permissionDescription' => '고객이 Runway로 애플리케이션을 빌드하고 백그라운드 서비스로 실행할 수 있도록 허용합니다.',
+
+    // Errors
+    'errorHelperFailed' => '권한 있는 헬퍼에서 오류가 발생했습니다: %%details%%',
+    'errorAccessDenied' => '액세스가 거부되었습니다.',
+    'errorNoDomain' => '도메인을 찾을 수 없습니다.',
+    'errorNoHosting' => '이 도메인에는 웹 호스팅이 없습니다.',
+    'errorNotConfigured' => '애플리케이션이 아직 구성되지 않았습니다. 먼저 설정을 저장하십시오.',
+    'errorInvalidOperation' => '잘못된 작업입니다.',
+    'errorInvalidValue' => '잘못된 값입니다.',
+    'errorPostRequired' => '이 작업에는 POST 요청이 필요합니다.',
+    'errorInternal' => '내부 오류가 발생했습니다. 자세한 내용은 Plesk 패널 로그에 있습니다.',
+    'errorRuntime' => '유효한 런타임을 선택하십시오.',
+    'errorToolchain' => '유효한 툴체인 버전을 선택하십시오.',
+    'errorAppRoot' => '애플리케이션 루트는 구독 내부의 경로여야 하며(문자, 숫자 및 . _ - @ + /), "." 또는 ".." 세그먼트를 포함할 수 없습니다.',
+    'errorBuildCmd' => '빌드 명령이 너무 길거나 제어 문자를 포함합니다.',
+    'errorStartCmd' => '시작 명령은 제어 문자가 없는 한 줄이어야 합니다(최대 1000자).',
+    'errorStartCmdEmpty' => '애플리케이션을 활성화하려면 시작 명령이 필요합니다.',
+    'errorLimit' => '%%name%%은(는) 허용 범위 내의 정수여야 합니다.',
+    'errorEnvLine' => '%%line%%행: 키=값 형식을 사용하십시오.',
+    'errorEnvKey' => '%%line%%행: "%%key%%"은(는) 유효한 변수 이름이 아닙니다.',
+    'errorEnvReserved' => '%%key%%은(는) Runway가 관리하므로 설정할 수 없습니다.',
+    'errorEnvLoader' => '%%key%%은(는) 여기에서 설정할 수 없습니다. 시작 명령에 넣으십시오(예: %%key%%=... ./app).',
+    'errorEnvValue' => '%%key%%의 값에는 줄 바꿈이나 제어 문자를 포함할 수 없습니다.',
+    'errorEnvTooMany' => '환경 변수가 너무 많습니다(최대 200개).',
+    'errorListen' => '유효한 수신 방식을 선택하십시오.',
+    'errorMode' => '유효한 애플리케이션 모드를 선택하십시오.',
+    'errorMountPath' => 'URL 경로는 /api와 같은 형식이어야 합니다(문자, 숫자 및 . _ ~ -).',
+    'errorStaticPaths' => '정적 경로는 URL 경로 목록이어야 합니다.',
+    'errorStaticPath' => '"%%path%%"은(는) 유효한 URL 경로가 아닙니다(예: /assets).',
+    'errorStaticPathsTooMany' => '정적 경로는 최대 %%max%%개까지 허용됩니다.',
+    'errorStaticPathsTooLong' => '정적 경로의 총 길이가 너무 깁니다(최대 %%max%%자).',
+    'errorConfigTooLarge' => '설정의 총 길이가 너무 깁니다(%%length%%자, 최대 %%max%%자). 명령이나 경로를 줄이십시오.',
+    'errorHealthPath' => '헬스 체크 경로는 /healthz와 같은 URL 경로여야 합니다.',
+    'errorPortRange' => '첫 번째 포트는 마지막 포트보다 클 수 없습니다.',
+    'errorSettingRange' => '%%min%%과(와) %%max%% 사이의 정수를 입력하십시오.',
+    'errorListenMode' => '백그라운드 워커에는 리스너가 없습니다. 수신 방식으로 "없음"을 선택하거나 TCP 포트 또는 Unix 소켓을 사용하는 웹 모드를 선택하십시오.',
+    'errorMountPathReserved' => '%%path%%은(는) Plesk가 사용하므로(웹 통계 또는 인증서 검증) 프록시할 수 없습니다.',
+    'errorMaxApps' => '이 구독은 이미 활성화된 애플리케이션의 최대 수(%%max%%개)에 도달했습니다.',
+    'errorFetchUrl' => 'https:// URL을 입력하십시오(최대 2048자, 공백 없이).',
+    'errorFetchHttps' => 'https:// URL만 다운로드할 수 있습니다.',
+    'errorSampleNotEmpty' => '애플리케이션 루트가 비어 있지 않습니다. 샘플이 기존 파일을 덮어쓰도록 허용하십시오. %%details%%',
+    'errorSampleUnix' => '기본 PHP 서버(php -S)는 Unix 소켓에서 수신 대기할 수 없습니다. FrankenPHP 툴체인을 설치하거나 TCP를 선택하십시오.',
+    'errorFetchSha256' => 'SHA-256 체크섬은 64자리 16진수 문자여야 합니다.',
+    'errorFetchFilename' => '파일 이름에는 문자, 숫자 및 . _ + -만 사용할 수 있습니다(최대 128자).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => '메모리 제한(MiB)',
+    'fieldCpuPercent' => 'CPU 제한(%)',
+    'fieldTasks' => '프로세스 / 스레드 제한',
+
+    // Messages
+    'messageSavedEnabled' => '설정이 저장되었으며 애플리케이션을 (재)시작하는 중입니다.',
+    'messageSavedBuilding' => '설정이 저장되었습니다. 애플리케이션을 빌드하는 중이며 빌드가 성공하면 (재)시작됩니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+    'messageSavedBuildNotStarted' => '설정이 저장되었지만 빌드를 시작할 수 없습니다: %%details%%',
+    'messageSavedDisabled' => '설정이 저장되었습니다. 애플리케이션이 비활성화되어 있습니다.',
+    'messageAction_start' => '애플리케이션을 시작하는 중입니다.',
+    'messageAction_stop' => '애플리케이션이 중지되었습니다. 다시 시작할 때까지 중지된 상태로 유지됩니다.',
+    'messageAction_restart' => '애플리케이션을 재시작하는 중입니다.',
+    'messageDeployStarted' => '빌드가 시작되었습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+    'messageRemoved' => '애플리케이션이 제거되었습니다.',
+    'messageJobStarted' => '작업이 시작되었습니다. 진행 상황은 아래에 표시됩니다.',
+    'messageToolchainRemoved' => '%%version%%이(가) 제거되었습니다.',
+    'messageSampleWritten' => '샘플 애플리케이션이 생성되었으며(파일 %%count%%개) 설정이 업데이트되었습니다.',
+    'messageSampleWrittenOne' => '샘플 애플리케이션이 생성되었으며(파일 1개) 설정이 업데이트되었습니다.',
+    'messageFetchStarted' => '다운로드가 시작되었습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => '구성된 애플리케이션과 그 상태를 나열합니다.',
+    'cli.commands.status' => '도메인의 애플리케이션 상태를 표시합니다: --status <도메인>',
+    'cli.commands.start' => '도메인의 애플리케이션을 시작합니다: --start <도메인>',
+    'cli.commands.stop' => '도메인의 애플리케이션을 중지합니다. --start 또는 --restart 전까지(재부팅이나 배포 후에도) 중지된 상태로 유지됩니다: --stop <도메인>',
+    'cli.commands.restart' => '도메인의 애플리케이션을 재시작합니다: --restart <도메인>',
+    'cli.commands.deploy' => '도메인의 애플리케이션을 빌드하고 재시작한 뒤 결과를 기다립니다(중지된 애플리케이션은 빌드되지만 중지된 상태로 유지됩니다): --deploy <도메인> [-no-wait]',
+    'cli.commands.enable' => '도메인의 구성된 애플리케이션을 활성화합니다: --enable <도메인>',
+    'cli.commands.disable' => '도메인의 애플리케이션을 비활성화합니다: --disable <도메인>',
+    'cli.commands.toolchains' => '설치된 툴체인과 이를 사용하는 도메인을 나열합니다.',
+    'cli.commands.install-toolchain' => '툴체인을 설치하고 결과를 기다립니다: --install-toolchain <런타임> <버전> [-no-wait]',
+    'cli.commands.reconcile' => '애플리케이션 서비스를 Plesk와 일치시킵니다(삭제되거나 이름이 변경되거나 일시 중단된 도메인).',
+];

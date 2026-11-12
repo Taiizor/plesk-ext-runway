@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Dutch translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../nl-NL.php; the frontend strings live in ../app/nl-NL.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Installeer toolchains en draai applicaties als services, zonder Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Bouw en draai op dit domein een Go-, Rust-, Bun-, Java-, .NET-, Python-, Ruby-, PHP- of vooraf gebouwde applicatie.',
+    'permissionName' => 'Beheer van Runway-applicaties',
+    'permissionDescription' => 'Staat de klant toe om met Runway applicaties te bouwen en als achtergrondservices te draaien.',
+
+    // Errors
+    'errorHelperFailed' => 'Fout in het hulpprogramma met verhoogde rechten: %%details%%',
+    'errorAccessDenied' => 'Toegang geweigerd.',
+    'errorNoDomain' => 'Het domein is niet gevonden.',
+    'errorNoHosting' => 'Het domein heeft geen webhosting.',
+    'errorNotConfigured' => 'De applicatie is nog niet geconfigureerd. Sla eerst de instellingen op.',
+    'errorInvalidOperation' => 'Ongeldige bewerking.',
+    'errorInvalidValue' => 'Ongeldige waarde.',
+    'errorPostRequired' => 'Deze actie vereist een POST-verzoek.',
+    'errorInternal' => 'Er is een interne fout opgetreden. Details staan in het logboek van het Plesk-paneel.',
+    'errorRuntime' => 'Kies een geldige runtime.',
+    'errorToolchain' => 'Kies een geldige toolchainversie.',
+    'errorAppRoot' => 'De applicatiehoofdmap moet een pad binnen het abonnement zijn (letters, cijfers en . _ - @ + /), zonder segmenten "." of "..".',
+    'errorBuildCmd' => 'De buildopdracht is te lang of bevat stuurtekens.',
+    'errorStartCmd' => 'De startopdracht moet uit één regel zonder stuurtekens bestaan (max. 1000 tekens).',
+    'errorStartCmdEmpty' => 'Een startopdracht is vereist om de applicatie in te schakelen.',
+    'errorLimit' => '%%name%% moet een geheel getal binnen het toegestane bereik zijn.',
+    'errorEnvLine' => 'Regel %%line%%: gebruik de notatie SLEUTEL=waarde.',
+    'errorEnvKey' => 'Regel %%line%%: "%%key%%" is geen geldige variabelenaam.',
+    'errorEnvReserved' => '%%key%% wordt beheerd door Runway en kan niet worden ingesteld.',
+    'errorEnvLoader' => '%%key%% kan hier niet worden ingesteld; zet deze in de startopdracht (bijv. %%key%%=... ./app).',
+    'errorEnvValue' => 'De waarde van %%key%% mag geen regeleinden of stuurtekens bevatten.',
+    'errorEnvTooMany' => 'Te veel omgevingsvariabelen (maximaal 200).',
+    'errorListen' => 'Kies een geldige luistermodus.',
+    'errorMode' => 'Kies een geldige applicatiemodus.',
+    'errorMountPath' => 'Het URL-pad moet een pad zijn zoals /api (letters, cijfers en . _ ~ -).',
+    'errorStaticPaths' => 'Statische paden moeten een lijst van URL-paden zijn.',
+    'errorStaticPath' => '"%%path%%" is geen geldig URL-pad (voorbeeld: /assets).',
+    'errorStaticPathsTooMany' => 'Er zijn maximaal %%max%% statische paden toegestaan.',
+    'errorStaticPathsTooLong' => 'De statische paden zijn samen te lang (maximaal %%max%% tekens).',
+    'errorConfigTooLarge' => 'De instellingen zijn samen te lang (%%length%% van maximaal %%max%% tekens): kort de opdrachten of de paden in.',
+    'errorHealthPath' => 'Het healthcheck-pad moet een URL-pad zijn zoals /healthz.',
+    'errorPortRange' => 'De eerste poort mag niet groter zijn dan de laatste poort.',
+    'errorSettingRange' => 'Voer een geheel getal in tussen %%min%% en %%max%%.',
+    'errorListenMode' => 'Een achtergrondproces heeft geen listener: kies "Niets" als luistermodus, of een webmodus met een TCP-poort of Unix-socket.',
+    'errorMountPathReserved' => '%%path%% wordt gebruikt door Plesk (webstatistieken of certificaatvalidatie) en kan niet via de proxy worden doorgestuurd.',
+    'errorMaxApps' => 'Dit abonnement heeft al het maximale aantal ingeschakelde applicaties (%%max%%).',
+    'errorFetchUrl' => 'Voer een https://-URL in (max. 2048 tekens, zonder spaties).',
+    'errorFetchHttps' => 'Alleen https://-URL\'s kunnen worden gedownload.',
+    'errorSampleNotEmpty' => 'De applicatiehoofdmap is niet leeg. Bevestig dat het voorbeeld bestanden mag overschrijven. %%details%%',
+    'errorSampleUnix' => 'De standaard PHP-server (php -S) kan niet op een Unix-socket luisteren: installeer een FrankenPHP-toolchain of kies TCP.',
+    'errorFetchSha256' => 'De SHA-256-checksum moet uit 64 hexadecimale tekens bestaan.',
+    'errorFetchFilename' => 'De bestandsnaam mag alleen letters, cijfers en . _ + - bevatten (max. 128 tekens).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Geheugenlimiet (MiB)',
+    'fieldCpuPercent' => 'CPU-limiet (%)',
+    'fieldTasks' => 'Proces-/threadlimiet',
+
+    // Messages
+    'messageSavedEnabled' => 'De instellingen zijn opgeslagen en de applicatie wordt (opnieuw) gestart.',
+    'messageSavedBuilding' => 'De instellingen zijn opgeslagen. De applicatie wordt gebouwd en wordt (opnieuw) gestart zodra de build slaagt; volg de voortgang in het logboek "Build en deploy".',
+    'messageSavedBuildNotStarted' => 'De instellingen zijn opgeslagen, maar de build kon niet worden gestart: %%details%%',
+    'messageSavedDisabled' => 'De instellingen zijn opgeslagen. De applicatie is uitgeschakeld.',
+    'messageAction_start' => 'De applicatie wordt gestart.',
+    'messageAction_stop' => 'De applicatie is gestopt. Deze blijft gestopt totdat u de applicatie opnieuw start.',
+    'messageAction_restart' => 'De applicatie wordt herstart.',
+    'messageDeployStarted' => 'De build is gestart. Volg de voortgang in het logboek "Build en deploy".',
+    'messageRemoved' => 'De applicatie is verwijderd.',
+    'messageJobStarted' => 'De taak is gestart. De voortgang wordt hieronder weergegeven.',
+    'messageToolchainRemoved' => '%%version%% is verwijderd.',
+    'messageSampleWritten' => 'De voorbeeldapplicatie is aangemaakt (%%count%% bestanden) en de instellingen zijn bijgewerkt.',
+    'messageSampleWrittenOne' => 'De voorbeeldapplicatie is aangemaakt (één bestand) en de instellingen zijn bijgewerkt.',
+    'messageFetchStarted' => 'De download is gestart. Volg de voortgang in het logboek "Build en deploy".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Toont de geconfigureerde applicaties en hun status.',
+    'cli.commands.status' => 'Toont de status van de applicatie van een domein: --status <domein>',
+    'cli.commands.start' => 'Start de applicatie van een domein: --start <domein>',
+    'cli.commands.stop' => 'Stopt de applicatie van een domein; deze blijft gestopt (ook na een herstart van de server of een deployment) tot --start of --restart: --stop <domein>',
+    'cli.commands.restart' => 'Herstart de applicatie van een domein: --restart <domein>',
+    'cli.commands.deploy' => 'Bouwt en herstart de applicatie van een domein en wacht op het resultaat (een gestopte applicatie wordt gebouwd, maar blijft gestopt): --deploy <domein> [-no-wait]',
+    'cli.commands.enable' => 'Schakelt de geconfigureerde applicatie van een domein in: --enable <domein>',
+    'cli.commands.disable' => 'Schakelt de applicatie van een domein uit: --disable <domein>',
+    'cli.commands.toolchains' => 'Toont de geïnstalleerde toolchains en de domeinen die ze gebruiken.',
+    'cli.commands.install-toolchain' => 'Installeert een toolchain en wacht op het resultaat: --install-toolchain <runtime> <versie> [-no-wait]',
+    'cli.commands.reconcile' => 'Brengt de applicatieservices in overeenstemming met Plesk (verwijderde, hernoemde of opgeschorte domeinen).',
+];

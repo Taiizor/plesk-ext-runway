@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Hebrew translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../he-IL.php; the frontend strings live in ../app/he-IL.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'התקן ערכות כלים והרץ יישומים כשירותים, ללא Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'בנה והרץ בדומיין זה יישום Go, Rust, Bun, Java, .NET, Python, Ruby, PHP או יישום מוכן מראש.',
+    'permissionName' => 'ניהול יישומי Runway',
+    'permissionDescription' => 'מאפשר ללקוח לבנות ולהריץ יישומים כשירותי רקע באמצעות Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'תוכנית העזר בעלת ההרשאות נכשלה: %%details%%',
+    'errorAccessDenied' => 'הגישה נדחתה.',
+    'errorNoDomain' => 'הדומיין לא נמצא.',
+    'errorNoHosting' => 'לדומיין אין אירוח אתרים.',
+    'errorNotConfigured' => 'היישום עדיין לא הוגדר. שמור תחילה את ההגדרות.',
+    'errorInvalidOperation' => 'פעולה לא חוקית.',
+    'errorInvalidValue' => 'ערך לא חוקי.',
+    'errorPostRequired' => 'פעולה זו דורשת בקשת POST.',
+    'errorInternal' => 'אירעה שגיאה פנימית. הפרטים נמצאים ביומן הפאנל של Plesk.',
+    'errorRuntime' => 'בחר סביבת ריצה חוקית.',
+    'errorToolchain' => 'בחר גרסת ערכת כלים חוקית.',
+    'errorAppRoot' => 'שורש היישום חייב להיות נתיב בתוך המנוי (אותיות, ספרות והתווים . _ - @ + /), ללא מקטעי "." או "..".',
+    'errorBuildCmd' => 'פקודת הבנייה ארוכה מדי או מכילה תווי בקרה.',
+    'errorStartCmd' => 'פקודת ההפעלה חייבת להיות שורה אחת ללא תווי בקרה (עד 1000 תווים).',
+    'errorStartCmdEmpty' => 'כדי להפעיל את היישום נדרשת פקודת הפעלה.',
+    'errorLimit' => '%%name%% חייבת להיות מספר שלם בטווח המותר.',
+    'errorEnvLine' => 'שורה %%line%%: השתמש בתבנית KEY=value.',
+    'errorEnvKey' => 'שורה %%line%%: "%%key%%" אינו שם משתנה חוקי.',
+    'errorEnvReserved' => '%%key%% מנוהל על ידי Runway ולא ניתן להגדיר אותו.',
+    'errorEnvLoader' => 'לא ניתן להגדיר את %%key%% כאן; הוסף אותו לפקודת ההפעלה (למשל %%key%%=... ./app).',
+    'errorEnvValue' => 'הערך של %%key%% אינו יכול להכיל מעברי שורה או תווי בקרה.',
+    'errorEnvTooMany' => 'יותר מדי משתני סביבה (לכל היותר 200).',
+    'errorListen' => 'בחר מצב האזנה חוקי.',
+    'errorMode' => 'בחר מצב יישום חוקי.',
+    'errorMountPath' => 'נתיב ה-URL חייב להיות נתיב כמו /api (אותיות, ספרות והתווים . _ ~ -).',
+    'errorStaticPaths' => 'הנתיבים הסטטיים חייבים להיות רשימה של נתיבי URL.',
+    'errorStaticPath' => '"%%path%%" אינו נתיב URL חוקי (לדוגמה: /assets).',
+    'errorStaticPathsTooMany' => 'מותרים לכל היותר %%max%% נתיבים סטטיים.',
+    'errorStaticPathsTooLong' => 'האורך הכולל של הנתיבים הסטטיים גדול מדי (לכל היותר %%max%% תווים).',
+    'errorConfigTooLarge' => 'האורך הכולל של ההגדרות גדול מדי (%%length%% תווים מתוך %%max%% לכל היותר): קצר את הפקודות או את הנתיבים.',
+    'errorHealthPath' => 'נתיב בדיקת התקינות חייב להיות נתיב URL כמו /healthz.',
+    'errorPortRange' => 'הפורט הראשון אינו יכול להיות גדול מהפורט האחרון.',
+    'errorSettingRange' => 'הזן מספר שלם בין %%min%% ל-%%max%%.',
+    'errorListenMode' => 'לתהליך רקע אין מאזין: בחר "ללא" כמצב האזנה, או מצב ווב עם פורט TCP או סוקט Unix.',
+    'errorMountPathReserved' => '%%path%% נמצא בשימוש על ידי Plesk (סטטיסטיקות אתר או אימות אישורים) ולא ניתן לנתב אותו דרך פרוקסי.',
+    'errorMaxApps' => 'מנוי זה כבר הגיע למספר המרבי של יישומים מופעלים (%%max%%).',
+    'errorFetchUrl' => 'הזן כתובת URL המתחילה ב-https:// (עד 2048 תווים, ללא רווחים).',
+    'errorFetchHttps' => 'ניתן להוריד רק מכתובות https://.',
+    'errorSampleNotEmpty' => 'שורש היישום אינו ריק. אשר שהיישום לדוגמה רשאי לדרוס קבצים. %%details%%',
+    'errorSampleUnix' => 'שרת ברירת המחדל של PHP (php -S) אינו יכול להאזין בסוקט Unix: התקן ערכת כלים של FrankenPHP או בחר TCP.',
+    'errorFetchSha256' => 'סכום הביקורת SHA-256 חייב להכיל 64 תווים הקסדצימליים.',
+    'errorFetchFilename' => 'שם הקובץ יכול להכיל רק אותיות, ספרות והתווים . _ + - (עד 128 תווים).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',
+    'fieldCpuPercent' => 'מגבלת CPU (%)',
+    'fieldTasks' => 'מגבלת תהליכים / תהליכונים',
+
+    // Messages
+    'messageSavedEnabled' => 'ההגדרות נשמרו והיישום מופעל (מחדש) כעת.',
+    'messageSavedBuilding' => 'ההגדרות נשמרו. היישום נבנה כעת ויופעל (מחדש) כשהבנייה תצליח; ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+    'messageSavedBuildNotStarted' => 'ההגדרות נשמרו, אך לא ניתן היה להתחיל את הבנייה: %%details%%',
+    'messageSavedDisabled' => 'ההגדרות נשמרו. היישום מושבת.',
+    'messageAction_start' => 'היישום מופעל כעת.',
+    'messageAction_stop' => 'היישום נעצר. הוא יישאר עצור עד שתפעיל אותו שוב.',
+    'messageAction_restart' => 'היישום מופעל מחדש כעת.',
+    'messageDeployStarted' => 'הבנייה החלה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+    'messageRemoved' => 'היישום הוסר.',
+    'messageJobStarted' => 'המשימה החלה. ההתקדמות שלה מוצגת למטה.',
+    'messageToolchainRemoved' => 'הגרסה %%version%% הוסרה.',
+    'messageSampleWritten' => 'היישום לדוגמה נכתב (%%count%% קבצים) וההגדרות עודכנו.',
+    'messageSampleWrittenOne' => 'היישום לדוגמה נכתב (קובץ אחד) וההגדרות עודכנו.',
+    'messageFetchStarted' => 'ההורדה החלה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'מציג את היישומים המוגדרים ואת מצבם.',
+    'cli.commands.status' => 'מציג את מצב היישום של דומיין: --status <domain>',
+    'cli.commands.start' => 'מפעיל את היישום של דומיין: --start <domain>',
+    'cli.commands.stop' => 'עוצר את היישום של דומיין; הוא נשאר עצור (גם לאחר אתחול מחדש או פריסה) עד --start או --restart: --stop <domain>',
+    'cli.commands.restart' => 'מפעיל מחדש את היישום של דומיין: --restart <domain>',
+    'cli.commands.deploy' => 'בונה ומפעיל מחדש את היישום של דומיין וממתין לתוצאה (יישום עצור נבנה אך נשאר עצור): --deploy <domain> [-no-wait]',
+    'cli.commands.enable' => 'מעביר את היישום המוגדר של דומיין למצב מופעל: --enable <domain>',
+    'cli.commands.disable' => 'משבית את היישום של דומיין: --disable <domain>',
+    'cli.commands.toolchains' => 'מציג את ערכות הכלים המותקנות ואת הדומיינים שמשתמשים בהן.',
+    'cli.commands.install-toolchain' => 'מתקין ערכת כלים וממתין לתוצאה: --install-toolchain <runtime> <version> [-no-wait]',
+    'cli.commands.reconcile' => 'מסנכרן את שירותי היישומים עם Plesk (דומיינים שנמחקו, ששמם שונה או שהושעו).',
+];

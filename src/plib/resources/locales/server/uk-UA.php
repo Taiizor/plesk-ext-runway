@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Ukrainian translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../uk-UA.php; the frontend strings live in ../app/uk-UA.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Встановлюйте набори інструментів і запускайте застосунки як служби без Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Зберіть і запустіть на цьому домені застосунок Go, Rust, Bun, Java, .NET, Python, Ruby, PHP або попередньо зібраний застосунок.',
+    'permissionName' => 'Керування застосунками Runway',
+    'permissionDescription' => 'Дозволяє клієнту збирати та запускати застосунки як фонові служби за допомогою Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'Помилка привілейованого помічника: %%details%%',
+    'errorAccessDenied' => 'Доступ заборонено.',
+    'errorNoDomain' => 'Домен не знайдено.',
+    'errorNoHosting' => 'Домен не має вебхостингу.',
+    'errorNotConfigured' => 'Застосунок ще не налаштовано. Спочатку збережіть налаштування.',
+    'errorInvalidOperation' => 'Недійсна операція.',
+    'errorInvalidValue' => 'Недійсне значення.',
+    'errorPostRequired' => 'Ця дія потребує запиту POST.',
+    'errorInternal' => 'Сталася внутрішня помилка. Подробиці наведено в журналі панелі Plesk.',
+    'errorRuntime' => 'Виберіть дійсне середовище виконання.',
+    'errorToolchain' => 'Виберіть дійсну версію набору інструментів.',
+    'errorAppRoot' => 'Корінь застосунку має бути шляхом усередині передплати (літери, цифри та . _ - @ + /) без сегментів «.» або «..».',
+    'errorBuildCmd' => 'Команда збірки надто довга або містить керівні символи.',
+    'errorStartCmd' => 'Команда запуску має бути одним рядком без керівних символів (макс. 1000 символів).',
+    'errorStartCmdEmpty' => 'Щоб увімкнути застосунок, потрібна команда запуску.',
+    'errorLimit' => '%%name%% має бути цілим числом у дозволеному діапазоні.',
+    'errorEnvLine' => 'Рядок %%line%%: використовуйте формат КЛЮЧ=значення.',
+    'errorEnvKey' => 'Рядок %%line%%: «%%key%%» не є дійсним іменем змінної.',
+    'errorEnvReserved' => 'Змінною %%key%% керує Runway, тому задати її не можна.',
+    'errorEnvLoader' => '%%key%% не можна задати тут; додайте її до команди запуску (напр. %%key%%=... ./app).',
+    'errorEnvValue' => 'Значення %%key%% не може містити розриви рядків або керівні символи.',
+    'errorEnvTooMany' => 'Забагато змінних середовища (максимум 200).',
+    'errorListen' => 'Виберіть дійсний режим прослуховування.',
+    'errorMode' => 'Виберіть дійсний режим застосунку.',
+    'errorMountPath' => 'Шлях монтування має бути шляхом URL на кшталт /api (літери, цифри та . _ ~ -).',
+    'errorStaticPaths' => 'Статичні шляхи мають бути списком шляхів URL.',
+    'errorStaticPath' => '«%%path%%» не є дійсним шляхом URL (приклад: /assets).',
+    'errorStaticPathsTooMany' => 'Дозволено не більше %%max%% статичних шляхів.',
+    'errorStaticPathsTooLong' => 'Статичні шляхи разом надто довгі (не більше %%max%% символів).',
+    'errorConfigTooLarge' => 'Налаштування разом надто довгі (%%length%% із максимум %%max%% символів): скоротіть команди або шляхи.',
+    'errorHealthPath' => 'Шлях перевірки стану має бути шляхом URL на кшталт /healthz.',
+    'errorPortRange' => 'Перший порт не може бути більшим за останній.',
+    'errorSettingRange' => 'Введіть ціле число від %%min%% до %%max%%.',
+    'errorListenMode' => 'Фоновий обробник нічого не прослуховує: виберіть режим прослуховування «Нічого» або вебрежим із TCP-портом чи Unix-сокетом.',
+    'errorMountPathReserved' => '%%path%% використовується Plesk (вебстатистика або перевірка сертифіката), тому його не можна проксіювати.',
+    'errorMaxApps' => 'У цій передплаті вже досягнуто максимальної кількості увімкнених застосунків (%%max%%).',
+    'errorFetchUrl' => 'Введіть URL-адресу https:// (макс. 2048 символів, без пробілів).',
+    'errorFetchHttps' => 'Завантажувати можна лише з URL-адрес https://.',
+    'errorSampleNotEmpty' => 'Корінь застосунку не порожній. Підтвердьте, що зразок може перезаписати файли. %%details%%',
+    'errorSampleUnix' => 'Типовий сервер PHP (php -S) не може прослуховувати Unix-сокет: встановіть набір інструментів FrankenPHP або виберіть TCP.',
+    'errorFetchSha256' => 'Контрольна сума SHA-256 має складатися з 64 шістнадцяткових символів.',
+    'errorFetchFilename' => 'Ім’я файлу може містити лише літери, цифри та . _ + - (макс. 128 символів).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Обмеження пам’яті (МіБ)',
+    'fieldCpuPercent' => 'Обмеження CPU (%)',
+    'fieldTasks' => 'Обмеження процесів / потоків',
+
+    // Messages
+    'messageSavedEnabled' => 'Налаштування збережено, застосунок (пере)запускається.',
+    'messageSavedBuilding' => 'Налаштування збережено. Застосунок збирається і буде (пере)запущений після успішної збірки; стежте за нею в журналі «Збірка та розгортання».',
+    'messageSavedBuildNotStarted' => 'Налаштування збережено, але збірку не вдалося запустити: %%details%%',
+    'messageSavedDisabled' => 'Налаштування збережено. Застосунок вимкнено.',
+    'messageAction_start' => 'Застосунок запускається.',
+    'messageAction_stop' => 'Застосунок зупинено. Він залишатиметься зупиненим, доки ви не запустите його знову.',
+    'messageAction_restart' => 'Застосунок перезапускається.',
+    'messageDeployStarted' => 'Збірку розпочато. Стежте за нею в журналі «Збірка та розгортання».',
+    'messageRemoved' => 'Застосунок видалено.',
+    'messageJobStarted' => 'Завдання розпочато. Його перебіг показано нижче.',
+    'messageToolchainRemoved' => '%%version%% видалено.',
+    'messageSampleWritten' => 'Зразок застосунку записано (файлів: %%count%%), налаштування оновлено.',
+    'messageSampleWrittenOne' => 'Зразок застосунку записано (один файл), налаштування оновлено.',
+    'messageFetchStarted' => 'Завантаження розпочато. Стежте за ним у журналі «Збірка та розгортання».',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Показати список налаштованих застосунків та їхній стан.',
+    'cli.commands.status' => 'Показати стан застосунку домену: --status <домен>',
+    'cli.commands.start' => 'Запустити застосунок домену: --start <домен>',
+    'cli.commands.stop' => 'Зупинити застосунок домену; він залишається зупиненим (також після перезавантаження або розгортання) до --start чи --restart: --stop <домен>',
+    'cli.commands.restart' => 'Перезапустити застосунок домену: --restart <домен>',
+    'cli.commands.deploy' => 'Зібрати й перезапустити застосунок домену та дочекатися результату (зупинений застосунок збирається, але залишається зупиненим): --deploy <домен> [-no-wait]',
+    'cli.commands.enable' => 'Увімкнути налаштований застосунок домену: --enable <домен>',
+    'cli.commands.disable' => 'Вимкнути застосунок домену: --disable <домен>',
+    'cli.commands.toolchains' => 'Показати список встановлених наборів інструментів і доменів, які їх використовують.',
+    'cli.commands.install-toolchain' => 'Встановити набір інструментів і дочекатися результату: --install-toolchain <середовище> <версія> [-no-wait]',
+    'cli.commands.reconcile' => 'Узгодити служби застосунків із Plesk (видалені, перейменовані або призупинені домени).',
+];

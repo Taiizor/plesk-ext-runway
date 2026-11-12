@@ -2,9 +2,10 @@
 
 import { createElement, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Panel, Paragraph, Translate } from '@plesk/plesk-ext-sdk';
+import { Panel, Paragraph, Translate, useTranslate } from '@plesk/plesk-ext-sdk';
 import Facts from '../components/Facts';
 import Mono from '../components/Mono';
+import { runtimeName } from '../lib/format';
 
 const ENV_ROWS = [
     { key: 'port', label: <Mono>PORT</Mono>, value: <Translate content="Domain.help.envPort" /> },
@@ -20,6 +21,7 @@ const ENV_ROWS = [
  * trigger files and a link to the runtime's documentation. Starts collapsed when `collapsed`.
  */
 const HelpPanel = ({ meta, collapsed }) => {
+    const translate = useTranslate();
     const [open, setOpen] = useState(!collapsed);
     return (
         <Panel
@@ -35,7 +37,7 @@ const HelpPanel = ({ meta, collapsed }) => {
             {meta && meta.docs_url && (
                 <Paragraph>
                     <a href={meta.docs_url} target="_blank" rel="noopener noreferrer">
-                        <Translate content="Domain.help.docs" params={{ runtime: meta.label }} />
+                        <Translate content="Domain.help.docs" params={{ runtime: runtimeName(translate, meta) }} />
                     </a>
                 </Paragraph>
             )}

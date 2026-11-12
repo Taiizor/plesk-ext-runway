@@ -1,0 +1,96 @@
+<?php
+// Copyright 2026 Taiizor. Licensed under the MIT License.
+// Catalan translation
+//
+// Server strings, used by PHP through pm_Locale::lmsg() (API messages, validation errors,
+// buttons, permission, "plesk ext runway --help" descriptions: keys "cli.commands.<command>").
+// Loaded by ../ca-ES.php; the frontend strings live in ../app/ca-ES.php.
+// Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
+
+return [
+    // Navigation and permission
+    'buttonAdminTitle' => 'Runway',
+    'buttonAdminDescription' => 'Instal·leu cadenes d\'eines i executeu aplicacions com a serveis, sense Docker.',
+    'buttonDomainTitle' => 'Runway',
+    'buttonDomainDescription' => 'Compileu i executeu una aplicació de Go, Rust, Bun, Java, .NET, Python, Ruby, PHP o precompilada en aquest domini.',
+    'permissionName' => 'Gestió d\'aplicacions de Runway',
+    'permissionDescription' => 'Permet al client compilar i executar aplicacions com a serveis en segon pla amb Runway.',
+
+    // Errors
+    'errorHelperFailed' => 'L\'auxiliar amb privilegis ha fallat: %%details%%',
+    'errorAccessDenied' => 'Accés denegat.',
+    'errorNoDomain' => 'No s\'ha trobat el domini.',
+    'errorNoHosting' => 'El domini no té allotjament web.',
+    'errorNotConfigured' => 'L\'aplicació encara no està configurada. Deseu primer la configuració.',
+    'errorInvalidOperation' => 'Operació no vàlida.',
+    'errorInvalidValue' => 'Valor no vàlid.',
+    'errorPostRequired' => 'Aquesta acció requereix una sol·licitud POST.',
+    'errorInternal' => 'S\'ha produït un error intern. Els detalls són al registre del tauler de Plesk.',
+    'errorRuntime' => 'Trieu un entorn d\'execució vàlid.',
+    'errorToolchain' => 'Trieu una versió vàlida de la cadena d\'eines.',
+    'errorAppRoot' => 'L\'arrel de l\'aplicació ha de ser un camí dins de la subscripció (lletres, dígits i . _ - @ + /), sense segments "." ni "..".',
+    'errorBuildCmd' => 'L\'ordre de compilació és massa llarga o conté caràcters de control.',
+    'errorStartCmd' => 'L\'ordre d\'inici ha de ser una sola línia sense caràcters de control (màx. 1000 caràcters).',
+    'errorStartCmdEmpty' => 'Cal una ordre d\'inici per habilitar l\'aplicació.',
+    'errorLimit' => '%%name%% ha de ser un nombre enter dins de l\'interval permès.',
+    'errorEnvLine' => 'Línia %%line%%: utilitzeu el format CLAU=valor.',
+    'errorEnvKey' => 'Línia %%line%%: "%%key%%" no és un nom de variable vàlid.',
+    'errorEnvReserved' => '%%key%% està gestionada per Runway i no es pot definir.',
+    'errorEnvLoader' => '%%key%% no es pot definir aquí; poseu-la a l\'ordre d\'inici (p. ex. %%key%%=... ./app).',
+    'errorEnvValue' => 'El valor de %%key%% no pot contenir salts de línia ni caràcters de control.',
+    'errorEnvTooMany' => 'Hi ha massa variables d\'entorn (màxim 200).',
+    'errorListen' => 'Trieu un mode d\'escolta vàlid.',
+    'errorMode' => 'Trieu un mode d\'aplicació vàlid.',
+    'errorMountPath' => 'El camí d\'URL ha de ser un camí com /api (lletres, dígits i . _ ~ -).',
+    'errorStaticPaths' => 'Els camins estàtics han de ser una llista de camins d\'URL.',
+    'errorStaticPath' => '"%%path%%" no és un camí d\'URL vàlid (exemple: /assets).',
+    'errorStaticPathsTooMany' => 'Es permeten com a màxim %%max%% camins estàtics.',
+    'errorStaticPathsTooLong' => 'Els camins estàtics són massa llargs en conjunt (com a màxim %%max%% caràcters).',
+    'errorConfigTooLarge' => 'La configuració és massa llarga en conjunt (%%length%% caràcters d\'un màxim de %%max%%): escurceu les ordres o els camins.',
+    'errorHealthPath' => 'El camí de comprovació d\'estat ha de ser un camí d\'URL com /healthz.',
+    'errorPortRange' => 'El primer port no pot ser més gran que el darrer.',
+    'errorSettingRange' => 'Introduïu un nombre enter entre %%min%% i %%max%%.',
+    'errorListenMode' => 'Un procés en segon pla no escolta en cap port ni sòcol: trieu "Res" com a mode d\'escolta, o bé un mode web amb un port TCP o un sòcol Unix.',
+    'errorMountPathReserved' => 'Plesk utilitza %%path%% (estadístiques web o validació de certificats) i no es pot reenviar a l\'aplicació.',
+    'errorMaxApps' => 'Aquesta subscripció ja té el nombre màxim d\'aplicacions habilitades (%%max%%).',
+    'errorFetchUrl' => 'Introduïu un URL https:// (màx. 2048 caràcters, sense espais).',
+    'errorFetchHttps' => 'Només es poden baixar URL https://.',
+    'errorSampleNotEmpty' => 'L\'arrel de l\'aplicació no és buida. Confirmeu que l\'exemple pot sobreescriure fitxers. %%details%%',
+    'errorSampleUnix' => 'El servidor PHP per defecte (php -S) no pot escoltar en un sòcol Unix: instal·leu una cadena d\'eines FrankenPHP o trieu TCP.',
+    'errorFetchSha256' => 'La suma de verificació SHA-256 ha de tenir 64 caràcters hexadecimals.',
+    'errorFetchFilename' => 'El nom del fitxer només pot contenir lletres, dígits i . _ + - (màx. 128 caràcters).',
+
+    // Field names used in error messages
+    'fieldMemoryMb' => 'Límit de memòria (MiB)',
+    'fieldCpuPercent' => 'Límit de CPU (%)',
+    'fieldTasks' => 'Límit de processos / fils',
+
+    // Messages
+    'messageSavedEnabled' => 'S\'ha desat la configuració i l\'aplicació s\'està (re)iniciant.',
+    'messageSavedBuilding' => 'S\'ha desat la configuració. L\'aplicació s\'està compilant i es (re)iniciarà quan la compilació acabi correctament; seguiu-la al registre "Compilació i desplegament".',
+    'messageSavedBuildNotStarted' => 'S\'ha desat la configuració, però no s\'ha pogut iniciar la compilació: %%details%%',
+    'messageSavedDisabled' => 'S\'ha desat la configuració. L\'aplicació està inhabilitada.',
+    'messageAction_start' => 'L\'aplicació s\'està iniciant.',
+    'messageAction_stop' => 'L\'aplicació s\'ha aturat. Es mantindrà aturada fins que la torneu a iniciar.',
+    'messageAction_restart' => 'L\'aplicació s\'està reiniciant.',
+    'messageDeployStarted' => 'La compilació ha començat. Seguiu-la al registre "Compilació i desplegament".',
+    'messageRemoved' => 'S\'ha suprimit l\'aplicació.',
+    'messageJobStarted' => 'La tasca ha començat. El progrés es mostra a sota.',
+    'messageToolchainRemoved' => 'S\'ha suprimit %%version%%.',
+    'messageSampleWritten' => 'S\'ha escrit l\'aplicació d\'exemple (%%count%% fitxers) i s\'ha actualitzat la configuració.',
+    'messageSampleWrittenOne' => 'S\'ha escrit l\'aplicació d\'exemple (un fitxer) i s\'ha actualitzat la configuració.',
+    'messageFetchStarted' => 'La baixada ha començat. Seguiu-la al registre "Compilació i desplegament".',
+
+    // Command line: descriptions shown by "plesk ext runway --help"
+    'cli.commands.list' => 'Llista les aplicacions configurades i el seu estat.',
+    'cli.commands.status' => 'Mostra l\'estat de l\'aplicació d\'un domini: --status <domini>',
+    'cli.commands.start' => 'Inicia l\'aplicació d\'un domini: --start <domini>',
+    'cli.commands.stop' => 'Atura l\'aplicació d\'un domini; es manté aturada (també després d\'un reinici del servidor o d\'un desplegament) fins a --start o --restart: --stop <domini>',
+    'cli.commands.restart' => 'Reinicia l\'aplicació d\'un domini: --restart <domini>',
+    'cli.commands.deploy' => 'Compila i reinicia l\'aplicació d\'un domini i espera el resultat (una aplicació aturada es compila però es manté aturada): --deploy <domini> [-no-wait]',
+    'cli.commands.enable' => 'Habilita l\'aplicació configurada d\'un domini: --enable <domini>',
+    'cli.commands.disable' => 'Inhabilita l\'aplicació d\'un domini: --disable <domini>',
+    'cli.commands.toolchains' => 'Llista les cadenes d\'eines instal·lades i els dominis que les utilitzen.',
+    'cli.commands.install-toolchain' => 'Instal·la una cadena d\'eines i espera el resultat: --install-toolchain <entorn-execució> <versió> [-no-wait]',
+    'cli.commands.reconcile' => 'Sincronitza els serveis de les aplicacions amb Plesk (dominis suprimits, reanomenats o suspesos).',
+];

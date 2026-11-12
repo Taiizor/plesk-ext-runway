@@ -10,7 +10,7 @@
 * [+] Sample application for every runtime and "fetch a prebuilt binary from a URL" deployments.
 * [+] Server-wide port range, build timeout and resource limits; per-application memory, CPU and task limits set by the administrator.
 * [+] Customer access through the "Runway applications management" permission of service plans and subscriptions.
-* [+] English and Turkish user interface.
+* [+] User interface in every Plesk language (32 locales).
 * [*] Security hardening from the pre-release review: no unit line runs as root (socket directories are created by the helper and systemd-tmpfiles), LD_PRELOAD-style loader variables are refused, a replaced Unix socket path is detected and contained, and the helper's customer-file inspection runs with resource limits.
 * [*] Unix socket mode exports only RUNWAY_SOCKET; Stop persists until the application is started again.
 * [*] Laravel Octane runs with Runway's Caddyfile (admin endpoint off, bound to 127.0.0.1 or the socket).
