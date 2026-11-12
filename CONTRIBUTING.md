@@ -58,13 +58,15 @@ CI (`.github/workflows/ci.yml`):
 1. **Lint**: pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
    frontend build, `build.py --check`, `php -l` with PHP 7.4 and 8.2.
 2. **Package**: `python build.py --strict`, uploads the zip as the `runway-package` artifact.
-3. **End-to-end**: starts `plesk/plesk` with systemd, installs the zip, creates the
-   subscription `gotest.local` and (when the license allows customer accounts) its owner
-   `cust1`, installs Go through Runway and runs `tests/helper-smoke.sh`, `tests/api-smoke.sh`
-   (with a real deployment), `tests/customer-smoke.sh` (skipped without the customer) and
+3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
+   the zip, creating the subscription `gotest.local` and (when the license allows customer
+   accounts) its owner `cust1` and installing Go through Runway; then *helper* runs
+   `tests/helper-smoke.sh`, *panel* runs `tests/api-smoke.sh` (with a real deployment) and
+   `tests/customer-smoke.sh` (skipped without the customer), *runtime* runs
    `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`). `.github/scripts/plesk-e2e.sh` does
    the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`
-   (`scripts/plesk-dev.sh` wraps it: `up`, `install`, `prepare`, `test`, `down`).
+   (`SMOKE_SUITES=helper,api,customer,runtime` picks the suites; `scripts/plesk-dev.sh` wraps
+   it: `up`, `install`, `prepare`, `test`, `down`).
 
 CodeQL (`.github/workflows/codeql.yml`) analyses the helper, the frontend and the workflows on
 every push and pull request that changes code; its findings are under *Security > Code

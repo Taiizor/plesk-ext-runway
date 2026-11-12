@@ -1,0 +1,82 @@
+# Labels of the repository, applied by .github/workflows/labels.yml (crazy-max/ghaction-github-labeler)
+# on every push that changes this file: labels missing here are deleted, so edit this file instead
+# of the label settings. Type labels decide the release notes category (.github/release.yml);
+# area labels are added to pull requests by .github/labeler.yml.
+
+# Type labels
+- name: bug
+  color: d73a4a
+  description: Something isn't working
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+- name: security
+  color: b60205
+  description: Security hardening or a vulnerability fix
+- name: breaking change
+  color: d93f0b
+  description: Changes behaviour or a documented contract in an incompatible way
+- name: runtime
+  color: 5319e7
+  description: Runtime adapters (Go, Rust, Bun, Java, .NET, Python, Ruby, PHP, binary)
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to documentation
+- name: dependencies
+  color: 0366d6
+  description: Dependency updates (Dependabot)
+- name: skip-changelog
+  color: ededed
+  description: Left out of the generated release notes
+
+# Triage
+- name: needs triage
+  color: fbca04
+  description: New issue that nobody has looked at yet
+- name: question
+  color: d876e3
+  description: Further information is requested
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+- name: invalid
+  color: e4e669
+  description: This doesn't seem right
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed
+- name: accessibility
+  color: f143ab
+  description: Barrier affecting people with disabilities
+
+# Area labels (.github/labeler.yml)
+- name: helper
+  color: "006b75"
+  description: Root helper (src/sbin/runway-helper)
+- name: php
+  color: "006b75"
+  description: "PHP side (src/plib: JSON API, hooks, library)"
+- name: frontend
+  color: "006b75"
+  description: React user interface (src/frontend)
+- name: locales
+  color: "006b75"
+  description: Translations (src/plib/resources/locales)
+- name: packaging
+  color: "006b75"
+  description: build.py, meta.xml, catalog files, icons and screenshots
+- name: tests
+  color: "006b75"
+  description: Test scripts (tests/)
+- name: examples
+  color: "006b75"
+  description: Example applications (examples/)
+- name: ci
+  color: "006b75"
+  description: GitHub Actions, scripts and repository configuration

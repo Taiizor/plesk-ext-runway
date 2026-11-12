@@ -90,7 +90,7 @@ jobs:
           if ($errors.Count) { exit 1 }
           Write-Host "ok scripts/plesk-dev.ps1"
 
-      - name: Locale keys (en-US, tr-TR)
+      - name: Locale keys and placeholders (every locale against en-US)
         run: python tests/check_locales.py
 
       - name: Frontend build (bun + plesk-ext-sdk)
@@ -150,16 +150,30 @@ jobs:
           retention-days: 14
 
   e2e:
-    name: End-to-end (Plesk container)
+    # Three Plesk containers in parallel, one per group of suites (SMOKE_SUITES of
+    # .github/scripts/plesk-e2e.sh): the container start and the preparation are repeated,
+    # the suites themselves are the long part.
+    name: End-to-end (${{ matrix.name }})
     needs: [lint, build]
     # inputs.e2e: the "Run workflow" input, or the input of the calling release workflow.
     if: github.event_name != 'workflow_dispatch' || inputs.e2e
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: helper
+            suites: helper
+          - name: panel
+            suites: api,customer
+          - name: runtime
+            suites: runtime
     env:
       CONTAINER: runway-plesk
       PLESK_IMAGE: plesk/plesk:latest
       PANEL_PORT: "18880"
+      SMOKE_SUITES: ${{ matrix.suites }}
     steps:
       - uses: actions/checkout@v7
 
@@ -177,7 +191,7 @@ jobs:
       - name: Subscription, Go toolchain and sample app
         run: bash .github/scripts/plesk-e2e.sh prepare
 
-      - name: Helper, API and customer smoke tests, Go runtime matrix
+      - name: Smoke tests (${{ matrix.suites }})
         run: bash .github/scripts/plesk-e2e.sh smoke
 
       - name: Collect diagnostics
@@ -187,7 +201,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.name }}
           path: e2e-logs
           retention-days: 7
 

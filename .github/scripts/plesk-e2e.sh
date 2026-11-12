@@ -8,7 +8,8 @@
 #   .github/scripts/plesk-e2e.sh install ZIP       # install or upgrade the extension package
 #   .github/scripts/plesk-e2e.sh prepare           # customer, subscription, Go toolchain, Go sample app
 #   .github/scripts/plesk-e2e.sh smoke             # helper-smoke, api-smoke, customer-smoke and the Go
-#                                                  # part of runtime-e2e (RUNWAY_E2E_RUNTIMES=go)
+#                                                  # part of runtime-e2e (RUNWAY_E2E_RUNTIMES=go); the
+#                                                  # SMOKE_SUITES variable picks a subset
 #   .github/scripts/plesk-e2e.sh diagnostics DIR   # copy logs into DIR (after a failure)
 #   .github/scripts/plesk-e2e.sh stop              # remove the container
 #
@@ -16,8 +17,11 @@
 # DOMAIN (gotest.local), SYSUSER (gotestuser, the name tests/helper-smoke.sh expects),
 # CUSTOMER (cust1, owner of DOMAIN for tests/customer-smoke.sh), GO_VERSION (1.27.4),
 # WAIT_MINUTES (25), E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "smoke", "" skips it),
-# PUBLISH (extra port mappings of "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh).
+# SMOKE_SUITES (helper,api,customer,runtime: the suites "smoke" runs; CI runs them in three
+# parallel containers: helper | api,customer | runtime), PUBLISH (extra port mappings of
+# "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh).
 set -euo pipefail
+SMOKE_SUITES=${SMOKE_SUITES:-helper,api,customer,runtime}
 CONTAINER=${CONTAINER:-runway-plesk}
 PLESK_IMAGE=${PLESK_IMAGE:-plesk/plesk:latest}
 PANEL_PORT=${PANEL_PORT:-18880}
@@ -142,27 +146,36 @@ cmd_prepare() {
     in_c chown -R "$SYSUSER:psacln" "$home/apps"
 }
 
+# want SUITE: 0 when SUITE is listed in SMOKE_SUITES.
+want() { case ",$SMOKE_SUITES," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+
 cmd_smoke() {
     local rc=0 id owner
     id=$(site_id)
-    log "tests/helper-smoke.sh (inside the container)"
-    dock cp "$ROOT/tests/helper-smoke.sh" "$CONTAINER:/root/helper-smoke.sh"
-    in_c env GO_VERSION="$GO_VERSION" bash /root/helper-smoke.sh || rc=1
-    log "tests/api-smoke.sh (JSON API through the panel)"
-    CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
-        APP_ROOT="apps/$DOMAIN" GO_VERSION="$GO_VERSION" RUNWAY_SMOKE_DEPLOY=1 \
-        bash "$ROOT/tests/api-smoke.sh" || rc=1
-    # No "grep -q" here: with pipefail an early exit of grep fails the pipeline when docker exec
-    # is still writing (EPIPE), which skipped this suite on GitHub's runners.
-    owner=$(in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -i "^Owner" | tr -s ' ' | tr -d '\r' || true)
-    case "$owner" in
-        *"($CUSTOMER)"*)
-            log "tests/customer-smoke.sh (as $CUSTOMER)"
-            CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" CUSTOMER="$CUSTOMER" \
-                bash "$ROOT/tests/customer-smoke.sh" || rc=1 ;;
-        *) echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER (${owner:-no owner line})" ;;
-    esac
-    if [ -n "$E2E_RUNTIMES" ]; then
+    if want helper; then
+        log "tests/helper-smoke.sh (inside the container)"
+        dock cp "$ROOT/tests/helper-smoke.sh" "$CONTAINER:/root/helper-smoke.sh"
+        in_c env GO_VERSION="$GO_VERSION" bash /root/helper-smoke.sh || rc=1
+    fi
+    if want api; then
+        log "tests/api-smoke.sh (JSON API through the panel)"
+        CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
+            APP_ROOT="apps/$DOMAIN" GO_VERSION="$GO_VERSION" RUNWAY_SMOKE_DEPLOY=1 \
+            bash "$ROOT/tests/api-smoke.sh" || rc=1
+    fi
+    if want customer; then
+        # No "grep -q" here: with pipefail an early exit of grep fails the pipeline when docker
+        # exec is still writing (EPIPE), which skipped this suite on GitHub's runners.
+        owner=$(in_c plesk bin subscription --info "$DOMAIN" 2>/dev/null | grep -i "^Owner" | tr -s ' ' | tr -d '\r' || true)
+        case "$owner" in
+            *"($CUSTOMER)"*)
+                log "tests/customer-smoke.sh (as $CUSTOMER)"
+                CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" CUSTOMER="$CUSTOMER" \
+                    bash "$ROOT/tests/customer-smoke.sh" || rc=1 ;;
+            *) echo "SKIP  tests/customer-smoke.sh: $DOMAIN is not owned by the customer $CUSTOMER (${owner:-no owner line})" ;;
+        esac
+    fi
+    if want runtime && [ -n "$E2E_RUNTIMES" ]; then
         log "tests/runtime-e2e.sh (runtimes: $E2E_RUNTIMES)"
         CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
             RUNWAY_E2E_RUNTIMES="$E2E_RUNTIMES" bash "$ROOT/tests/runtime-e2e.sh" || rc=1
@@ -198,5 +211,5 @@ case "$command" in
     smoke) cmd_smoke ;;
     diagnostics) cmd_diagnostics "$@" ;;
     stop) cmd_stop ;;
-    *) sed -n '2,19p' "$0"; exit 2 ;;
+    *) sed -n '2,22p' "$0"; exit 2 ;;
 esac

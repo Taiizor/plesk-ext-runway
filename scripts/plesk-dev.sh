@@ -17,7 +17,8 @@
 # Environment: CONTAINER (runway-plesk), PLESK_IMAGE (plesk/plesk:latest), PANEL_PORT (18880:
 # http://localhost:18880), PANEL_SSL_PORT (18443: https://localhost:18443), HTTP_PORT (18080: the
 # hosted sites; add "127.0.0.1 gotest.local" to the hosts file and open http://gotest.local:18080),
-# E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "test", "" skips it), WAIT_MINUTES (25).
+# E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "test", "" skips it), SMOKE_SUITES (the
+# suites of "test": helper,api,customer,runtime), WAIT_MINUTES (25).
 # The first "up" downloads the image (about 2 GB); Plesk then needs a few minutes to initialise.
 set -euo pipefail
 # pwd -W: Windows path in Git Bash (docker cp does not understand /e/... with MSYS_NO_PATHCONV).
@@ -40,7 +41,7 @@ fi
 # Git Bash on Windows: no path conversion for docker arguments.
 dock() { MSYS_NO_PATHCONV=1 docker "$@"; }
 in_c() { dock exec "$CONTAINER" "$@"; }
-usage() { sed -n '2,21p' "$0"; }
+usage() { sed -n '2,22p' "$0"; }
 state() {
     # docker inspect prints an empty line (and fails) for a missing container.
     local status

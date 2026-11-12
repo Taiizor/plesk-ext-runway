@@ -1,0 +1,32 @@
+name: Sync labels
+
+# Applies .github/labels.yml to the repository's labels (creates, updates and deletes), so the
+# file is the only place where labels are defined. A pull request that changes the file gets a
+# dry run that lists what would change.
+on:
+  push:
+    branches: [develop]
+    paths: [".github/labels.yml", ".github/workflows/labels.yml"]
+  pull_request:
+    paths: [".github/labels.yml", ".github/workflows/labels.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Apply .github/labels.yml
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: crazy-max/ghaction-github-labeler@548a7c3603594ec17c819e1239f281a3b801ab4d # v6.0.0
+        with:
+          yaml-file: .github/labels.yml
+          skip-delete: false
+          dry-run: ${{ github.event_name == 'pull_request' }}
