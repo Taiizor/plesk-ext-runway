@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'เส้นทางตรวจสอบสุขภาพต้องเป็นเส้นทาง URL เช่น /healthz',
     'errorPortRange' => 'พอร์ตแรกต้องไม่มากกว่าพอร์ตสุดท้าย',
     'errorSettingRange' => 'โปรดป้อนจำนวนเต็มระหว่าง %%min%% ถึง %%max%%',
+    'errorSettingBoolean' => 'โปรดเลือกเปิดหรือปิด',
     'errorListenMode' => 'เวิร์กเกอร์เบื้องหลังไม่มีตัวรับฟัง: โปรดเลือก "ไม่มี" เป็นโหมดการรับฟัง หรือเลือกโหมดเว็บที่ใช้พอร์ต TCP หรือซ็อกเก็ต Unix',
     'errorMountPathReserved' => '%%path%% ถูกใช้โดย Plesk (สถิติเว็บหรือการตรวจสอบใบรับรอง) และไม่สามารถพร็อกซีได้',
     'errorMaxApps' => 'การสมัครใช้บริการนี้มีแอปพลิเคชันที่เปิดใช้งานครบจำนวนสูงสุดแล้ว (%%max%%)',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'เซิร์ฟเวอร์ PHP ตามค่าเริ่มต้น (php -S) ไม่สามารถรับฟังผ่านซ็อกเก็ต Unix ได้: โปรดติดตั้งชุดเครื่องมือ FrankenPHP หรือเลือก TCP',
     'errorFetchSha256' => 'เช็กซัม SHA-256 ต้องเป็นอักขระเลขฐานสิบหก 64 ตัว',
     'errorFetchFilename' => 'ชื่อไฟล์ใช้ได้เฉพาะตัวอักษร ตัวเลข และ . _ + - เท่านั้น (สูงสุด 128 อักขระ)',
+    'errorUpdateVersion' => 'เวอร์ชันต้องอยู่ในรูปแบบ 1.2.3-1',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'ขีดจำกัดหน่วยความจำ (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'สร้างแอปพลิเคชันตัวอย่าง (%%count%% ไฟล์) และอัปเดตการตั้งค่าแล้ว',
     'messageSampleWrittenOne' => 'สร้างแอปพลิเคชันตัวอย่าง (1 ไฟล์) และอัปเดตการตั้งค่าแล้ว',
     'messageFetchStarted' => 'การดาวน์โหลดเริ่มแล้ว ติดตามได้ในล็อก "บิลด์และดีพลอย"',
+    'messageUpdateStarted' => 'การอัปเดตเป็น Runway %%version%% เริ่มแล้ว ความคืบหน้าแสดงอยู่ด้านล่าง',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'แสดงรายการแอปพลิเคชันที่กำหนดค่าไว้พร้อมสถานะ',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'แสดงรายการชุดเครื่องมือที่ติดตั้งไว้และโดเมนที่ใช้ชุดเครื่องมือเหล่านั้น',
     'cli.commands.install-toolchain' => 'ติดตั้งชุดเครื่องมือ แล้วรอผลลัพธ์: --install-toolchain <รันไทม์> <เวอร์ชัน> [-no-wait]',
     'cli.commands.reconcile' => 'ปรับบริการของแอปพลิเคชันให้สอดคล้องกับ Plesk (โดเมนที่ถูกลบ เปลี่ยนชื่อ หรือระงับ)',
+    'cli.commands.check-update' => 'สอบถามรีลีสล่าสุดของ Runway จาก GitHub และแสดงเวอร์ชันที่ติดตั้งอยู่และเวอร์ชันล่าสุด',
+    'cli.commands.update' => 'อัปเดต Runway เป็นรีลีสล่าสุดจาก GitHub แล้วรอผลลัพธ์: --update [-no-wait]',
 ];

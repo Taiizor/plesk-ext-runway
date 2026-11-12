@@ -4,9 +4,9 @@
 /**
  * JSON API of the extension (docs/DESIGN.md section 6), used by the React frontend.
  *
- * URLs: <baseUrl>index.php/api/<action>. The domain actions live under api/app/<sub>:
- * Zend's module route maps "api/app/save" to appAction() (the extra segment becomes a
- * request parameter), which dispatches on the path segment after "app".
+ * URLs: <baseUrl>index.php/api/<action>. The domain actions live under api/app/<sub> and the
+ * updater under api/update/<sub>: Zend's module route maps "api/app/save" to appAction() (the
+ * extra segment becomes a request parameter), which dispatches on the path segment after "app".
  *
  * Responses: {"status": "success", "data": ...} or {"status": "error", "errors": ["..."]};
  * validation errors are keyed by field: {"status": "error", "errors": {"field": ["..."]}}.
@@ -257,6 +257,40 @@ class ApiController extends pm_Controller_Action
         });
     }
 
+    /**
+     * Built-in updater: GET api/update (installed version, last check, admin job and the
+     * settings updateCheck/updateAuto; no network), POST api/update/check (asks GitHub now),
+     * POST api/update/install {version: "X.Y.Z-R"} (starts the self-update job).
+     */
+    public function updateAction()
+    {
+        $this->respond(function () {
+            Modules_Runway_Access::requireAdmin();
+            switch ($this->subAction('update')) {
+                case '':
+                    return Modules_Runway_Updater::status();
+                case 'check':
+                    $this->requirePost();
+                    return Modules_Runway_Updater::check(true);
+                case 'install':
+                    $this->requirePost();
+                    $body = $this->body();
+                    $version = isset($body['version']) && is_string($body['version']) ? trim($body['version']) : '';
+                    if (!preg_match(Modules_Runway_Updater::VERSION_PATTERN, $version)) {
+                        throw new Modules_Runway_ValidationException(['version' => [pm_Locale::lmsg('errorUpdateVersion')]]);
+                    }
+                    $result = Modules_Runway_Updater::install($version);
+                    return [
+                        'job' => isset($result['job']) ? $result['job'] : 'admin',
+                        'version' => $version,
+                        'message' => pm_Locale::lmsg('messageUpdateStarted', ['version' => $version]),
+                    ];
+                default:
+                    throw new Modules_Runway_Exception(pm_Locale::lmsg('errorInvalidOperation'));
+            }
+        });
+    }
+
     // -----------------------------------------------------------------------
     // Domain (administrator, or customer with the permission and access to the domain)
     // -----------------------------------------------------------------------
@@ -268,7 +302,7 @@ class ApiController extends pm_Controller_Action
     public function appAction()
     {
         $this->respond(function () {
-            $sub = $this->appSubAction();
+            $sub = $this->subAction('app');
             switch ($sub) {
                 case '':
                     return $this->appGet();
@@ -668,15 +702,17 @@ class ApiController extends pm_Controller_Action
     }
 
     /**
-     * The path segment after "api/app" ('' for api/app itself).
+     * The path segment after "api/<action>" ('' for api/<action> itself), e.g. "save" of
+     * api/app/save or "check" of api/update/check.
      *
+     * @param string $action
      * @return string
      */
-    private function appSubAction()
+    private function subAction($action)
     {
         $parts = array_values(array_filter(explode('/', (string)$this->getRequest()->getPathInfo()), 'strlen'));
         $index = array_search('api', $parts, true);
-        if ($index === false || !isset($parts[$index + 1]) || $parts[$index + 1] !== 'app') {
+        if ($index === false || !isset($parts[$index + 1]) || $parts[$index + 1] !== $action) {
             return '';
         }
         return isset($parts[$index + 2]) ? strtolower($parts[$index + 2]) : '';

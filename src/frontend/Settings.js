@@ -3,7 +3,7 @@
 import { createElement, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Form, FormFieldText, RouterLink, Section, Toolbar, Translate, withStatusMessages, useTranslate,
+    Alert, Button, Form, FormFieldCheckbox, FormFieldText, RouterLink, Section, Text, Toolbar, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from './lib/api';
 import { useApi, useApiData } from './lib/hooks';
@@ -11,9 +11,11 @@ import ErrorAlert from './components/ErrorAlert';
 
 const FIELDS = ['portMin', 'portMax', 'buildTimeout', 'memoryMb', 'cpuPercent', 'tasks',
     'buildMemoryMb', 'buildCpuPercent', 'buildTasks', 'maxAppsPerSubscription'];
+/** Switches of the built-in updater (booleans). */
+const SWITCHES = ['updateCheck', 'updateAuto'];
 
-/** Numeric strings become numbers; anything else is sent as typed (the server validates). */
-const toNumbers = values => {
+/** Numeric strings become numbers, switches booleans; anything else is sent as typed (the server validates). */
+const toBody = values => {
     const body = {};
     FIELDS.forEach(key => {
         if (values[key] === undefined) {
@@ -22,6 +24,11 @@ const toNumbers = values => {
         const text = String(values[key]).trim();
         body[key] = /^-?\d+$/.test(text) ? parseInt(text, 10) : text;
     });
+    SWITCHES.forEach(key => {
+        if (values[key] !== undefined) {
+            body[key] = Boolean(values[key]);
+        }
+    });
     return body;
 };
 
@@ -29,7 +36,7 @@ const NumberField = props => <FormFieldText size="md" {...props} />;
 
 /**
  * Server-wide settings (administrators only): port range, default limits of new applications,
- * build limits and the number of applications per subscription.
+ * build limits, the number of applications per subscription and the built-in updater.
  */
 const Settings = ({ baseUrl, statusMessages }) => {
     const api = useApi(baseUrl);
@@ -42,7 +49,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
     const save = formValues => {
         setSaving(true);
         setError(null);
-        api.post('settings', toNumbers(formValues)).then(result => {
+        api.post('settings', toBody(formValues)).then(result => {
             setSaving(false);
             setValues(null);
             settings.setData(result);
@@ -61,7 +68,8 @@ const Settings = ({ baseUrl, statusMessages }) => {
     }
     const current = values || settings.data;
     const unknownErrors = error && error.fieldErrors
-        ? Object.keys(error.fieldErrors).filter(key => FIELDS.indexOf(key) === -1).map(key => [].concat(error.fieldErrors[key]).join(' '))
+        ? Object.keys(error.fieldErrors).filter(key => FIELDS.indexOf(key) === -1 && SWITCHES.indexOf(key) === -1)
+            .map(key => [].concat(error.fieldErrors[key]).join(' '))
         : [];
 
     return (
@@ -108,6 +116,20 @@ const Settings = ({ baseUrl, statusMessages }) => {
                         label={<Translate content="Settings.maxAppsPerSubscription" />}
                         description={<Translate content="Settings.maxAppsPerSubscriptionHint" />}
                     />
+                </Section>
+                <Section title={<Translate content="Settings.sectionUpdates" />}>
+                    <FormFieldCheckbox
+                        name="updateCheck"
+                        label={<Translate content="Settings.updateCheck" />}
+                        description={<Translate content="Settings.updateCheckHint" />}
+                    />
+                    <FormFieldCheckbox
+                        name="updateAuto"
+                        label={<Translate content="Settings.updateAuto" />}
+                        description={<Translate content="Settings.updateAutoHint" />}
+                        disabled={!current.updateCheck}
+                    />
+                    <Text intent="muted" fontSize="sm"><Translate content="Settings.updatePrivacy" /></Text>
                 </Section>
             </Form>
         </div>

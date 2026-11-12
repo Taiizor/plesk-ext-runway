@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Het healthcheck-pad moet een URL-pad zijn zoals /healthz.',
     'errorPortRange' => 'De eerste poort mag niet groter zijn dan de laatste poort.',
     'errorSettingRange' => 'Voer een geheel getal in tussen %%min%% en %%max%%.',
+    'errorSettingBoolean' => 'Kies aan of uit.',
     'errorListenMode' => 'Een achtergrondproces heeft geen listener: kies "Niets" als luistermodus, of een webmodus met een TCP-poort of Unix-socket.',
     'errorMountPathReserved' => '%%path%% wordt gebruikt door Plesk (webstatistieken of certificaatvalidatie) en kan niet via de proxy worden doorgestuurd.',
     'errorMaxApps' => 'Dit abonnement heeft al het maximale aantal ingeschakelde applicaties (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'De standaard PHP-server (php -S) kan niet op een Unix-socket luisteren: installeer een FrankenPHP-toolchain of kies TCP.',
     'errorFetchSha256' => 'De SHA-256-checksum moet uit 64 hexadecimale tekens bestaan.',
     'errorFetchFilename' => 'De bestandsnaam mag alleen letters, cijfers en . _ + - bevatten (max. 128 tekens).',
+    'errorUpdateVersion' => 'De versie moet de vorm 1.2.3-1 hebben.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Geheugenlimiet (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'De voorbeeldapplicatie is aangemaakt (%%count%% bestanden) en de instellingen zijn bijgewerkt.',
     'messageSampleWrittenOne' => 'De voorbeeldapplicatie is aangemaakt (één bestand) en de instellingen zijn bijgewerkt.',
     'messageFetchStarted' => 'De download is gestart. Volg de voortgang in het logboek "Build en deploy".',
+    'messageUpdateStarted' => 'De update naar Runway %%version%% is gestart. De voortgang wordt hieronder weergegeven.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Toont de geconfigureerde applicaties en hun status.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Toont de geïnstalleerde toolchains en de domeinen die ze gebruiken.',
     'cli.commands.install-toolchain' => 'Installeert een toolchain en wacht op het resultaat: --install-toolchain <runtime> <versie> [-no-wait]',
     'cli.commands.reconcile' => 'Brengt de applicatieservices in overeenstemming met Plesk (verwijderde, hernoemde of opgeschorte domeinen).',
+    'cli.commands.check-update' => 'Vraagt GitHub naar de nieuwste Runway-release en toont de geïnstalleerde en de nieuwste versie.',
+    'cli.commands.update' => 'Werkt Runway bij naar de nieuwste GitHub-release en wacht op het resultaat: --update [-no-wait]',
 ];

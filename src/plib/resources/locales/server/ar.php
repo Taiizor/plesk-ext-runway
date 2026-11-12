@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'يجب أن يكون مسار فحص السلامة مسار URL مثل /healthz.',
     'errorPortRange' => 'يجب ألا يكون المنفذ الأول أكبر من المنفذ الأخير.',
     'errorSettingRange' => 'أدخل عددًا صحيحًا بين %%min%% و%%max%%.',
+    'errorSettingBoolean' => 'اختر تشغيل أو إيقاف.',
     'errorListenMode' => 'لا يملك العامل في الخلفية مستمعًا: اختر "لا شيء" كوضع استماع، أو وضع ويب بمنفذ TCP أو مقبس Unix.',
     'errorMountPathReserved' => 'المسار %%path%% مستخدَم من قبل Plesk (إحصائيات الويب أو التحقق من الشهادات) ولا يمكن تمريره عبر الوكيل.',
     'errorMaxApps' => 'وصل هذا الاشتراك بالفعل إلى الحد الأقصى لعدد التطبيقات الممكّنة (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'لا يمكن لخادم PHP الافتراضي (php -S) الاستماع على مقبس Unix: ثبّت سلسلة أدوات FrankenPHP أو اختر TCP.',
     'errorFetchSha256' => 'يجب أن يتكون المجموع الاختباري SHA-256 من 64 حرفًا سداسيًا عشريًا.',
     'errorFetchFilename' => 'يمكن أن يحتوي اسم الملف على أحرف وأرقام و . _ + - فقط (128 حرفًا كحد أقصى).',
+    'errorUpdateVersion' => 'يجب أن يكون الإصدار بالصيغة 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'حد الذاكرة (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'تمت كتابة التطبيق النموذجي (عدد الملفات: %%count%%) وتم تحديث الإعدادات.',
     'messageSampleWrittenOne' => 'تمت كتابة التطبيق النموذجي (ملف واحد) وتم تحديث الإعدادات.',
     'messageFetchStarted' => 'بدأ التنزيل. تابعه في سجل "البناء والنشر".',
+    'messageUpdateStarted' => 'بدأ التحديث إلى Runway %%version%%. يظهر تقدمه أدناه.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'يسرد التطبيقات المكوّنة وحالتها.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'يسرد سلاسل الأدوات المثبّتة والنطاقات التي تستخدمها.',
     'cli.commands.install-toolchain' => 'يثبّت سلسلة أدوات وينتظر النتيجة: --install-toolchain <runtime> <version> [-no-wait]',
     'cli.commands.reconcile' => 'يزامن خدمات التطبيقات مع Plesk (النطاقات المحذوفة أو المعاد تسميتها أو المعلّقة).',
+    'cli.commands.check-update' => 'يستعلم من GitHub عن أحدث إصدار من Runway ويعرض الإصدار المثبّت وأحدث إصدار.',
+    'cli.commands.update' => 'يحدّث Runway إلى أحدث إصدار على GitHub وينتظر النتيجة: --update [-no-wait]',
 ];

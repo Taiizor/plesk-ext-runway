@@ -18,6 +18,8 @@
  *   --toolchains                                 installed toolchains per runtime
  *   --install-toolchain <runtime> <version> [-no-wait]
  *   --reconcile                                  converge the services with Plesk now
+ *   --check-update                               ask GitHub for the latest Runway release
+ *   --update [-no-wait]                          update Runway to the latest release (waits by default)
  * <domain> is a domain name or a numeric domain id.
  */
 class Modules_Runway_Cli
@@ -42,12 +44,15 @@ class Modules_Runway_Cli
         'toolchains' => '',
         'install-toolchain' => '<runtime> <version> [-no-wait]',
         'reconcile' => '',
+        'check-update' => '',
+        'update' => '[-no-wait]',
     ];
 
     /** @var array command => flags it accepts */
     private static $flags = [
         'deploy' => ['no-wait'],
         'install-toolchain' => ['no-wait'],
+        'update' => ['no-wait'],
     ];
 
     /** @var callable */
@@ -121,6 +126,10 @@ class Modules_Runway_Cli
                     return $this->installToolchain($command, $args, empty($flags['no-wait']));
                 case 'reconcile':
                     return $this->reconcile();
+                case 'check-update':
+                    return $this->checkUpdate();
+                case 'update':
+                    return $this->update(empty($flags['no-wait']));
             }
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
@@ -428,6 +437,73 @@ class Modules_Runway_Cli
         return $summary['errors'] ? self::EXIT_FAILED : self::EXIT_OK;
     }
 
+    /**
+     * --check-update: forced check of the latest GitHub release (at most once a minute).
+     *
+     * @return int EXIT_FAILED when the check failed
+     */
+    private function checkUpdate()
+    {
+        $result = Modules_Runway_Updater::check(true);
+        $this->facts(self::updateFacts($result));
+        if ($result['error'] !== null) {
+            $this->error('Error: ' . $result['error']);
+            return self::EXIT_FAILED;
+        }
+        return self::EXIT_OK;
+    }
+
+    /**
+     * --update [-no-wait]: checks GitHub (forced) and starts the self-update job for the latest
+     * release when it is newer than the installed one, then waits for the job.
+     *
+     * @param bool $wait
+     * @return int
+     */
+    private function update($wait)
+    {
+        $result = Modules_Runway_Updater::check(true);
+        $this->facts(self::updateFacts($result));
+        if (!$result['available']) {
+            if ($result['error'] !== null) {
+                $this->error('Error: ' . $result['error']);
+                return self::EXIT_FAILED;
+            }
+            $this->line('Runway ' . $result['installed'] . ' is up to date.');
+            return self::EXIT_OK;
+        }
+        $version = $result['latest']['full'];
+        $start = Modules_Runway_Updater::install($version);
+        $job = isset($start['job']) && is_string($start['job']) ? $start['job'] : 'admin';
+        $this->line('The update to Runway ' . $version . ' has started (job ' . $job . ').');
+        if (!$wait) {
+            return self::EXIT_OK;
+        }
+        // The upgrade replaces the extension's files while this command waits: tolerate
+        // helper calls that fail for a moment.
+        $code = $this->waitForJob($job, 3600, 30);
+        if ($code === self::EXIT_OK) {
+            $this->line('Runway ' . $version . ' is installed.');
+        }
+        return $code;
+    }
+
+    /**
+     * @param array $result Modules_Runway_Updater::check()
+     * @return array [[label, value], ...]
+     */
+    private static function updateFacts(array $result)
+    {
+        $latest = $result['latest'];
+        return [
+            ['Installed', $result['installed']],
+            ['Latest', $latest ? $latest['full'] . ($latest['publishedAt'] ? ' (' . substr($latest['publishedAt'], 0, 10) . ')' : '')
+                : ($result['error'] === null ? 'no release published' : 'unknown')],
+            ['Available', $result['available'] ? 'yes (plesk ext runway --update)' : 'no'],
+            ['Checked', $result['checkedAt'] !== null ? $result['checkedAt'] : 'never'],
+        ];
+    }
+
     // -----------------------------------------------------------------------
     // Plumbing
     // -----------------------------------------------------------------------
@@ -522,16 +598,27 @@ class Modules_Runway_Cli
      *
      * @param string $job Job id (admin, deploy-<id>)
      * @param int $timeout Seconds
+     * @param int $retries Failed status polls in a row that are tolerated (self-update)
      * @return int EXIT_OK when the job succeeded
      */
-    private function waitForJob($job, $timeout)
+    private function waitForJob($job, $timeout, $retries = 0)
     {
         $deadline = time() + max(60, (int)$timeout);
         $last = null;
         $status = [];
+        $failures = 0;
         do {
             sleep(self::POLL_SECONDS);
-            $status = Modules_Runway_Helper::call('job-status', ['job' => $job, 'lines' => 40]);
+            try {
+                $status = Modules_Runway_Helper::call('job-status', ['job' => $job, 'lines' => 40]);
+                $failures = 0;
+            } catch (Exception $e) {
+                if (++$failures > $retries) {
+                    throw $e;
+                }
+                $state = 'running';
+                continue;
+            }
             $state = isset($status['state']) ? (string)$status['state'] : 'none';
             if ($state !== $last) {
                 $this->line('Job ' . $job . ': ' . $state);

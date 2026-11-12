@@ -1,9 +1,11 @@
 <?php
 // Copyright 2026 Taiizor. Licensed under the MIT License.
-// Scheduled task (every 10 minutes): converges the services with the state of Plesk.
+// Scheduled task (every 10 minutes): converges the services with the state of Plesk, then runs
+// the update check of the built-in updater (twice a day, when enabled in the settings).
 
 pm_Context::init('runway');
 
+$code = 0;
 try {
     $summary = Modules_Runway_Reconcile::run();
     if ($summary['removed'] || $summary['reapplied'] || $summary['recovered'] || $summary['errors']) {
@@ -11,6 +13,8 @@ try {
     }
 } catch (Exception $e) {
     Modules_Runway_Log::err('Scheduled reconcile failed: ' . $e->getMessage());
-    exit(1);
+    $code = 1;
 }
-exit(0);
+// Never fails the task: errors of the update check are logged by the updater itself.
+Modules_Runway_Updater::scheduled();
+exit($code);

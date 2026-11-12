@@ -49,6 +49,7 @@ return [
     'errorHealthPath' => 'Sağlık kontrolü yolu /healthz gibi bir URL yolu olmalıdır.',
     'errorPortRange' => 'İlk port son porttan büyük olamaz.',
     'errorSettingRange' => '%%min%% ile %%max%% arasında bir tam sayı girin.',
+    'errorSettingBoolean' => 'Açık veya kapalı seçin.',
     'errorListenMode' => 'Arka plan işçisinin dinleyicisi yoktur: dinleme yöntemi olarak "Hiçbiri"ni ya da TCP portu veya Unix soketi olan bir web modunu seçin.',
     'errorMountPathReserved' => '%%path%% Plesk tarafından kullanılıyor (web istatistikleri veya sertifika doğrulaması) ve proxy ile yönlendirilemez.',
     'errorMaxApps' => 'Bu abonelik, etkin uygulama sayısı sınırına (%%max%%) zaten ulaştı.',
@@ -58,6 +59,7 @@ return [
     'errorSampleUnix' => 'Varsayılan PHP sunucusu (php -S) Unix soketinde dinleyemez: bir FrankenPHP sürümü kurun veya TCP seçin.',
     'errorFetchSha256' => 'SHA-256 sağlama toplamı 64 onaltılık karakterden oluşmalıdır.',
     'errorFetchFilename' => 'Dosya adı yalnızca harf, rakam ve . _ + - içerebilir (en fazla 128 karakter).',
+    'errorUpdateVersion' => 'Sürüm 1.2.3-1 biçiminde olmalıdır.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Bellek sınırı (MiB)',
@@ -79,6 +81,7 @@ return [
     'messageSampleWritten' => 'Örnek uygulama yazıldı (%%count%% dosya) ve ayarlar güncellendi.',
     'messageSampleWrittenOne' => 'Örnek uygulama yazıldı (bir dosya) ve ayarlar güncellendi.',
     'messageFetchStarted' => 'İndirme başladı. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
+    'messageUpdateStarted' => 'Runway %%version%% güncellemesi başladı. İlerlemesi aşağıda gösteriliyor.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Yapılandırılmış uygulamaları ve durumlarını listeler.',
@@ -92,4 +95,6 @@ return [
     'cli.commands.toolchains' => 'Kurulu araç zincirlerini ve bunları kullanan alan adlarını listeler.',
     'cli.commands.install-toolchain' => 'Bir araç zinciri kurar ve sonucu bekler: --install-toolchain <çalışma-ortamı> <sürüm> [-no-wait]',
     'cli.commands.reconcile' => 'Uygulama servislerini Plesk ile eşitler (silinen, yeniden adlandırılan veya askıya alınan alan adları).',
+    'cli.commands.check-update' => 'GitHub\'daki en son Runway sürümünü sorgular; kurulu ve en son sürümü gösterir.',
+    'cli.commands.update' => 'Runway\'i GitHub\'daki en son sürüme günceller ve sonucu bekler: --update [-no-wait]',
 ];

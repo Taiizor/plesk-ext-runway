@@ -35,7 +35,7 @@ Runway/
     plib/
       controllers/ApiController.php         # all JSON endpoints (see §6)
       hooks/{CustomButtons,WebServer,Permissions,ApiCli}.php
-      library/                              # Modules_Runway_* : App, Access, Helper, WebConfig, Reconcile, Settings, Log, Runtime, Cli, EventListener.php
+      library/                              # Modules_Runway_* : App, Access, Helper, WebConfig, Reconcile, Settings, Updater, Log, Runtime, Cli, EventListener.php
       resources/locales/<locale>.php        # 32 Plesk locales; loaders: server/<locale>.php (lmsg) + app/<locale>.php ('app' section for the frontend)
       scripts/{pre-install,post-install,pre-uninstall,reconcile}.php
     sbin/runway-helper                      # python3 root helper (adapter-based)
@@ -68,7 +68,8 @@ Runway/
 | Trigger files | `<app root>/tmp/deploy.txt` (build + restart), `<app root>/tmp/restart.txt` (restart) |
 | Domain settings keys | `runwayApp` (JSON config without env), `runwayLimits` (admin-only limits) |
 | Permission | `manage_runway_apps` (plan/subscription) |
-| Scheduled task | `reconcile.php` every 10 minutes |
+| Scheduled task | `reconcile.php` every 10 minutes (reconcile, then the update check of the built-in updater: `update-check` with the network used at most every 12 hours) |
+| Update cache | `/var/lib/runway/cache/update.json` (root 0600: last check, latest release, last failed version); downloads in `/var/lib/runway/cache/update/` (0700) while the self-update job runs |
 
 ## 4. Architecture (unchanged principles from the base)
 
@@ -194,7 +195,10 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/toolchain` | POST | admin | body `{runtime, op: install\|remove\|update, version}` → `{job}` or `{removed}` |
 | `api/build-deps` | POST | admin | → `{job}` |
 | `api/job` | GET | admin | `?job=admin\|deploy-<id>` → `{state,title,message,log,...}` |
-| `api/settings` | GET/POST | admin | all server settings (`portMin, portMax, buildTimeout, memoryMb, cpuPercent, tasks, buildMemoryMb, buildCpuPercent, buildTasks, maxAppsPerSubscription`); `maxAppsPerSubscription` limits the **enabled** apps of one system user and is checked when an app is enabled (field error `enabled`) |
+| `api/settings` | GET/POST | admin | all server settings (`portMin, portMax, buildTimeout, memoryMb, cpuPercent, tasks, buildMemoryMb, buildCpuPercent, buildTasks, maxAppsPerSubscription` integers, `updateCheck` (default true) and `updateAuto` (default false) booleans: JSON booleans, 0/1 or "true"/"false", else field error); `maxAppsPerSubscription` limits the **enabled** apps of one system user and is checked when an app is enabled (field error `enabled`) |
+| `api/update` | GET | admin | built-in updater, no network: `{installed: "X.Y.Z-R", latest: {version, release, full, tag, htmlUrl, publishedAt} \| null, available, checkedAt, error, updateSource, lastFailedVersion, job: {admin job status}, updateCheck, updateAuto}` (helper `update-status` plus the two settings) |
+| `api/update/check` | POST | admin | forced check (helper `update-check {force: true}`; within 60 s of the previous check the cache answers) → `api/update` shape plus `checked`; a failed check is `error`, not an API error; HTTP 404 of GitHub (nothing published) is `latest: null` |
+| `api/update/install` | POST | admin | `{version: "X.Y.Z-R"}` (the version the administrator saw; field error `version` when malformed) → helper `update-install` → `{job, version, message}`; refused unless it is the cached available update, newer than the installed one, and no admin job runs |
 | `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active}, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}` |
 | `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, static paths 1000 in total. A save is an explicit start (helper `resume`) |
 | `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again |
@@ -227,14 +231,17 @@ their code.
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover}` | `{action}`; start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
 | `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params`, and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
 | `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes}], reconcile_paused}`; `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes) |
-| `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux}` |
+| `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
+| `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
+| `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
+| `update-install` | `{version: "X.Y.Z-R"}` | `{job: "admin", version}`; refuses a malformed version, one that is not newer than the installed one, one that is not the cached available update, and a running admin job |
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
 | `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`) | |
 
 Codes for translation: `listener_code` ∈ `ok, none, foreign, tampered, socket_symlink,
 socket_not_socket, socket_owner, worker`, `health_code` ∈ `no_path, not_listening, failed, no_http,
 http` (params as in the English detail); job statuses carry `title_key` (`install, update,
-build_deps, deploy_build, deploy_restart, deploy_fetch`, and for a deployment of a stopped application
+build_deps, self_update` (params `{version}`), `deploy_build, deploy_restart, deploy_fetch`, and for a deployment of a stopped application
 `deploy_build_only`, `deploy_restart_skipped`, `deploy_fetch_only`, chosen when the job starts) +
 `title_params`. The panel translates
 them (`Domain.status.listenerDetail.*`, `Domain.status.healthDetail.*`, `Common.jobTitle.*`) and
@@ -256,6 +263,37 @@ Test-only switches (root-owned regular files): `/etc/runway/allow-insecure-fetch
 `reconcile_paused: true` while the file is younger than one hour, and `Modules_Runway_Reconcile`
 then changes nothing (tests/helper-smoke.sh uses the fake domain id 999).
 
+Test-only update source: `/etc/runway/update-source` (root-owned regular file, first line; ignored
+while the file or `/etc/runway` is writable by group or others) replaces the GitHub API URL; https
+only, `http://` while `/etc/runway/allow-insecure-fetch` exists (then redirects may lead to
+`http://` too); asset and release page URLs must then lie below that URL's `scheme://host:port/`
+and end in `/<tag>/<asset name>` or `/<tag>`, with the same path rules as for GitHub. The overview
+shows a warning while it is active (`updateSource` of `api/update`). tests/helper-smoke.sh serves
+a mock release with a small `http.server` script (files named `<path>.redirect` answer with a 302).
+
+Built-in updater (the extension is distributed through GitHub releases, not the catalog, so
+Plesk never offers updates for it): `update-check` asks
+`https://api.github.com/repos/Taiizor/plesk-ext-runway/releases/latest` (User-Agent
+`plesk-runway/<VERSION>`, `Accept: application/vnd.github+json`, 20 s timeout). Drafts and
+prereleases are ignored; the tag must be `vX.Y.Z` or `vX.Y.Z-R`, the asset
+`runway-X.Y.Z-R.zip` must agree with it and `SHA256SUMS` must exist; asset URLs are parsed and
+must be exactly `https://github.com/<repo>/releases/download/<tag>/<asset name>`, the release page
+exactly `https://github.com/<repo>/releases/tag/<tag>` (same scheme and host, no query, fragment,
+`%`, backslash or empty, `.` or `..` path segment); the release notes are not stored. The API
+request and both downloads use an opener whose redirect handler accepts only `https://` targets
+(at most 5 redirects; urllib's default would also follow `http://` and `ftp://`). Versions compare as
+`(X, Y, Z, R)` integer tuples; the same or an older version is never installed. The admin job
+action `self-update` (title key `self_update`, "Update Runway to X.Y.Z-R") re-reads the cached
+release and re-validates its URLs, downloads `SHA256SUMS` (≤ 64 KiB) and the versioned zip
+(≤ 200 MiB) into `/var/lib/runway/cache/update/`, checks the zip's SHA-256 against the
+`SHA256SUMS` line of exactly that name and its `meta.xml` (`<id>runway</id>`, version, release),
+refuses a downgrade, runs `plesk bin extension --upgrade <zip>` (1800 s, output in the job log and,
+on failure, in the job message) and fails unless Plesk's `meta.xml` then shows the new version;
+downloads are always removed, failures recorded as `last_failed_version`/`last_failed_at`. The
+job runs `/opt/runway/bin/runway-helper`, which the upgrade replaces by rename (the running
+process keeps its copy); nothing in the upgrade (pre-install, post-install: helper `install`,
+reconcile, web server configuration) stops `runway-job-admin.service` or removes job files.
+
 Fetch security: https only, the download runs as the customer, every address of the host must be
 public; the connection is made to exactly the checked address (pinned lookup through a custom
 `http.client` connection factory, TLS still verifies the host name), redirects are re-checked,
@@ -273,7 +311,18 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 - **Toolchains**: tabs per runtime; each tab = installed list (version, used by, remove/update)
   + install control (select for managed, instructions for detected); build dependencies card;
   job panel with live log (poll every 2 s while busy).
-- **Settings**: form.
+- **Settings**: form (port range, limits, applications per subscription, and "Updates": daily
+  checks, automatic installation, disabled while checks are off).
+- **Updater** (overview, administrators): an available release shows an info alert with the
+  release notes link and "Update now" (confirmation, then `api/update/install` and the admin job
+  panel). `api/update` is reloaded with the overview poll (15 s); a self-update that starts
+  elsewhere (another tab, CLI, automatic installation) is followed in the job panel. The page
+  remembers the installed version of its first `api/update` answer (module state: survives
+  in-app navigation, resets on a reload) and asks to reload the page whenever the installed
+  version differs from it; `lastFailedVersion` equal to the available version shows a warning,
+  `updateSource` (test switch) another one. The server panel shows the Runway
+  version, the last check (time, "never" or the error) and "Check now"; the Toolchains page shows
+  the same admin job (`Common.jobTitle.self_update`).
 - **Domain**: status card (state label, facts, Start/Stop/Restart/Build & restart buttons; Start
   and Restart are disabled while a deployment runs, a stopped app shows "stays stopped until you
   start it", a tampered app an explanation of the containment),
@@ -294,7 +343,10 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 `--list`, `--status <domain>`, `--start|--stop|--restart|--deploy <domain> [-no-wait]` (`--stop`
 persists until `--start`/`--restart`; `--deploy` builds a stopped application without starting it),
 `--enable|--disable <domain>`, `--toolchains`, `--install-toolchain <runtime> <version> [-no-wait]`,
-`--reconcile`. `<domain>` is a name or a domain id. Exit codes: 0 success, 1 failure, 2 usage
+`--reconcile`, `--check-update` (forced check; prints the installed and the latest version; exit 1
+when the check failed), `--update [-no-wait]` (forced check, then the self-update job for the
+latest release when it is newer; waits like `--install-toolchain` and tolerates helper calls that
+fail while the upgrade replaces the files). `<domain>` is a name or a domain id. Exit codes: 0 success, 1 failure, 2 usage
 error (unknown command, domain or runtime). Admin context.
 
 ## 10. Testing and release
@@ -304,7 +356,10 @@ error (unknown command, domain or runtime). Admin context.
   API calls), `tests/customer-smoke.sh` (customer `cust1` with and without the permission),
   `tests/runtime-e2e.sh` (sample app per runtime and listen mode through the API and nginx, path
   mode, static paths, triggers, worker, suspension, CLI, WebSockets through nginx and Apache,
-  optional Laravel Octane), browser check of each page.
+  optional Laravel Octane), browser check of each page. helper-smoke's self-update section runs
+  against a mock release server; with `RUNWAY_SMOKE_SELF_UPDATE=1` (CI's helper job only: it
+  cannot be undone) it repackages the installed extension as release+1 and upgrades to it through
+  the updater.
 - CI (`.github/workflows/ci.yml`): lint (pyflakes, Python 3.8 grammar check of the helper,
   locales, bun build, `build.py --check`, `php -l` in `php:7.4-cli` and `php:8.2-cli`), build
   (bun + `build.py --strict`, zip artifact), e2e in the Plesk container through
@@ -314,7 +369,8 @@ error (unknown command, domain or runtime). Admin context.
   matrix runs locally. Pushes that only change documentation skip CI; pull requests always run
   it (the required checks of `develop` must start). CodeQL (`codeql.yml`) analyses the helper,
   the frontend and the workflows. Release (`release.yml`): tag `v*` → version gate (tag =
-  `src/meta.xml`) → CI → GitHub Release with the tested zip, SHA256SUMS and generated notes
+  `src/meta.xml`) → CI → GitHub Release with the tested zip (also attached as `runway.zip`, the
+  fixed name behind `releases/latest/download/runway.zip`), SHA256SUMS of both and generated notes
   (CHANGELOG section + install + checksums + "What's Changed" from the labelled pull requests,
   docs/RELEASING.md); "Run workflow" rehearses it without publishing.
 - Packaging: `build.py` runs `bun run build` (= `plesk-ext-sdk build`) unless `--no-frontend`,

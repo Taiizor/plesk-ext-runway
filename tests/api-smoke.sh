@@ -10,6 +10,9 @@
 #                                                  # check that nginx serves it (needs Go
 #                                                  # $GO_VERSION installed through Runway)
 #
+# The updater checks (api/update, the settings updateCheck/updateAuto, CLI --check-update) ask
+# GitHub once; they never install anything (helper-smoke covers the update job).
+#
 # The sample, fetch, path mode, worker and maxAppsPerSubscription tests use a scratch subdomain
 # SUB.DOMAIN (created when missing, deleted at the end unless KEEP_SUB=1), so the application
 # of SITE_ID is never modified unless RUNWAY_SMOKE_DEPLOY=1. The fetch test serves a copy of
@@ -46,6 +49,7 @@ SKIP=0
 SUB_ID=""
 CREATED_SUB=0
 MAX_APPS_BEFORE=""
+SWITCHES_BEFORE=""
 
 # Git Bash on Windows: no path conversion for docker arguments (but keep it for curl's
 # cookie jar path, which is a POSIX path there).
@@ -106,6 +110,7 @@ wait_conf_gone() {
 }
 cleanup() {
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
+    if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
     # "[.]" keeps pkill from matching (and killing) this very shell.
     dock exec "$CONTAINER" sh -c "rm -rf /root/runway-smoke-www /etc/runway/allow-insecure-fetch; pkill -f 'http[.]server $FETCH_PORT'" >/dev/null 2>&1
     if [ -n "$SUB_ID" ]; then
@@ -163,6 +168,9 @@ check "overview: site URL uses $SCHEME (SSL/TLS support of $DOMAIN)" "[a['url'] 
 check "toolchains" "d['status'] == 'success' and d['data']['runtimes']['go']['toolchainKind'] == 'managed' and isinstance(d['data']['runtimes']['go']['available'], list)" "$(get 'toolchains?available=0')"
 check "settings" "d['status'] == 'success' and d['data']['portMin'] <= d['data']['portMax'] and 'maxAppsPerSubscription' in d['data']" "$(get settings)"
 check "job" "d['status'] == 'success' and 'state' in d['data']" "$(get 'job?job=admin')"
+check "update: status of the built-in updater (no network)" \
+    "d['status'] == 'success' and set(['installed', 'latest', 'available', 'checkedAt', 'error', 'job', 'updateCheck', 'updateAuto']) <= set(d['data']) and d['data']['installed'].count('-') == 1 and isinstance(d['data']['available'], bool)" \
+    "$(get update)"
 APP=$(get "app?site_id=$SITE_ID")
 check "app" "d['status'] == 'success' and d['data']['domain']['id'] == $SITE_ID and 'config' in d['data'] and d['data']['config']['mode'] in ('web', 'path', 'worker')" "$APP"
 check "app: defaults and toolchains for every runtime" "sorted(d['data']['defaults']) == $KEYS and sorted(d['data']['toolchains']) == $KEYS and all('start_cmd' in v for v in d['data']['defaults'].values())" "$APP"
@@ -177,6 +185,27 @@ check "GET on a mutation is rejected" "d['status'] == 'error'" "$(get toolchain)
 check "GET on app/sample is rejected" "d['status'] == 'error'" "$(get "app/sample?site_id=$SITE_ID")"
 check "settings: errors keyed by field" "d['status'] == 'error' and 'portMax' in d['errors']" "$(post settings '{"portMin": 30000, "portMax": 29000}')"
 check "toolchain: unknown runtime" "d['status'] == 'error' and 'runtime' in d['errors']" "$(post toolchain '{"runtime": "cobol", "op": "install", "version": "1"}')"
+
+echo "== built-in updater"
+check "GET on update/check is rejected" "d['status'] == 'error'" "$(get update/check)"
+check "update/install: invalid version" "d['status'] == 'error' and list(d['errors']) == ['version']" "$(post update/install '{"version": "latest"}')"
+check "update/install: an older version is refused" "d['status'] == 'error' and 'not newer' in str(d['errors'])" "$(post update/install '{"version": "0.0.1-1"}')"
+out=$(post update/check '{}')
+if echo "$out" | grep -q 'rate limit'; then
+    skip "update/check: GitHub API rate limit reached"
+else
+    # Without a published release GitHub answers 404: no release, no error.
+    check "update/check asks GitHub (no release yet: latest null, no error)" \
+        "d['status'] == 'success' and d['data']['error'] is None and d['data']['checkedAt'] and (d['data']['latest'] is None or d['data']['latest']['full'].count('-') == 1)" "$out"
+fi
+SWITCHES_BEFORE=$(get settings | jexpr "json.dumps({'updateCheck': d['data']['updateCheck'], 'updateAuto': d['data']['updateAuto']})")
+check "settings: update switches round-trip" "d['status'] == 'success' and d['data']['updateCheck'] is False and d['data']['updateAuto'] is True" \
+    "$(post settings '{"updateCheck": false, "updateAuto": true}')"
+check "settings: update switches are stored" "d['data']['updateCheck'] is False and d['data']['updateAuto'] is True" "$(get settings)"
+check "update: reports the switches" "d['data']['updateCheck'] is False and d['data']['updateAuto'] is True" "$(get update)"
+check "settings: a switch must be a boolean" "d['status'] == 'error' and list(d['errors']) == ['updateCheck']" "$(post settings '{"updateCheck": "maybe"}')"
+check "settings: update switches restored" "d['status'] == 'success' and json.dumps({'updateCheck': d['data']['updateCheck'], 'updateAuto': d['data']['updateAuto']}) == '$SWITCHES_BEFORE'" \
+    "$(post settings "$SWITCHES_BEFORE")"
 check "app/save: errors keyed by field" \
     "d['status'] == 'error' and set(['appRoot', 'env', 'staticPaths']) <= set(d['errors'])" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"appRoot\": \"../etc\", \"env\": \"PORT=1\", \"staticPaths\": [\"bad path\"]}")"
@@ -253,6 +282,14 @@ out=$(cli --install-toolchain cobol 1.0); code=$?
 [ $code -eq 2 ] && echo "$out" | grep -q 'Unknown runtime' && ok "CLI: unknown runtime exits with 2" || bad "CLI unknown runtime ($code): $out"
 out=$(cli --toolchains); code=$?
 [ $code -eq 0 ] && echo "$out" | grep -q '^Go (go, managed)' && ok "CLI --toolchains" || bad "CLI --toolchains ($code): $out"
+out=$(cli --check-update); code=$?
+if echo "$out" | grep -q 'rate limit'; then
+    skip "CLI --check-update: GitHub API rate limit reached"
+else
+    [ $code -eq 0 ] && echo "$out" | grep -q '^Installed:' && echo "$out" | grep -q '^Available:' && ok "CLI --check-update" || bad "CLI --check-update ($code): $out"
+fi
+out=$(cli --update now); code=$?
+[ $code -eq 2 ] && echo "$out" | grep -q 'Usage: plesk ext runway --update \[-no-wait\]' && ok "CLI --update takes no argument (exit 2)" || bad "CLI --update argument ($code): $out"
 
 if [ "${RUNWAY_SMOKE_SUB:-1}" = "1" ]; then
     echo "== scratch subdomain $SUB_DOMAIN"

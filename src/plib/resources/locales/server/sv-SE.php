@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Sökvägen för hälsokontrollen måste vara en URL-sökväg som /healthz.',
     'errorPortRange' => 'Den första porten får inte vara större än den sista porten.',
     'errorSettingRange' => 'Ange ett heltal mellan %%min%% och %%max%%.',
+    'errorSettingBoolean' => 'Välj på eller av.',
     'errorListenMode' => 'En bakgrundsprocess har ingen lyssnare: välj "Inget" som lyssningsläge, eller ett webbläge med TCP-port eller Unix-socket.',
     'errorMountPathReserved' => '%%path%% används av Plesk (webbstatistik eller certifikatvalidering) och kan inte vidarebefordras via proxy.',
     'errorMaxApps' => 'Det här abonnemanget har redan nått det högsta tillåtna antalet aktiverade applikationer (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'PHP:s standardserver (php -S) kan inte lyssna på en Unix-socket: installera en FrankenPHP-verktygskedja eller välj TCP.',
     'errorFetchSha256' => 'SHA-256-kontrollsumman måste bestå av 64 hexadecimala tecken.',
     'errorFetchFilename' => 'Filnamnet får endast innehålla bokstäver, siffror och . _ + - (max 128 tecken).',
+    'errorUpdateVersion' => 'Versionen måste ha formatet 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnesgräns (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Exempelapplikationen skapades (%%count%% filer) och inställningarna uppdaterades.',
     'messageSampleWrittenOne' => 'Exempelapplikationen skapades (en fil) och inställningarna uppdaterades.',
     'messageFetchStarted' => 'Nedladdningen har startat. Följ förloppet i loggen "Bygge och driftsättning".',
+    'messageUpdateStarted' => 'Uppdateringen till Runway %%version%% har startat. Förloppet visas nedan.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listar de konfigurerade applikationerna och deras status.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Listar de installerade verktygskedjorna och domänerna som använder dem.',
     'cli.commands.install-toolchain' => 'Installerar en verktygskedja och väntar på resultatet: --install-toolchain <körmiljö> <version> [-no-wait]',
     'cli.commands.reconcile' => 'Synkroniserar applikationstjänsterna med Plesk (borttagna, omdöpta eller avstängda domäner).',
+    'cli.commands.check-update' => 'Frågar GitHub efter den senaste Runway-utgåvan och visar den installerade och den senaste versionen.',
+    'cli.commands.update' => 'Uppdaterar Runway till den senaste utgåvan på GitHub och väntar på resultatet: --update [-no-wait]',
 ];

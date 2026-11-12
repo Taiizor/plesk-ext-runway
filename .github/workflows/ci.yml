@@ -163,8 +163,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # self_update: tests/helper-smoke.sh also upgrades the installed extension to a
+          # repackaged release+1 through the built-in updater (irreversible, so only in this
+          # throw-away container; locally it stays off).
           - name: helper
             suites: helper
+            self_update: "1"
           - name: panel
             suites: api,customer
           - name: runtime
@@ -174,6 +178,7 @@ jobs:
       PLESK_IMAGE: plesk/plesk:latest
       PANEL_PORT: "18880"
       SMOKE_SUITES: ${{ matrix.suites }}
+      RUNWAY_SMOKE_SELF_UPDATE: ${{ matrix.self_update || '0' }}
     steps:
       - uses: actions/checkout@v7
 

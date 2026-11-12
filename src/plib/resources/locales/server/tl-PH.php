@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Ang health check path ay dapat isang URL path tulad ng /healthz.',
     'errorPortRange' => 'Ang unang port ay hindi dapat mas mataas kaysa sa huling port.',
     'errorSettingRange' => 'Maglagay ng buong numero mula %%min%% hanggang %%max%%.',
+    'errorSettingBoolean' => 'Pumili ng on o off.',
     'errorListenMode' => 'Walang listener ang background worker: piliin ang "Wala" bilang listen mode, o isang web mode na may TCP port o Unix socket.',
     'errorMountPathReserved' => 'Ginagamit ng Plesk ang %%path%% (mga istatistika ng web o pagpapatunay ng certificate) at hindi ito maaaring i-proxy.',
     'errorMaxApps' => 'Naabot na ng subscription na ito ang maximum na bilang ng mga pinaganang application (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Hindi makakapakinig sa Unix socket ang default na PHP server (php -S): mag-install ng FrankenPHP toolchain o piliin ang TCP.',
     'errorFetchSha256' => 'Ang SHA-256 checksum ay dapat binubuo ng 64 hexadecimal character.',
     'errorFetchFilename' => 'Ang pangalan ng file ay maaari lamang maglaman ng mga letra, numero at . _ + - (max. 128 character).',
+    'errorUpdateVersion' => 'Ang bersyon ay dapat nasa anyong 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Naisulat ang sample application (%%count%% file) at na-update ang mga setting.',
     'messageSampleWrittenOne' => 'Naisulat ang sample application (isang file) at na-update ang mga setting.',
     'messageFetchStarted' => 'Nagsimula na ang pag-download. Subaybayan ito sa log na "Build at deploy".',
+    'messageUpdateStarted' => 'Nagsimula na ang update sa Runway %%version%%. Makikita sa ibaba ang progreso nito.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Ilista ang mga naka-configure na application at ang status ng mga ito.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Ilista ang mga naka-install na toolchain at ang mga domain na gumagamit ng mga ito.',
     'cli.commands.install-toolchain' => 'Mag-install ng toolchain at hintayin ang resulta: --install-toolchain <runtime> <bersyon> [-no-wait]',
     'cli.commands.reconcile' => 'Itugma ang mga serbisyo ng application sa Plesk (mga domain na binura, pinalitan ng pangalan o na-suspend).',
+    'cli.commands.check-update' => 'Tanungin sa GitHub ang pinakabagong release ng Runway at ipakita ang naka-install at ang pinakabagong bersyon.',
+    'cli.commands.update' => 'I-update ang Runway sa pinakabagong release sa GitHub at hintayin ang resulta: --update [-no-wait]',
 ];

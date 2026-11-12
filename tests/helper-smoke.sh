@@ -8,12 +8,25 @@
 # 10 minutes and run on domain events) removes helper apps of domains it does not know, so the
 # script creates the root-only flag /var/lib/runway/pause-reconcile while it runs (Reconcile
 # honours it for at most one hour) and removes it on exit.
+# The self-update section checks the built-in updater against a mock release server; with
+# RUNWAY_SMOKE_SELF_UPDATE=1 it also upgrades the installed extension to a repackaged
+# release+1 (irreversible: Plesk refuses the downgrade afterwards, so only on throw-away servers).
 set -u
 H=/opt/runway/bin/runway-helper
 ID=999
 PAUSE_FLAG=/var/lib/runway/pause-reconcile
 touch "$PAUSE_FLAG"
-trap 'rm -f "$PAUSE_FLAG"' EXIT
+# The self-update section starts a mock release server and sets the update test switches.
+UPD_PID=""
+UPD_DIR=""
+cleanup() {
+    rm -f "$PAUSE_FLAG" /etc/runway/update-source /etc/runway/allow-insecure-fetch
+    [ -n "$UPD_PID" ] && kill "$UPD_PID" 2>/dev/null
+    # The update cache holds mock releases (and a recorded failure of a mock version) once the
+    # self-update section has started: never leave it behind, also not after an aborted run.
+    [ -n "$UPD_DIR" ] && rm -rf "$UPD_DIR" /var/lib/runway/cache/update.json /var/lib/runway/cache/update
+}
+trap cleanup EXIT
 USER_NAME=gotestuser
 HOME_DIR=$(getent passwd "$USER_NAME" | cut -d: -f6)
 APP=$HOME_DIR/apps/smoke
@@ -456,6 +469,263 @@ echo "== reconcile pause flag"
 touch -d '2 hours ago' "$PAUSE_FLAG"
 [ "$(call apps-list '{}' | field "['reconcile_paused']")" = "False" ] && ok "a stale pause flag is ignored" || bad "stale pause flag honoured"
 touch "$PAUSE_FLAG"
+
+echo "== self-update (built-in updater against a mock release source)"
+# A mock "GitHub" on a free local port serves one release per scenario under
+# /<scenario>/releases/latest (+ /<scenario>/download/<tag>/{runway-X.Y.Z-R.zip,SHA256SUMS});
+# a file <path>.redirect makes it answer <path> with a 302 to the URL in that file.
+# The test switches /etc/runway/update-source (the API URL) and allow-insecure-fetch (http://)
+# point the helper at it; a new source URL starts with an empty cache, so each scenario is
+# checked once. RUNWAY_SMOKE_SELF_UPDATE=1 also upgrades the installed extension for real.
+META=/usr/local/psa/admin/plib/modules/runway/meta.xml
+UPD_CACHE=/var/lib/runway/cache/update.json
+UPD_SOURCE_FLAG=/etc/runway/update-source
+UPD_DIR=$(mktemp -d /root/runway-update-XXXXXX)
+mkdir -p "$UPD_DIR/www"
+UPD_PORT=$(python3 -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')
+UPD_URL=http://127.0.0.1:$UPD_PORT
+INSTALLED=$(python3 -c "import sys, xml.etree.ElementTree as E; r = E.parse(sys.argv[1]).getroot(); print('%s-%s' % (r.findtext('version').strip(), r.findtext('release').strip()))" "$META")
+IFS=.- read -r V_MAJ V_MIN V_PATCH V_REL <<< "$INSTALLED"
+NEWER=$V_MAJ.$V_MIN.$((V_PATCH + 1))
+
+expect() { # expect NAME EXPR JSON: EXPR on d = the decoded JSON
+    if [ "$(echo "$3" | jexpr "$2" 2>/dev/null)" = "True" ]; then ok "$1"; else bad "$1: $(echo "$3" | head -c 500)"; fi
+}
+upd_source() { echo "$UPD_URL/$1/releases/latest" > "$UPD_SOURCE_FLAG"; }
+cat > "$UPD_DIR/server.py" <<'PYEOF'
+import http.server, os, sys
+
+class Handler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        redirect = self.translate_path(self.path) + ".redirect"
+        if os.path.isfile(redirect):
+            with open(redirect) as fh:
+                location = fh.read().strip()
+            self.send_response(302)
+            self.send_header("Location", location)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        http.server.SimpleHTTPRequestHandler.do_GET(self)
+
+    def log_message(self, *args):
+        pass
+
+os.chdir(sys.argv[2])
+http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
+PYEOF
+start_mock() {
+    python3 "$UPD_DIR/server.py" "$UPD_PORT" "$UPD_DIR/www" >/dev/null 2>&1 &
+    UPD_PID=$!
+    for _ in $(seq 1 25); do curl -s -o /dev/null "$UPD_URL/" && return 0; sleep 0.2; done
+    return 1
+}
+# mock_release SCENARIO TAG VERSION RELEASE [draft] [pre] [badsum] [evil] [dotdot] [nosums] [redirect] [zip=PATH]
+# evil: the zip URL is on another host; dotdot: below the source, but with ".." segments that
+# leave the release's directory; redirect: SHA256SUMS answers with a relative 302 (followed),
+# the zip with a 302 to ftp:// (refused).
+mock_release() {
+    python3 - "$UPD_DIR/www" "$UPD_URL" "$@" <<'PYEOF'
+import hashlib, json, os, shutil, sys, zipfile
+root, origin, name, tag, version, release = sys.argv[1:7]
+flags = sys.argv[7:]
+base = os.path.join(root, name)
+download = os.path.join(base, "download", tag)
+os.makedirs(download, exist_ok=True)
+os.makedirs(os.path.join(base, "releases"), exist_ok=True)
+zip_name = "runway-%s-%s.zip" % (version, release)
+package = os.path.join(download, zip_name)
+source = [flag[4:] for flag in flags if flag.startswith("zip=")]
+if source:
+    shutil.copyfile(source[0], package)
+else:
+    meta = ('<?xml version="1.0" encoding="utf-8"?>\n<module>\n    <id>runway</id>\n'
+            '    <version>%s</version>\n    <release>%s</release>\n</module>\n' % (version, release))
+    with zipfile.ZipFile(package, "w") as archive:
+        archive.writestr("meta.xml", meta)
+with open(package, "rb") as fh:
+    data = fh.read()
+digest = "0" * 64 if "badsum" in flags else hashlib.sha256(data).hexdigest()
+sums = os.path.join(download, "SHA256SUMS")
+with open(sums + (".real" if "redirect" in flags else ""), "w") as fh:
+    fh.write("%s  %s\n%s  runway.zip\n" % (digest, zip_name, digest))
+if "redirect" in flags:
+    with open(sums + ".redirect", "w") as fh:
+        fh.write("/%s/download/%s/SHA256SUMS.real\n" % (name, tag))
+    with open(package + ".redirect", "w") as fh:
+        fh.write("ftp://127.0.0.1:9/%s\n" % zip_name)
+url = "%s/%s/download/%s/" % (origin, name, tag)
+zip_url = url + zip_name
+if "evil" in flags:
+    zip_url = "https://example.com/" + zip_name
+elif "dotdot" in flags:
+    zip_url = "%s../../../elsewhere/download/%s/%s" % (url, tag, zip_name)
+assets = [{"name": zip_name, "size": len(data), "browser_download_url": zip_url},
+          {"name": "runway.zip", "size": len(data), "browser_download_url": url + "runway.zip"}]
+if "nosums" not in flags:
+    assets.append({"name": "SHA256SUMS", "size": 200, "browser_download_url": url + "SHA256SUMS"})
+release_json = {"tag_name": tag, "draft": "draft" in flags, "prerelease": "pre" in flags,
+                "html_url": "%s/%s/releases/tag/%s" % (origin, name, tag), "published_at": "2026-11-12T10:00:00Z",
+                "body": "Release notes the helper does not keep", "assets": assets}
+with open(os.path.join(base, "releases", "latest"), "w") as fh:
+    json.dump(release_json, fh)
+PYEOF
+}
+
+start_mock || bad "mock release server on port $UPD_PORT"
+rm -f "$UPD_CACHE"
+expect "update-status reads the installed version from meta.xml ($INSTALLED)" \
+    "d['ok'] and d['installed'] == '$INSTALLED' and d['latest'] is None and d['update_source'] is None" "$(call update-status '{}')"
+upd_source none
+call update-check '{"force": true}' | grep -q 'not a valid https URL' && ok "update source: http:// only with the insecure test switch" || bad "http:// update source accepted"
+touch /etc/runway/allow-insecure-fetch
+[ "$(call info '{}' | field "['update_source']")" = "$UPD_URL/none/releases/latest" ] && ok "info reports the update source" || bad "info: update_source"
+chmod 0666 "$UPD_SOURCE_FLAG"
+[ "$(call info '{}' | field "['update_source']")" = "None" ] && ok "a group/world-writable update source is ignored" || bad "writable update source honoured"
+chmod 0644 "$UPD_SOURCE_FLAG"
+expect "HTTP 404: no release published, no error" \
+    "d['ok'] and d['checked'] is True and d['latest'] is None and d['error'] is None and d['available'] is False" "$(call update-check '{"force": true}')"
+
+mock_release newer "v$NEWER" "$NEWER" 1
+upd_source newer
+expect "a newer release is detected ($NEWER-1)" \
+    "d['checked'] is True and d['available'] is True and d['latest']['full'] == '$NEWER-1' and d['latest']['tag'] == 'v$NEWER' and d['latest']['html_url'].startswith('$UPD_URL/') and d['error'] is None" \
+    "$(call update-check '{"force": true}')"
+grep -q 'Release notes' "$UPD_CACHE" && bad "the cache keeps the release notes" || ok "the release notes are not cached"
+[ "$(stat -c '%U %a' "$UPD_CACHE")" = "root 600" ] && ok "update cache is root 0600" || bad "update cache mode: $(stat -c '%U %a' "$UPD_CACHE")"
+expect "a forced check within a minute answers from the cache" "d['checked'] is False and d['latest']['full'] == '$NEWER-1'" "$(call update-check '{"force": true}')"
+expect "a scheduled check within 12 hours answers from the cache" "d['checked'] is False and d['available'] is True" "$(call update-check '{}')"
+# Age the cache, so any check would use the network, then stop the mock: a network attempt of
+# update-status would show up as an error or a new checked_at.
+CHECKED_AT=$(python3 - "$UPD_CACHE" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as fh:
+    cache = json.load(fh)
+cache["checked_epoch"] = 0
+with open(sys.argv[1], "w") as fh:
+    json.dump(cache, fh)
+print(cache["checked_at"])
+PYEOF
+)
+kill "$UPD_PID" 2>/dev/null; wait "$UPD_PID" 2>/dev/null
+expect "update-status needs no network" \
+    "d['ok'] and d['available'] is True and d['latest']['full'] == '$NEWER-1' and d['error'] is None and d['checked_at'] == '$CHECKED_AT'" \
+    "$(call update-status '{}')"
+start_mock || bad "mock release server restarted"
+call update-install "{\"version\": \"$NEWER-2\"}" | grep -q 'is not the available update' && ok "update-install refuses a version that is not the available one" || bad "update-install accepted $NEWER-2"
+call update-install '{"version": "latest"}' | grep -q 'Invalid version' && ok "update-install validates the version" || bad "update-install version validation"
+
+mock_release draft "v$NEWER" "$NEWER" 1 draft
+upd_source draft
+expect "a draft release is ignored" "d['latest'] is None and d['available'] is False and d['error'] is None" "$(call update-check '{"force": true}')"
+call update-install "{\"version\": \"$NEWER-1\"}" | grep -q 'No newer Runway release' && ok "update-install refuses without an available update" || bad "update-install without an available update"
+mock_release pre "v$NEWER" "$NEWER" 1 pre
+upd_source pre
+expect "a prerelease is ignored" "d['latest'] is None and d['available'] is False and d['error'] is None" "$(call update-check '{"force": true}')"
+mock_release evil "v$NEWER" "$NEWER" 1 evil
+upd_source evil
+expect "an asset URL outside the source is rejected" "d['latest'] is None and 'unexpected download URL' in d['error']" "$(call update-check '{"force": true}')"
+mock_release dotdot "v$NEWER" "$NEWER" 1 dotdot
+upd_source dotdot
+expect "an asset URL with '..' segments is rejected" "d['latest'] is None and 'unexpected download URL' in d['error']" "$(call update-check '{"force": true}')"
+mock_release nosums "v$NEWER" "$NEWER" 1 nosums
+upd_source nosums
+expect "a release without SHA256SUMS is rejected" "d['latest'] is None and 'SHA256SUMS' in d['error']" "$(call update-check '{"force": true}')"
+mock_release mismatch "v$NEWER-3" "$NEWER" 1
+upd_source mismatch
+expect "a package that does not match the tag is rejected" "d['latest'] is None and 'matches its tag' in d['error']" "$(call update-check '{"force": true}')"
+
+mock_release same "v$INSTALLED" "$V_MAJ.$V_MIN.$V_PATCH" "$V_REL"
+upd_source same
+expect "the installed version is not offered" "d['latest']['full'] == '$INSTALLED' and d['available'] is False" "$(call update-check '{"force": true}')"
+call update-install "{\"version\": \"$INSTALLED\"}" | grep -q 'is not newer' && ok "update-install refuses the installed version" || bad "update-install accepted $INSTALLED"
+mock_release older "v0.9.0" 0.9.0 1
+upd_source older
+expect "an older release is not offered" "d['latest']['full'] == '0.9.0-1' and d['available'] is False" "$(call update-check '{"force": true}')"
+call update-install '{"version": "0.9.0-1"}' | grep -q 'is not newer' && ok "update-install refuses a downgrade" || bad "update-install accepted a downgrade"
+
+mock_release badsum "v$NEWER" "$NEWER" 1 badsum
+upd_source badsum
+out=$(call update-check '{"force": true, "auto_install": true}')
+expect "auto_install starts the self-update job" "d['started'] is True and d['job']['title_key'] == 'self_update' and d['job']['title_params'] == {'version': '$NEWER-1'}" "$out"
+state=$(wait_job admin)
+[ "$state" = "failed" ] && grep -q 'Checksum mismatch' /var/lib/runway/jobs/admin.log && ok "a wrong checksum fails the self-update job" || bad "self-update with a wrong checksum: $state: $(tail -n 3 /var/lib/runway/jobs/admin.log)"
+expect "the failed update leaves $INSTALLED installed and is recorded" \
+    "d['installed'] == '$INSTALLED' and d['last_failed_version'] == '$NEWER-1' and d['available'] is True" "$(call update-status '{}')"
+grep -q "<version>$V_MAJ.$V_MIN.$V_PATCH</version>" "$META" && grep -q "<release>$V_REL</release>" "$META" && ok "Plesk's meta.xml is unchanged" || bad "meta.xml changed"
+[ ! -e /var/lib/runway/cache/update ] && ok "the downloads were removed" || bad "downloads left in /var/lib/runway/cache/update"
+expect "auto_install waits 24 hours before it retries a failed version" "d['started'] is False and 'auto_skipped' in d" "$(call update-check '{"auto_install": true}')"
+mock_release redirect "v$NEWER" "$NEWER" 1 redirect
+upd_source redirect
+expect "the redirect release is offered" "d['available'] is True and d['latest']['full'] == '$NEWER-1'" "$(call update-check '{"force": true}')"
+call update-install "{\"version\": \"$NEWER-1\"}" >/dev/null
+state=$(wait_job admin)
+[ "$state" = "failed" ] && grep -q 'redirected to a URL that is not https://' /var/lib/runway/jobs/admin.log && ok "a redirect to ftp:// fails the self-update job" || bad "self-update with an ftp:// redirect: $state: $(tail -n 3 /var/lib/runway/jobs/admin.log)"
+# Only SHA256SUMS (reached through a relative http:// redirect) can have been downloaded.
+grep -q '\] Downloaded ' /var/lib/runway/jobs/admin.log && ok "an allowed redirect (SHA256SUMS) is followed" || bad "SHA256SUMS redirect: $(tail -n 5 /var/lib/runway/jobs/admin.log)"
+grep -q "<release>$V_REL</release>" "$META" && ok "the refused redirect leaves meta.xml unchanged" || bad "meta.xml changed after the refused redirect"
+
+if [ "${RUNWAY_SMOKE_SELF_UPDATE:-0}" = "1" ]; then
+    # Irreversible: the container keeps the repackaged release (Plesk refuses downgrades).
+    TARGET=$V_MAJ.$V_MIN.$V_PATCH-$((V_REL + 1))
+    echo "== self-update: real upgrade $INSTALLED -> $TARGET (RUNWAY_SMOKE_SELF_UPDATE=1)"
+    mkdir -p "$UPD_DIR/pack"
+    plesk bin extension --pack runway -destination "$UPD_DIR/pack" >/dev/null
+    PACKED=$(ls "$UPD_DIR"/pack/*.zip 2>/dev/null | head -n 1)
+    # release+1 in meta.xml and a changed (functionally identical) helper, so the upgrade really
+    # replaces /opt/runway/bin/runway-helper, the file the running self-update job was started from.
+    MARKER="# smoke release $((V_REL + 1))"
+    python3 - "$PACKED" "$UPD_DIR/repacked.zip" "$((V_REL + 1))" "$MARKER" <<'PYEOF'
+import re, sys, zipfile
+source, dest, release, marker = sys.argv[1:5]
+changed = set()
+with zipfile.ZipFile(source) as zin, zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zout:
+    for info in zin.infolist():
+        data = zin.read(info)
+        if info.filename == "meta.xml":
+            data = re.sub(rb"<release>\s*\d+\s*</release>", b"<release>" + release.encode() + b"</release>", data, count=1)
+            changed.add("meta")
+        elif info.filename == "sbin/runway-helper":
+            data = data.rstrip(b"\n") + b"\n" + marker.encode() + b"\n"
+            changed.add("helper")
+        zout.writestr(info, data)
+sys.exit(0 if changed == {"meta", "helper"} else 1)
+PYEOF
+    [ $? -eq 0 ] && [ -s "$UPD_DIR/repacked.zip" ] && ok "repackaged the installed extension as $TARGET (with a changed helper)" || bad "repackaging failed (pack: ${PACKED:-none})"
+    HELPER_BEFORE=$(sha256sum /opt/runway/bin/runway-helper | cut -d' ' -f1)
+    mock_release real "v$TARGET" "$V_MAJ.$V_MIN.$V_PATCH" "$((V_REL + 1))" "zip=$UPD_DIR/repacked.zip"
+    upd_source real
+    expect "the repackaged release is offered" "d['available'] is True and d['latest']['full'] == '$TARGET'" "$(call update-check '{"force": true}')"
+    case "$(curl -s --max-time 5 "http://127.0.0.1:$PORT/")" in "Hello from"*) ok "the application answers before the upgrade" ;; *) bad "the application does not answer before the upgrade" ;; esac
+    expect "update-install starts the self-update job" "d['ok'] and d['job'] == 'admin' and d['version'] == '$TARGET'" "$(call update-install "{\"version\": \"$TARGET\"}")"
+    state=""
+    for _ in $(seq 1 450); do
+        state=$(call job-status '{"job": "admin"}' | field "['state']" 2>/dev/null)
+        case "$state" in queued|running|"") sleep 2 ;; *) break ;; esac
+    done
+    [ "$state" = "succeeded" ] && ok "the self-update job succeeded" || bad "self-update job: $state: $(tail -n 25 /var/lib/runway/jobs/admin.log)"
+    grep -q "<release>$((V_REL + 1))</release>" "$META" && ok "Plesk's meta.xml shows release $((V_REL + 1))" || bad "meta.xml: $(grep -E '<(version|release)>' "$META" | tr -d ' ')"
+    plesk bin extension --list | grep -q '^runway ' && ok "plesk bin extension --list lists runway" || bad "runway missing from plesk bin extension --list"
+    expect "update-status: $TARGET installed, nothing newer" "d['installed'] == '$TARGET' and d['available'] is False and d['job']['state'] == 'succeeded'" "$(call update-status '{}')"
+    [ "$(sha256sum /opt/runway/bin/runway-helper | cut -d' ' -f1)" != "$HELPER_BEFORE" ] && [ "$(tail -n 1 /opt/runway/bin/runway-helper)" = "$MARKER" ] && ok "the upgrade replaced the helper copy the job ran from, and the job survived" || bad "/opt/runway/bin/runway-helper was not replaced by the upgrade"
+    cmp -s /opt/runway/bin/runway-helper /usr/local/psa/admin/sbin/modules/runway/runway-helper && ok "the helper copy matches the upgraded helper" || bad "/opt/runway/bin/runway-helper differs from the upgraded helper"
+    grep -q 'is installed' /var/lib/runway/jobs/admin.log && grep -q 'successfully' /var/lib/runway/jobs/admin.log && ok "the job log shows the plesk output and the result" || bad "self-update log: $(tail -n 5 /var/lib/runway/jobs/admin.log)"
+    case "$(curl -s --max-time 5 "http://127.0.0.1:$PORT/")" in "Hello from"*) ok "the application kept running" ;; *) bad "the application does not answer after the upgrade" ;; esac
+    JAR=$UPD_DIR/cookies
+    LINK=$(plesk bin admin --get-login-link -relative-url | tr -d '\r')
+    curl -s -c "$JAR" -b "$JAR" -L "http://localhost:8880$LINK" -o /dev/null
+    expect "the panel API of the new version answers" "d['status'] == 'success' and d['data']['installed'] == '$TARGET' and d['data']['available'] is False" \
+        "$(curl -s -b "$JAR" -H 'X-Requested-With: XMLHttpRequest' "http://localhost:8880/modules/runway/index.php/api/update")"
+    out=$(plesk ext runway --check-update 2>&1); code=$?
+    [ $code -eq 0 ] && echo "$out" | grep -q "^Installed: *$TARGET" && ok "CLI --check-update of the new version" || bad "CLI --check-update ($code): $out"
+    out=$(plesk ext runway --update 2>&1); code=$?
+    [ $code -eq 0 ] && echo "$out" | grep -q "is up to date" && ok "CLI --update: nothing newer" || bad "CLI --update ($code): $out"
+fi
+kill "$UPD_PID" 2>/dev/null; wait "$UPD_PID" 2>/dev/null
+UPD_PID=""
+rm -f "$UPD_SOURCE_FLAG" "$UPD_CACHE" /etc/runway/allow-insecure-fetch
+rm -rf "$UPD_DIR"
+expect "without the test switch the source is GitHub again" "d['update_source'] is None and d['latest'] is None" "$(call update-status '{}')"
 
 echo "== cleanup"
 call app-remove "{\"domain_id\": $ID}" >/dev/null

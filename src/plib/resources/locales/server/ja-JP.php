@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'ヘルスチェックパスは /healthz のような URL パスでなければなりません。',
     'errorPortRange' => '開始ポートは終了ポート以下にしてください。',
     'errorSettingRange' => '%%min%% から %%max%% までの整数を入力してください。',
+    'errorSettingBoolean' => 'オンまたはオフを選択してください。',
     'errorListenMode' => 'バックグラウンドワーカにはリスナがありません。リッスンモードとして「なし」を選択するか、TCP ポートまたは Unix ソケットを使用するウェブモードを選択してください。',
     'errorMountPathReserved' => '%%path%% は Plesk がウェブ統計または証明書の検証に使用しているため、プロキシできません。',
     'errorMaxApps' => 'このサブスクリプションでは、有効なアプリケーションの数がすでに上限（%%max%%）に達しています。',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'デフォルトの PHP サーバ（php -S）は Unix ソケットでリッスンできません。FrankenPHP のツールチェーンをインストールするか、TCP を選択してください。',
     'errorFetchSha256' => 'SHA-256 チェックサムは 64 桁の 16 進数でなければなりません。',
     'errorFetchFilename' => 'ファイル名に使用できるのは英字、数字、. _ + - のみです（最大 128 文字）。',
+    'errorUpdateVersion' => 'バージョンは 1.2.3-1 のような形式で指定してください。',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'メモリ上限（MiB）',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'サンプルアプリケーション（%%count%% ファイル）を書き込み、設定を更新しました。',
     'messageSampleWrittenOne' => 'サンプルアプリケーション（1 ファイル）を書き込み、設定を更新しました。',
     'messageFetchStarted' => 'ダウンロードを開始しました。「ビルドとデプロイ」ログで確認できます。',
+    'messageUpdateStarted' => 'Runway %%version%% へのアップデートを開始しました。進行状況は下に表示されます。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '設定済みのアプリケーションとその状態を一覧表示します。',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'インストール済みのツールチェーンと、それを使用しているドメインを一覧表示します。',
     'cli.commands.install-toolchain' => 'ツールチェーンをインストールして結果を待ちます: --install-toolchain <ランタイム> <バージョン> [-no-wait]',
     'cli.commands.reconcile' => 'アプリケーションサービスを Plesk の状態に合わせます（削除、名前変更、一時停止されたドメイン）。',
+    'cli.commands.check-update' => 'GitHub に最新の Runway リリースを問い合わせ、インストール済みのバージョンと最新バージョンを表示します。',
+    'cli.commands.update' => 'Runway を GitHub の最新リリースにアップデートして結果を待ちます: --update [-no-wait]',
 ];

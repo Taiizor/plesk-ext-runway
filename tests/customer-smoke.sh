@@ -68,9 +68,11 @@ check "overview: only the customer's domains, no server facts" \
 APP=$(get "app?site_id=$SITE_ID")
 check "app: readable with the permission, no limits editing, no usage lists" \
     "d['status'] == 'success' and d['data']['isAdmin'] is False and all(not isinstance(t, dict) or 'in_use' not in t for v in d['data']['toolchains'].values() for t in v)" "$APP"
-for path in toolchains settings "job?job=admin"; do
+for path in toolchains settings "job?job=admin" update; do
     check "admin endpoint $path is refused" "d['status'] == 'error'" "$(get "$path")"
 done
+check "POST update/check is refused (access denied)" "d['status'] == 'error' and 'denied' in str(d['errors']).lower()" "$(post update/check '{}')"
+check "POST update/install is refused (access denied)" "d['status'] == 'error' and 'denied' in str(d['errors']).lower()" "$(post update/install '{"version": "9.9.9-1"}')"
 check "POST settings is refused" "d['status'] == 'error'" "$(post settings '{"portMin": 20000}')"
 check "POST toolchain is refused" "d['status'] == 'error'" "$(post toolchain '{"runtime": "go", "op": "remove", "version": "1.27.4"}')"
 check "POST build-deps is refused" "d['status'] == 'error'" "$(post build-deps '{}')"

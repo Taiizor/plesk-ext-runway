@@ -19,9 +19,12 @@
 # WAIT_MINUTES (25), E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "smoke", "" skips it),
 # SMOKE_SUITES (helper,api,customer,runtime: the suites "smoke" runs; CI runs them in three
 # parallel containers: helper | api,customer | runtime), PUBLISH (extra port mappings of
-# "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh).
+# "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh), RUNWAY_SMOKE_SELF_UPDATE (0; 1
+# lets tests/helper-smoke.sh really upgrade the installed extension to a repackaged release+1,
+# which cannot be undone: CI sets it for its throw-away helper container only).
 set -euo pipefail
 SMOKE_SUITES=${SMOKE_SUITES:-helper,api,customer,runtime}
+RUNWAY_SMOKE_SELF_UPDATE=${RUNWAY_SMOKE_SELF_UPDATE:-0}
 CONTAINER=${CONTAINER:-runway-plesk}
 PLESK_IMAGE=${PLESK_IMAGE:-plesk/plesk:latest}
 PANEL_PORT=${PANEL_PORT:-18880}
@@ -163,7 +166,8 @@ cmd_smoke() {
     if want helper; then
         log "tests/helper-smoke.sh (inside the container)"
         dock cp "$ROOT/tests/helper-smoke.sh" "$CONTAINER:/root/helper-smoke.sh"
-        in_c env GO_VERSION="$GO_VERSION" bash /root/helper-smoke.sh || rc=1
+        in_c env GO_VERSION="$GO_VERSION" RUNWAY_SMOKE_SELF_UPDATE="$RUNWAY_SMOKE_SELF_UPDATE" \
+            bash /root/helper-smoke.sh || rc=1
     fi
     if want api; then
         log "tests/api-smoke.sh (JSON API through the panel)"
@@ -219,5 +223,5 @@ case "$command" in
     smoke) cmd_smoke ;;
     diagnostics) cmd_diagnostics "$@" ;;
     stop) cmd_stop ;;
-    *) sed -n '2,22p' "$0"; exit 2 ;;
+    *) sed -n '2,24p' "$0"; exit 2 ;;
 esac

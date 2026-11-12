@@ -51,9 +51,10 @@ end-to-end job installed and tested. Title and notes of the release page are gen
    git push origin develop vX.Y.Z
    ```
 
-7. Watch the *Release* workflow. It publishes `runway-X.Y.Z-R.zip` and `SHA256SUMS` with the
-   generated title and notes. If it fails after the tag was pushed, fix the problem, delete the
-   tag (`git push --delete origin vX.Y.Z`, `git tag -d vX.Y.Z`) and tag again, or release
+7. Watch the *Release* workflow. It publishes `runway-X.Y.Z-R.zip`, the same file as
+   `runway.zip` and `SHA256SUMS` with the generated title and notes. If it fails after the tag
+   was pushed (before the release page exists), fix the problem, delete the tag
+   (`git push --delete origin vX.Y.Z`, `git tag -d vX.Y.Z`) and tag again, or release
    `vX.Y.Z-<R+1>`.
 8. Afterwards: add a fresh `## [Unreleased]` section to `CHANGELOG.md`.
 
@@ -66,23 +67,49 @@ or a description:
 - **Notes**, in this order:
   1. the `## [X.Y.Z] - YYYY-MM-DD` section of `CHANGELOG.md` (the workflow fails when the section
      is missing or empty, so write it before tagging);
-  2. *Install*: the `plesk bin extension --upgrade` command for the zip, the panel upload hint and
-     the requirements link;
-  3. *Checksums (SHA-256)* of the zip (the same as the attached `SHA256SUMS`);
+  2. *Install*: the one-line `plesk bin extension --upgrade-url .../releases/latest/download/runway.zip`
+     command, the `plesk bin extension --upgrade` command for the downloaded zip, the panel upload
+     hint, the built-in updater and the requirements link;
+  3. *Checksums (SHA-256)* of the versioned zip and `runway.zip` (the same as the attached
+     `SHA256SUMS`);
   4. *What's Changed*: the list GitHub generates from the pull requests merged since the previous
      release, grouped by their labels as configured in `.github/release.yml` (breaking changes,
      security, new features, bug fixes, runtimes, documentation, dependencies, other), plus new
      contributors and the compare link. Pull requests labelled `skip-changelog` are left out, so
      label pull requests before tagging (CONTRIBUTING.md, "Labels").
-- **Assets**: `runway-X.Y.Z-R.zip` and `SHA256SUMS`.
+- **Assets**: `runway-X.Y.Z-R.zip`, the same file under the fixed name `runway.zip` (so
+  `https://github.com/Taiizor/plesk-ext-runway/releases/latest/download/runway.zip` always points
+  at the newest release: `plesk bin extension --upgrade-url <that URL>` installs or updates in
+  one command, and the *Install* part of the notes shows it) and `SHA256SUMS` listing both.
+
+## Releases and the built-in updater
+
+Installed servers find new versions through the GitHub API's `releases/latest` (the helper's
+`update-check`, docs/DESIGN.md section 7) and install the versioned zip after checking it against
+`SHA256SUMS` of the same release. Consequences for releasing:
+
+- **A published release reaches servers on its own**: within 12 hours every server with update
+  checks on shows it, and servers with automatic installation install it. Never publish a
+  release that has not passed the whole workflow.
+- **A broken release cannot be withdrawn**: deleting it makes the previous release "latest"
+  again, but servers that installed it stay on it (the updater never downgrades). Fix it by
+  publishing a newer version (`vX.Y.Z-<R+1>` for a packaging fix, or the next patch version).
+- **Never mark a prerelease as latest**, and do not attach assets by hand: the updater ignores
+  drafts and prereleases, expects exactly one `runway-X.Y.Z-R.zip` that matches the tag
+  (`vX.Y.Z` or `vX.Y.Z-R`) plus `SHA256SUMS`, and refuses everything else (the check then shows an
+  error on every server).
+- The asset names, the tag format and the `meta.xml` inside the zip (`<id>runway</id>`, version,
+  release) are part of the updater's contract: changing them breaks updates of installed
+  versions.
 
 ## Rehearsal
 
 *Actions > Release > Run workflow* on `develop` runs the release workflow without a tag: it
 takes the version from `src/meta.xml`, builds and verifies the package, runs the lint and
 packaging checks (tick *e2e* to run the end-to-end tests as well), renders the release notes
-into the job summary and uploads them with the zip as the `release-rehearsal` artifact. Nothing
-is published. Use it to proof-read the notes before pushing the tag.
+into the job summary and uploads them with the zip (and its `runway.zip` copy) as the
+`release-rehearsal` artifact. Nothing is published. Use it to proof-read the notes before
+pushing the tag.
 
 ## Package verification
 

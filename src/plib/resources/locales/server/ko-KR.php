@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => '헬스 체크 경로는 /healthz와 같은 URL 경로여야 합니다.',
     'errorPortRange' => '첫 번째 포트는 마지막 포트보다 클 수 없습니다.',
     'errorSettingRange' => '%%min%%과(와) %%max%% 사이의 정수를 입력하십시오.',
+    'errorSettingBoolean' => '켜기 또는 끄기를 선택하십시오.',
     'errorListenMode' => '백그라운드 워커에는 리스너가 없습니다. 수신 방식으로 "없음"을 선택하거나 TCP 포트 또는 Unix 소켓을 사용하는 웹 모드를 선택하십시오.',
     'errorMountPathReserved' => '%%path%%은(는) Plesk가 사용하므로(웹 통계 또는 인증서 검증) 프록시할 수 없습니다.',
     'errorMaxApps' => '이 구독은 이미 활성화된 애플리케이션의 최대 수(%%max%%개)에 도달했습니다.',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => '기본 PHP 서버(php -S)는 Unix 소켓에서 수신 대기할 수 없습니다. FrankenPHP 툴체인을 설치하거나 TCP를 선택하십시오.',
     'errorFetchSha256' => 'SHA-256 체크섬은 64자리 16진수 문자여야 합니다.',
     'errorFetchFilename' => '파일 이름에는 문자, 숫자 및 . _ + -만 사용할 수 있습니다(최대 128자).',
+    'errorUpdateVersion' => '버전은 1.2.3-1과 같은 형식이어야 합니다.',
 
     // Field names used in error messages
     'fieldMemoryMb' => '메모리 제한(MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => '샘플 애플리케이션이 생성되었으며(파일 %%count%%개) 설정이 업데이트되었습니다.',
     'messageSampleWrittenOne' => '샘플 애플리케이션이 생성되었으며(파일 1개) 설정이 업데이트되었습니다.',
     'messageFetchStarted' => '다운로드가 시작되었습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
+    'messageUpdateStarted' => 'Runway %%version%%(으)로의 업데이트가 시작되었습니다. 진행 상황은 아래에 표시됩니다.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '구성된 애플리케이션과 그 상태를 나열합니다.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => '설치된 툴체인과 이를 사용하는 도메인을 나열합니다.',
     'cli.commands.install-toolchain' => '툴체인을 설치하고 결과를 기다립니다: --install-toolchain <런타임> <버전> [-no-wait]',
     'cli.commands.reconcile' => '애플리케이션 서비스를 Plesk와 일치시킵니다(삭제되거나 이름이 변경되거나 일시 중단된 도메인).',
+    'cli.commands.check-update' => 'GitHub에서 최신 Runway 릴리스를 조회하고 설치된 버전과 최신 버전을 표시합니다.',
+    'cli.commands.update' => 'Runway를 최신 GitHub 릴리스로 업데이트하고 결과를 기다립니다: --update [-no-wait]',
 ];

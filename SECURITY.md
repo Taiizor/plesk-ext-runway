@@ -50,6 +50,7 @@ What Runway protects:
 | Plesk state | suspended or deleted domains keep running | event listener plus a scheduled reconcile every 10 minutes stop, rename or remove services; builds re-check the state before restarting |
 | panel users | CSRF, privilege escalation in the API | every mutation is a POST with Plesk's forgery protection token; every domain action checks admin rights or the customer's permission and access to that domain; admin-only actions check the admin role |
 | internal services | "Fetch from URL" used to reach the server's loopback/private network (SSRF), including DNS rebinding | https only (PHP and helper), the download runs as the customer; every address of the host must be public, and the connection goes to exactly the address that was checked (the lookup is pinned, TLS still verifies the host name), with the same check for every redirect; no proxies; 500 MB cap |
+| the extension itself | a tampered or corrupted package installed by the built-in updater | see [Updates](#updates) below: HTTPS from the repository's GitHub releases only, SHA-256 from the same release, `meta.xml` and version checks, no downgrades, administrators only, automatic installation is opt-in |
 
 Out of scope (by design):
 
@@ -75,9 +76,45 @@ Out of scope (by design):
 
 Test-only switches (root-owned files, never present on production servers): the helper accepts
 plain `http://` and private addresses for "Fetch from URL" while `/etc/runway/allow-insecure-fetch`
-exists, and the panel's reconcile leaves applications alone while
-`/var/lib/runway/pause-reconcile` exists (at most one hour after its last modification). The test
-scripts create and remove them; `runway-helper info` reports the first as `fetch_insecure`.
+exists, the panel's reconcile leaves applications alone while
+`/var/lib/runway/pause-reconcile` exists (at most one hour after its last modification), and
+`/etc/runway/update-source` replaces the GitHub API URL of the built-in updater with the URL on
+its first line (https only, `http://` only while `allow-insecure-fetch` exists; package and
+release page URLs must then lie below that URL's own `scheme://host:port/`, with the same path
+rules as for GitHub). Its content decides where root downloads packages from, so the helper
+ignores it unless the file and `/etc/runway` are owned by root and writable by nobody else, and
+the overview shows a warning while it is active. The test scripts
+create and remove them; `runway-helper info` reports the first as `fetch_insecure` and the last
+as `update_source`.
+
+## Updates
+
+Runway is distributed through the GitHub releases of this repository, not the Plesk extension
+catalog, so Plesk itself never offers updates for it. The built-in updater:
+
+- asks `https://api.github.com/repos/Taiizor/plesk-ext-runway/releases/latest` (one HTTPS request
+  twice a day while *Settings > Updates > Check for updates* is on, the default, or when an
+  administrator clicks *Check now*; nothing about the server is sent besides the request itself
+  and the `plesk-runway/<version>` User-Agent);
+- takes package URLs only as exactly
+  `https://github.com/Taiizor/plesk-ext-runway/releases/download/<tag>/<file name>` of the
+  validated tag (parsed, not compared as a string prefix: no query, fragment, percent-escapes or
+  `.`/`..` segments) and the release page only as `.../releases/tag/<tag>`, ignores drafts and
+  prereleases, never installs the same or an older version, and keeps no release notes;
+- downloads the versioned zip and `SHA256SUMS` of the same release over HTTPS (redirects, such as
+  GitHub's to its asset host, are followed only to `https://` URLs, at most five), refuses the zip
+  unless its SHA-256 matches the line of exactly that file name and its `meta.xml` names the
+  extension `runway` with the expected version and release, then runs
+  `plesk bin extension --upgrade` as root in the administrator's background job;
+- is available to administrators only (panel, API and CLI; customers get "access denied"), and
+  installs automatically only when an administrator turns on *Install updates automatically*.
+
+The SHA-256 checksum comes from the same release as the package. It protects against corrupted
+or truncated downloads, **not** against a compromised GitHub account, a compromised release
+workflow or a malicious release: whoever can publish a release of this repository can run code
+as root on servers that install it (automatically, when automatic installation is on). Keep
+automatic installation off when that risk is not acceptable, and review the release notes before
+clicking *Update now*.
 
 ## Hardening checklist for administrators
 

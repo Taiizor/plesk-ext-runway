@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Le chemin de vérification d\'état doit être un chemin d\'URL comme /healthz.',
     'errorPortRange' => 'Le premier port ne doit pas être supérieur au dernier port.',
     'errorSettingRange' => 'Saisissez un nombre entier compris entre %%min%% et %%max%%.',
+    'errorSettingBoolean' => 'Choisissez activé ou désactivé.',
     'errorListenMode' => 'Un worker d\'arrière-plan n\'a pas d\'écouteur : choisissez « Aucun » comme mode d\'écoute, ou un mode Web avec un port TCP ou un socket Unix.',
     'errorMountPathReserved' => '%%path%% est utilisé par Plesk (statistiques Web ou validation de certificat) et ne peut pas être relayé vers l\'application.',
     'errorMaxApps' => 'Cet abonnement a déjà atteint le nombre maximal d\'applications activées (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Le serveur PHP par défaut (php -S) ne peut pas écouter sur un socket Unix : installez une chaîne d\'outils FrankenPHP ou choisissez TCP.',
     'errorFetchSha256' => 'La somme de contrôle SHA-256 doit comporter 64 caractères hexadécimaux.',
     'errorFetchFilename' => 'Le nom de fichier ne peut contenir que des lettres, des chiffres et . _ + - (128 caractères max.).',
+    'errorUpdateVersion' => 'La version doit être au format 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de mémoire (Mio)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'L\'exemple d\'application a été écrit (%%count%% fichiers) et les paramètres ont été mis à jour.',
     'messageSampleWrittenOne' => 'L\'exemple d\'application a été écrit (un fichier) et les paramètres ont été mis à jour.',
     'messageFetchStarted' => 'Le téléchargement a démarré. Suivez-le dans le journal « Compilation et déploiement ».',
+    'messageUpdateStarted' => 'La mise à jour vers Runway %%version%% a démarré. Sa progression est affichée ci-dessous.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liste les applications configurées et leur état.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Liste les chaînes d\'outils installées et les domaines qui les utilisent.',
     'cli.commands.install-toolchain' => 'Installe une chaîne d\'outils et attend le résultat : --install-toolchain <environnement> <version> [-no-wait]',
     'cli.commands.reconcile' => 'Aligne les services des applications sur Plesk (domaines supprimés, renommés ou suspendus).',
+    'cli.commands.check-update' => 'Interroge GitHub pour connaître la dernière version de Runway et affiche la version installée et la dernière version.',
+    'cli.commands.update' => 'Met à jour Runway vers la dernière version GitHub et attend le résultat : --update [-no-wait]',
 ];

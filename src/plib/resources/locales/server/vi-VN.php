@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Đường dẫn kiểm tra tình trạng phải là một đường dẫn URL như /healthz.',
     'errorPortRange' => 'Cổng đầu tiên không được lớn hơn cổng cuối cùng.',
     'errorSettingRange' => 'Hãy nhập một số nguyên từ %%min%% đến %%max%%.',
+    'errorSettingBoolean' => 'Hãy chọn bật hoặc tắt.',
     'errorListenMode' => 'Tiến trình nền không có trình lắng nghe: hãy chọn "Không" làm chế độ lắng nghe, hoặc một chế độ web với cổng TCP hoặc socket Unix.',
     'errorMountPathReserved' => '%%path%% được Plesk sử dụng (thống kê web hoặc xác thực chứng chỉ) nên không thể chuyển tiếp qua proxy.',
     'errorMaxApps' => 'Thuê bao này đã đạt số lượng ứng dụng được bật tối đa (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Máy chủ PHP mặc định (php -S) không thể lắng nghe trên socket Unix: hãy cài đặt bộ công cụ FrankenPHP hoặc chọn TCP.',
     'errorFetchSha256' => 'Tổng kiểm tra SHA-256 phải gồm 64 ký tự thập lục phân.',
     'errorFetchFilename' => 'Tên tệp chỉ được chứa chữ cái, chữ số và . _ + - (tối đa 128 ký tự).',
+    'errorUpdateVersion' => 'Phiên bản phải có dạng 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Giới hạn bộ nhớ (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Đã ghi ứng dụng mẫu (%%count%% tệp) và cập nhật cài đặt.',
     'messageSampleWrittenOne' => 'Đã ghi ứng dụng mẫu (một tệp) và cập nhật cài đặt.',
     'messageFetchStarted' => 'Đã bắt đầu tải xuống. Hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
+    'messageUpdateStarted' => 'Đã bắt đầu cập nhật lên Runway %%version%%. Tiến độ được hiển thị bên dưới.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liệt kê các ứng dụng đã cấu hình và trạng thái của chúng.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Liệt kê các bộ công cụ đã cài đặt và các tên miền đang dùng chúng.',
     'cli.commands.install-toolchain' => 'Cài đặt một bộ công cụ và chờ kết quả: --install-toolchain <môi-trường-chạy> <phiên-bản> [-no-wait]',
     'cli.commands.reconcile' => 'Đồng bộ các dịch vụ ứng dụng với Plesk (tên miền đã bị xóa, đổi tên hoặc tạm ngưng).',
+    'cli.commands.check-update' => 'Truy vấn GitHub để lấy bản phát hành Runway mới nhất và hiển thị phiên bản đã cài đặt cùng phiên bản mới nhất.',
+    'cli.commands.update' => 'Cập nhật Runway lên bản phát hành mới nhất trên GitHub và chờ kết quả: --update [-no-wait]',
 ];

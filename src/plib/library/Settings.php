@@ -2,8 +2,8 @@
 // Copyright 2026 Taiizor. Licensed under the MIT License.
 
 /**
- * Server-wide settings of the extension (managed by the administrator).
- * Every setting is an integer with an allowed range.
+ * Server-wide settings of the extension (managed by the administrator): integers with an
+ * allowed range, and the switches of the built-in updater (booleans).
  */
 class Modules_Runway_Settings
 {
@@ -36,12 +36,22 @@ class Modules_Runway_Settings
         'maxAppsPerSubscription' => [0, 10000],
     ];
 
+    /** @var array Boolean settings => default: the update check of the scheduled task (twice a day) and automatic installation */
+    private static $switches = [
+        'updateCheck' => true,
+        'updateAuto' => false,
+    ];
+
     /**
      * @param string $key
-     * @return int
+     * @return int|bool Integer settings, or a bool for the switches (updateCheck, updateAuto)
      */
     public static function get($key)
     {
+        if (array_key_exists($key, self::$switches)) {
+            $value = pm_Settings::get($key, null);
+            return $value === null || $value === '' ? self::$switches[$key] : (string)$value === '1';
+        }
         if (!array_key_exists($key, self::$defaults)) {
             throw new InvalidArgumentException("Unknown setting {$key}");
         }
@@ -50,10 +60,14 @@ class Modules_Runway_Settings
 
     /**
      * @param string $key
-     * @param int $value
+     * @param int|bool $value
      */
     public static function set($key, $value)
     {
+        if (array_key_exists($key, self::$switches)) {
+            pm_Settings::set($key, $value ? '1' : '0');
+            return;
+        }
         if (!array_key_exists($key, self::$defaults)) {
             throw new InvalidArgumentException("Unknown setting {$key}");
         }
@@ -66,7 +80,7 @@ class Modules_Runway_Settings
     public static function all()
     {
         $result = [];
-        foreach (array_keys(self::$defaults) as $key) {
+        foreach (array_merge(array_keys(self::$defaults), array_keys(self::$switches)) as $key) {
             $result[$key] = self::get($key);
         }
         return $result;
@@ -101,6 +115,17 @@ class Modules_Runway_Settings
             }
             $new[$key] = (int)$raw;
         }
+        foreach (array_keys(self::$switches) as $key) {
+            if (!array_key_exists($key, $values) || $values[$key] === null) {
+                continue;
+            }
+            $switch = self::toBool($values[$key]);
+            if ($switch === null) {
+                $errors[$key][] = pm_Locale::lmsg('errorSettingBoolean');
+                continue;
+            }
+            $new[$key] = $switch;
+        }
         if (!isset($errors['portMin']) && !isset($errors['portMax']) && $new['portMin'] > $new['portMax']) {
             $errors['portMax'][] = pm_Locale::lmsg('errorPortRange');
         }
@@ -110,6 +135,30 @@ class Modules_Runway_Settings
             }
         }
         return $errors;
+    }
+
+    /**
+     * @param mixed $value JSON boolean, 0/1 or "true"/"false"/"1"/"0" (form posts)
+     * @return bool|null Null when the value is not a boolean
+     */
+    private static function toBool($value)
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        if ($value === 0 || $value === 1) {
+            return $value === 1;
+        }
+        if (is_string($value)) {
+            $text = strtolower(trim($value));
+            if (in_array($text, ['1', 'true', 'on'], true)) {
+                return true;
+            }
+            if (in_array($text, ['0', 'false', 'off', ''], true)) {
+                return false;
+            }
+        }
+        return null;
     }
 
     /**

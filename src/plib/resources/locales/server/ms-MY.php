@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Laluan semakan kesihatan mestilah laluan URL seperti /healthz.',
     'errorPortRange' => 'Port pertama tidak boleh lebih besar daripada port terakhir.',
     'errorSettingRange' => 'Masukkan nombor bulat antara %%min%% dan %%max%%.',
+    'errorSettingBoolean' => 'Pilih hidup atau mati.',
     'errorListenMode' => 'Pekerja latar belakang tidak mempunyai pendengar: pilih "Tiada" sebagai mod dengar, atau mod web dengan port TCP atau soket Unix.',
     'errorMountPathReserved' => '%%path%% digunakan oleh Plesk (statistik web atau pengesahan sijil) dan tidak boleh diproksikan.',
     'errorMaxApps' => 'Langganan ini sudah mencapai bilangan maksimum aplikasi yang didayakan (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Pelayan PHP lalai (php -S) tidak dapat mendengar pada soket Unix: pasang rantaian alat FrankenPHP atau pilih TCP.',
     'errorFetchSha256' => 'Jumlah semak SHA-256 mestilah 64 aksara heksadesimal.',
     'errorFetchFilename' => 'Nama fail hanya boleh mengandungi huruf, digit dan . _ + - (maks. 128 aksara).',
+    'errorUpdateVersion' => 'Versi mestilah dalam bentuk seperti 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Had memori (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Aplikasi contoh telah ditulis (%%count%% fail) dan tetapan telah dikemas kini.',
     'messageSampleWrittenOne' => 'Aplikasi contoh telah ditulis (satu fail) dan tetapan telah dikemas kini.',
     'messageFetchStarted' => 'Muat turun telah bermula. Pantau kemajuannya dalam log "Bina & sebar".',
+    'messageUpdateStarted' => 'Kemas kini ke Runway %%version%% telah bermula. Kemajuannya ditunjukkan di bawah.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Menyenaraikan aplikasi yang dikonfigurasi dan keadaannya.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Menyenaraikan rantaian alat yang dipasang dan domain yang menggunakannya.',
     'cli.commands.install-toolchain' => 'Memasang rantaian alat dan menunggu keputusannya: --install-toolchain <masa-jalan> <versi> [-no-wait]',
     'cli.commands.reconcile' => 'Menyelaraskan perkhidmatan aplikasi dengan Plesk (domain yang dipadam, dinamakan semula atau digantung).',
+    'cli.commands.check-update' => 'Meminta keluaran Runway terkini daripada GitHub dan menunjukkan versi yang dipasang serta versi terkini.',
+    'cli.commands.update' => 'Mengemas kini Runway ke keluaran GitHub terkini dan menunggu keputusannya: --update [-no-wait]',
 ];

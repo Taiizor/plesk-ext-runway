@@ -38,6 +38,14 @@ was renamed to Runway (extension id `runway`, units `runway-*`, paths under `/op
 - Server settings: port range, build timeout, application and build resource limits, maximum
   number of applications per subscription.
 - `manage_runway_apps` permission for service plans and subscriptions.
+- Built-in updater: Runway checks the latest GitHub release twice a day (setting, on by
+  default), shows a newer version on the overview with a link to its release notes and "Update now", and
+  upgrades itself in the administrator's background job after verifying the SHA-256 checksum of
+  the release (never a downgrade); optional automatic installation (off by default), "Check now"
+  on the overview, `plesk ext runway --check-update` and `--update`, API `api/update`. Every
+  release also carries the package as `runway.zip`, so
+  `plesk bin extension --upgrade-url https://github.com/Taiizor/plesk-ext-runway/releases/latest/download/runway.zip`
+  installs or updates in one command.
 - Reconciliation with Plesk on domain deletion, rename, system user change and suspension
   (also of customer and reseller accounts), plus a scheduled reconcile every 10 minutes.
 - User interface in every Plesk language (32 locales): English and Turkish by hand, the other

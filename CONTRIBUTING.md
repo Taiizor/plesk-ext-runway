@@ -61,7 +61,10 @@ CI (`.github/workflows/ci.yml`):
 3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
    the zip, creating the subscription `gotest.local` and (when the license allows customer
    accounts) its owner `cust1` and installing Go through Runway; then *helper* runs
-   `tests/helper-smoke.sh`, *panel* runs `tests/api-smoke.sh` (with a real deployment) and
+   `tests/helper-smoke.sh` with `RUNWAY_SMOKE_SELF_UPDATE=1` (its self-update section then also
+   upgrades the installed extension to a repackaged release+1 through the built-in updater; that
+   cannot be undone, so leave it off locally unless the container is thrown away afterwards:
+   `plesk-e2e.sh start` recreates it), *panel* runs `tests/api-smoke.sh` (with a real deployment) and
    `tests/customer-smoke.sh` (skipped without the customer), *runtime* runs
    `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`). `.github/scripts/plesk-e2e.sh` does
    the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`

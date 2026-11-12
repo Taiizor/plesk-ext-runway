@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => '健康检查路径必须是类似 /healthz 的 URL 路径。',
     'errorPortRange' => '起始端口不能大于结束端口。',
     'errorSettingRange' => '请输入 %%min%% 到 %%max%% 之间的整数。',
+    'errorSettingBoolean' => '请选择开启或关闭。',
     'errorListenMode' => '后台工作进程没有监听器：监听模式请选择“无”，或选择使用 TCP 端口或 Unix 套接字的 Web 模式。',
     'errorMountPathReserved' => '%%path%% 已被 Plesk 使用（网站统计或证书验证），无法代理。',
     'errorMaxApps' => '此订阅已达到已启用应用程序的数量上限（%%max%%）。',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => '默认的 PHP 服务器（php -S）无法在 Unix 套接字上监听：请安装 FrankenPHP 工具链或选择 TCP。',
     'errorFetchSha256' => 'SHA-256 校验和必须是 64 个十六进制字符。',
     'errorFetchFilename' => '文件名只能包含字母、数字以及 . _ + -（最多 128 个字符）。',
+    'errorUpdateVersion' => '版本格式必须类似 1.2.3-1。',
 
     // Field names used in error messages
     'fieldMemoryMb' => '内存限制（MiB）',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => '示例应用程序已写入（%%count%% 个文件），设置已更新。',
     'messageSampleWrittenOne' => '示例应用程序已写入（1 个文件），设置已更新。',
     'messageFetchStarted' => '下载已开始。请在“构建与部署”日志中查看进度。',
+    'messageUpdateStarted' => '更新到 Runway %%version%% 的操作已开始。进度显示在下方。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '列出已配置的应用程序及其状态。',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => '列出已安装的工具链以及使用它们的域名。',
     'cli.commands.install-toolchain' => '安装工具链并等待结果：--install-toolchain <运行时> <版本> [-no-wait]',
     'cli.commands.reconcile' => '使应用程序服务与 Plesk 保持一致（已删除、已重命名或已挂起的域名）。',
+    'cli.commands.check-update' => '向 GitHub 查询最新的 Runway 发布版本，并显示已安装版本和最新版本。',
+    'cli.commands.update' => '将 Runway 更新到 GitHub 上的最新发布版本并等待结果：--update [-no-wait]',
 ];

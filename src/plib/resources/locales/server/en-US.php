@@ -49,6 +49,7 @@ return [
     'errorHealthPath' => 'The health check path must be a URL path like /healthz.',
     'errorPortRange' => 'The first port must not be greater than the last port.',
     'errorSettingRange' => 'Enter a whole number between %%min%% and %%max%%.',
+    'errorSettingBoolean' => 'Choose on or off.',
     'errorListenMode' => 'A background worker has no listener: choose "Nothing" as listen mode, or a web mode with a TCP port or Unix socket.',
     'errorMountPathReserved' => '%%path%% is used by Plesk (web statistics or certificate validation) and cannot be proxied.',
     'errorMaxApps' => 'This subscription already has the maximum number of enabled applications (%%max%%).',
@@ -58,6 +59,7 @@ return [
     'errorSampleUnix' => 'The default PHP server (php -S) cannot listen on a Unix socket: install a FrankenPHP toolchain or choose TCP.',
     'errorFetchSha256' => 'The SHA-256 checksum must be 64 hexadecimal characters.',
     'errorFetchFilename' => 'The file name may contain letters, digits and . _ + - only (max. 128 characters).',
+    'errorUpdateVersion' => 'The version must look like 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memory limit (MiB)',
@@ -79,6 +81,7 @@ return [
     'messageSampleWritten' => 'The sample application was written (%%count%% files) and the settings were updated.',
     'messageSampleWrittenOne' => 'The sample application was written (one file) and the settings were updated.',
     'messageFetchStarted' => 'The download has started. Follow it in the "Build & deploy" log.',
+    'messageUpdateStarted' => 'The update to Runway %%version%% has started. Its progress is shown below.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'List the configured applications and their state.',
@@ -92,4 +95,6 @@ return [
     'cli.commands.toolchains' => 'List the installed toolchains and the domains using them.',
     'cli.commands.install-toolchain' => 'Install a toolchain and wait for the result: --install-toolchain <runtime> <version> [-no-wait]',
     'cli.commands.reconcile' => 'Bring the application services in line with Plesk (deleted, renamed or suspended domains).',
+    'cli.commands.check-update' => 'Ask GitHub for the latest Runway release and show the installed and the latest version.',
+    'cli.commands.update' => 'Update Runway to the latest GitHub release and wait for the result: --update [-no-wait]',
 ];

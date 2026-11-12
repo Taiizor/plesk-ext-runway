@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'נתיב בדיקת התקינות חייב להיות נתיב URL כמו /healthz.',
     'errorPortRange' => 'הפורט הראשון אינו יכול להיות גדול מהפורט האחרון.',
     'errorSettingRange' => 'הזן מספר שלם בין %%min%% ל-%%max%%.',
+    'errorSettingBoolean' => 'בחר מופעל או כבוי.',
     'errorListenMode' => 'לתהליך רקע אין מאזין: בחר "ללא" כמצב האזנה, או מצב ווב עם פורט TCP או סוקט Unix.',
     'errorMountPathReserved' => '%%path%% נמצא בשימוש על ידי Plesk (סטטיסטיקות אתר או אימות אישורים) ולא ניתן לנתב אותו דרך פרוקסי.',
     'errorMaxApps' => 'מנוי זה כבר הגיע למספר המרבי של יישומים מופעלים (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'שרת ברירת המחדל של PHP (php -S) אינו יכול להאזין בסוקט Unix: התקן ערכת כלים של FrankenPHP או בחר TCP.',
     'errorFetchSha256' => 'סכום הביקורת SHA-256 חייב להכיל 64 תווים הקסדצימליים.',
     'errorFetchFilename' => 'שם הקובץ יכול להכיל רק אותיות, ספרות והתווים . _ + - (עד 128 תווים).',
+    'errorUpdateVersion' => 'הגרסה צריכה להיות בתבנית 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'היישום לדוגמה נכתב (%%count%% קבצים) וההגדרות עודכנו.',
     'messageSampleWrittenOne' => 'היישום לדוגמה נכתב (קובץ אחד) וההגדרות עודכנו.',
     'messageFetchStarted' => 'ההורדה החלה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
+    'messageUpdateStarted' => 'העדכון ל-Runway %%version%% החל. ההתקדמות שלו מוצגת למטה.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'מציג את היישומים המוגדרים ואת מצבם.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'מציג את ערכות הכלים המותקנות ואת הדומיינים שמשתמשים בהן.',
     'cli.commands.install-toolchain' => 'מתקין ערכת כלים וממתין לתוצאה: --install-toolchain <runtime> <version> [-no-wait]',
     'cli.commands.reconcile' => 'מסנכרן את שירותי היישומים עם Plesk (דומיינים שנמחקו, ששמם שונה או שהושעו).',
+    'cli.commands.check-update' => 'בודק ב-GitHub מהי הגרסה האחרונה של Runway ומציג את הגרסה המותקנת ואת האחרונה.',
+    'cli.commands.update' => 'מעדכן את Runway לגרסה האחרונה ב-GitHub וממתין לתוצאה: --update [-no-wait]',
 ];

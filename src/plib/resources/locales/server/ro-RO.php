@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Calea de verificare a stării trebuie să fie o cale URL precum /healthz.',
     'errorPortRange' => 'Primul port nu poate fi mai mare decât ultimul port.',
     'errorSettingRange' => 'Introduceți un număr întreg între %%min%% și %%max%%.',
+    'errorSettingBoolean' => 'Alegeți activat sau dezactivat.',
     'errorListenMode' => 'Un proces de fundal nu are ascultător: alegeți „Nimic” ca mod de ascultare sau un mod web cu port TCP ori socket Unix.',
     'errorMountPathReserved' => 'Calea %%path%% este utilizată de Plesk (statistici web sau validarea certificatelor) și nu poate fi transmisă prin proxy.',
     'errorMaxApps' => 'Acest abonament a atins deja numărul maxim de aplicații activate (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Serverul PHP implicit (php -S) nu poate asculta pe un socket Unix: instalați un toolchain FrankenPHP sau alegeți TCP.',
     'errorFetchSha256' => 'Suma de control SHA-256 trebuie să aibă 64 de caractere hexazecimale.',
     'errorFetchFilename' => 'Numele fișierului poate conține numai litere, cifre și . _ + - (max. 128 de caractere).',
+    'errorUpdateVersion' => 'Versiunea trebuie să aibă forma 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limita de memorie (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Aplicația exemplu a fost creată (%%count%% fișiere) și setările au fost actualizate.',
     'messageSampleWrittenOne' => 'Aplicația exemplu a fost creată (un fișier) și setările au fost actualizate.',
     'messageFetchStarted' => 'Descărcarea a început. Urmăriți-o în jurnalul „Compilare și implementare”.',
+    'messageUpdateStarted' => 'Actualizarea la Runway %%version%% a început. Progresul ei este afișat mai jos.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listează aplicațiile configurate și starea lor.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Listează toolchain-urile instalate și domeniile care le utilizează.',
     'cli.commands.install-toolchain' => 'Instalează un toolchain și așteaptă rezultatul: --install-toolchain <mediu-de-execuție> <versiune> [-no-wait]',
     'cli.commands.reconcile' => 'Sincronizează serviciile aplicațiilor cu Plesk (domenii șterse, redenumite sau suspendate).',
+    'cli.commands.check-update' => 'Interoghează GitHub pentru cea mai recentă lansare Runway și afișează versiunea instalată și cea mai recentă.',
+    'cli.commands.update' => 'Actualizează Runway la cea mai recentă lansare GitHub și așteaptă rezultatul: --update [-no-wait]',
 ];

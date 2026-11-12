@@ -1,8 +1,9 @@
 name: Release
 
 # Push a tag vX.Y.Z (or vX.Y.Z-R for a repackaged release) to build, test and publish a GitHub
-# release with the installable zip. The whole CI (lint, package, end-to-end tests) must pass
-# first. Title and notes of the release page are generated (docs/RELEASING.md, "Release page"):
+# release with the installable zip, attached twice: runway-X.Y.Z-R.zip and runway.zip (the
+# built-in updater and "plesk bin extension --upgrade-url" read releases/latest). The whole CI
+# (lint, package, end-to-end tests) must pass first. Title and notes of the release page are generated (docs/RELEASING.md, "Release page"):
 # the CHANGELOG.md section of the version, install instructions, the SHA-256 checksum and the
 # "What's Changed" list GitHub builds from the merged pull requests (.github/release.yml).
 # "Run workflow" rehearses all of it from the version in src/meta.xml and publishes nothing.
@@ -104,8 +105,12 @@ jobs:
           zips=(dist/*.zip)
           if [ "${#zips[@]}" -ne 1 ]; then echo "::error::expected one package, found ${#zips[@]}"; exit 1; fi
           python build.py --verify "${zips[0]}" --version "$VERSION"
-          echo "PACKAGE=$(basename "${zips[0]}")" >> "$GITHUB_ENV"
-          (cd dist && sha256sum -- *.zip > SHA256SUMS && cat SHA256SUMS)
+          package=$(basename "${zips[0]}")
+          echo "PACKAGE=$package" >> "$GITHUB_ENV"
+          # The same file under a fixed name: .../releases/latest/download/runway.zip always
+          # points at the newest release (plesk bin extension --upgrade-url, README "Updating").
+          cp "dist/$package" dist/runway.zip
+          (cd dist && sha256sum -- "$package" runway.zip > SHA256SUMS && cat SHA256SUMS)
 
       - name: What's Changed from the merged pull requests
         env:
@@ -126,6 +131,7 @@ jobs:
           base = os.environ["BASE"]
           package = os.environ["PACKAGE"]
           repo = "https://github.com/" + os.environ["GITHUB_REPOSITORY"]
+          latest = repo + "/releases/latest/download/runway.zip"
           with open("CHANGELOG.md", encoding="utf-8") as fh:
               text = fh.read()
           # The same heading rule as build.py's changelog check ("## [X.Y.Z]", optional "v").
@@ -141,12 +147,15 @@ jobs:
           parts = [
               match.group(1).strip(),
               "### Install\n\n"
-              "Download `%s` and run, as root on the Plesk server:\n\n"
-              "```sh\nplesk bin extension --upgrade %s\n```\n\n"
-              "or upload it under *Extensions > My Extensions > Upload Extension*. Requires Plesk "
+              "As root on the Plesk server, install Runway or update it to the latest release in "
+              "one step:\n\n"
+              "```sh\nplesk bin extension --upgrade-url %s\n```\n\n"
+              "or download `%s` and run `plesk bin extension --upgrade %s`, or upload it under "
+              "*Extensions > My Extensions > Upload Extension*. Installed servers can also update "
+              "from the Runway overview or with `plesk ext runway --update`. Requires Plesk "
               "Obsidian 18.0.55 or newer on Linux with systemd; see the [README](%s#readme) for the "
               "requirements and the [changelog](%s/blob/develop/CHANGELOG.md) for older versions."
-              % (package, package, repo, repo),
+              % (latest, package, package, repo, repo),
               "### Checksums (SHA-256)\n\n```\n%s\n```" % checksums,
           ]
           if generated:

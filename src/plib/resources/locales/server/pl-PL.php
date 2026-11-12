@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Ścieżka kontroli stanu musi być ścieżką URL, np. /healthz.',
     'errorPortRange' => 'Pierwszy port nie może być większy niż ostatni port.',
     'errorSettingRange' => 'Wprowadź liczbę całkowitą od %%min%% do %%max%%.',
+    'errorSettingBoolean' => 'Wybierz: włączone lub wyłączone.',
     'errorListenMode' => 'Proces w tle nie nasłuchuje: wybierz „Nic” jako tryb nasłuchiwania albo tryb WWW z portem TCP lub gniazdem uniksowym.',
     'errorMountPathReserved' => 'Ścieżka %%path%% jest używana przez Plesk (statystyki WWW lub walidacja certyfikatów) i nie może być przekazywana przez proxy.',
     'errorMaxApps' => 'Ta subskrypcja ma już maksymalną liczbę włączonych aplikacji (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Domyślny serwer PHP (php -S) nie może nasłuchiwać na gnieździe uniksowym: zainstaluj zestaw narzędzi FrankenPHP lub wybierz TCP.',
     'errorFetchSha256' => 'Suma kontrolna SHA-256 musi składać się z 64 znaków szesnastkowych.',
     'errorFetchFilename' => 'Nazwa pliku może zawierać tylko litery, cyfry oraz . _ + - (maks. 128 znaków).',
+    'errorUpdateVersion' => 'Wersja musi mieć postać 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit pamięci (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Przykładowa aplikacja została zapisana (liczba plików: %%count%%), a ustawienia zostały zaktualizowane.',
     'messageSampleWrittenOne' => 'Przykładowa aplikacja została zapisana (jeden plik), a ustawienia zostały zaktualizowane.',
     'messageFetchStarted' => 'Pobieranie zostało rozpoczęte. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
+    'messageUpdateStarted' => 'Rozpoczęto aktualizację Runway do wersji %%version%%. Postęp jest widoczny poniżej.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Wyświetla skonfigurowane aplikacje i ich stan.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Wyświetla zainstalowane zestawy narzędzi i domeny, które ich używają.',
     'cli.commands.install-toolchain' => 'Instaluje zestaw narzędzi i czeka na wynik: --install-toolchain <środowisko> <wersja> [-no-wait]',
     'cli.commands.reconcile' => 'Uzgadnia stan usług aplikacji z Plesk (usunięte, przemianowane lub zawieszone domeny).',
+    'cli.commands.check-update' => 'Pyta serwis GitHub o najnowsze wydanie Runway i pokazuje wersję zainstalowaną oraz najnowszą.',
+    'cli.commands.update' => 'Aktualizuje Runway do najnowszego wydania z serwisu GitHub i czeka na wynik: --update [-no-wait]',
 ];

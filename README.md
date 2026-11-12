@@ -24,7 +24,7 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 ## Contents
 
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
-[Installation](#installation) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
+[Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
 [Listen modes](#listen-modes) · [Deploying with Git](#deploying-with-git) ·
 [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
@@ -103,6 +103,8 @@ without a server, see [Try it in Docker](#try-it-in-docker).
 plesk bin extension --install /root/runway-1.0.0-1.zip
 # later versions: install or upgrade in one step
 plesk bin extension --upgrade /root/runway-1.0.0-1.zip
+# or straight from the latest GitHub release (install or upgrade)
+plesk bin extension --upgrade-url https://github.com/Taiizor/plesk-ext-runway/releases/latest/download/runway.zip
 ```
 
 **Panel**: Plesk only offers *Upload Extension* when it is enabled in
@@ -120,6 +122,41 @@ After the installation **Runway** appears in the administrator's navigation and 
 domain's *Dev Tools* (*Websites & Domains*). Customers see it when their service plan or
 subscription has the **Runway applications management** permission
 (*Service Plans > Permissions*).
+
+## Updating
+
+Plesk only offers updates for extensions from its catalog; Runway is distributed through the
+[GitHub releases](https://github.com/Taiizor/plesk-ext-runway/releases), so it updates itself:
+
+- **Built-in updater**: twice a day Runway asks GitHub for its latest release (one HTTPS request
+  to `api.github.com`, no data about the server). When a newer version exists, *Runway >
+  Overview* shows it with a link to the release notes and an **Update now** button: Runway
+  downloads the release, verifies its SHA-256 checksum and upgrades itself in a background job
+  (applications keep running), then asks you to reload the page. The *Server* panel shows the
+  installed version and the last check, with **Check now**.
+- **Settings** (*Runway > Settings > Updates*): *Check for updates twice a day* (on by default)
+  and *Install updates automatically* (off by default; installs a new release as soon as a check
+  finds it).
+- **Command line**:
+
+  ```sh
+  plesk ext runway --check-update     # installed and latest version
+  plesk ext runway --update           # update to the latest release and wait for the job
+  ```
+
+- **One command without the updater** (also for the first installation): the newest release is
+  always available as `runway.zip`:
+
+  ```sh
+  plesk bin extension --upgrade-url https://github.com/Taiizor/plesk-ext-runway/releases/latest/download/runway.zip
+  ```
+
+- **Manually**: download `runway-<version>-<release>.zip` and run
+  `plesk bin extension --upgrade <zip>` or upload it under *Extensions > My Extensions > Upload
+  Extension* (see [Installation](#installation)).
+
+Updates never downgrade, run for administrators only and keep every application, toolchain and
+setting. The trust model of the updater is described in [SECURITY.md](SECURITY.md#updates).
 
 ## Quick start
 
@@ -256,6 +293,8 @@ plesk ext runway --enable example.com                # also --disable
 plesk ext runway --toolchains                        # installed toolchains per runtime
 plesk ext runway --install-toolchain go 1.27.4
 plesk ext runway --reconcile                         # converge services with Plesk now
+plesk ext runway --check-update                      # ask GitHub for the latest Runway release
+plesk ext runway --update                            # update Runway to it (see Updating)
 ```
 
 ## Configuration reference
@@ -288,6 +327,8 @@ plesk ext runway --reconcile                         # converge services with Pl
 | Memory / CPU / tasks | limits of application services without their own limits (0 = unlimited) | 0 / 0 / 0 |
 | Build memory / CPU / tasks | limits of build jobs (the task limit always applies) | 0 / 0 / 4096 |
 | Applications per subscription | maximum number of **enabled** applications per subscription, checked when an application is enabled (0 = unlimited) | 0 |
+| Check for updates twice a day | ask GitHub for the latest Runway release (see [Updating](#updating)) | on |
+| Install updates automatically | install a newer release as soon as a check finds it (requires the check) | off |
 
 ### Files on the server
 
@@ -295,7 +336,7 @@ plesk ext runway --reconcile                         # converge services with Pl
 |---|---|
 | Root helper | `/usr/local/psa/admin/sbin/modules/runway/runway-helper`, stable copy `/opt/runway/bin/runway-helper` used by the units |
 | Toolchains | `/opt/runway/<runtime>/...` (`/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/dotnet`, `/opt/runway/uv/uv`, ...) |
-| State, job logs, caches | `/var/lib/runway/{apps,jobs,locks,cache}` (root, 0700) |
+| State, job logs, caches | `/var/lib/runway/{apps,jobs,locks,cache}` (root, 0700); the updater's last check in `/var/lib/runway/cache/update.json` |
 | Environment files | `/etc/runway/env/<domainId>.env` (root, 0600) |
 | Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, `runway-job-admin.service` |
 | Unix sockets | `/run/runway/<id>/app.sock`; the directory is recreated at boot from `/etc/tmpfiles.d/runway-<id>.conf` |

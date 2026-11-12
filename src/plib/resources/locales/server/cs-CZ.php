@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Cesta kontroly stavu musí být cesta URL, např. /healthz.',
     'errorPortRange' => 'První port nesmí být větší než poslední port.',
     'errorSettingRange' => 'Zadejte celé číslo od %%min%% do %%max%%.',
+    'errorSettingBoolean' => 'Zvolte zapnuto, nebo vypnuto.',
     'errorListenMode' => 'Proces na pozadí nenaslouchá: zvolte jako režim naslouchání „Nic“, nebo webový režim s portem TCP či unixovým socketem.',
     'errorMountPathReserved' => 'Cestu %%path%% používá Plesk (webové statistiky nebo ověření certifikátu) a nelze ji směrovat přes proxy.',
     'errorMaxApps' => 'Toto předplatné již má maximální počet povolených aplikací (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Výchozí server PHP (php -S) nemůže naslouchat na unixovém socketu: nainstalujte sadu nástrojů FrankenPHP nebo zvolte TCP.',
     'errorFetchSha256' => 'Kontrolní součet SHA-256 musí mít 64 šestnáctkových znaků.',
     'errorFetchFilename' => 'Název souboru smí obsahovat pouze písmena, číslice a . _ + - (max. 128 znaků).',
+    'errorUpdateVersion' => 'Verze musí mít tvar 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit paměti (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Ukázková aplikace byla vytvořena (počet souborů: %%count%%) a nastavení bylo aktualizováno.',
     'messageSampleWrittenOne' => 'Ukázková aplikace byla vytvořena (jeden soubor) a nastavení bylo aktualizováno.',
     'messageFetchStarted' => 'Stahování bylo zahájeno. Průběh sledujte v protokolu „Sestavení a nasazení“.',
+    'messageUpdateStarted' => 'Aktualizace na Runway %%version%% byla zahájena. Její průběh je zobrazen níže.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Vypíše nakonfigurované aplikace a jejich stav.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Vypíše nainstalované sady nástrojů a domény, které je používají.',
     'cli.commands.install-toolchain' => 'Nainstaluje sadu nástrojů a počká na výsledek: --install-toolchain <běhové-prostředí> <verze> [-no-wait]',
     'cli.commands.reconcile' => 'Uvede služby aplikací do souladu s panelem Plesk (smazané, přejmenované nebo pozastavené domény).',
+    'cli.commands.check-update' => 'Zjistí na GitHubu nejnovější vydání Runway a zobrazí nainstalovanou a nejnovější verzi.',
+    'cli.commands.update' => 'Aktualizuje Runway na nejnovější vydání z GitHubu a počká na výsledek: --update [-no-wait]',
 ];

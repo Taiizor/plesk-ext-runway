@@ -64,6 +64,16 @@ class Modules_Runway_ApiCli extends pm_Hook_ApiCli
         $this->dispatch('reconcile');
     }
 
+    public function checkUpdateCommand()
+    {
+        $this->dispatch('check-update');
+    }
+
+    public function updateCommand()
+    {
+        $this->dispatch('update');
+    }
+
     /**
      * @param string $command
      */

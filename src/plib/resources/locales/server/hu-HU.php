@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Az állapot-ellenőrzés útvonalának /healthz formájú URL-útvonalnak kell lennie.',
     'errorPortRange' => 'Az első port nem lehet nagyobb az utolsó portnál.',
     'errorSettingRange' => 'Adjon meg egy egész számot %%min%% és %%max%% között.',
+    'errorSettingBoolean' => 'Válasszon a be és a ki közül.',
     'errorListenMode' => 'A háttérfolyamatnak nincs figyelője: válassza figyelési módként a „Semmi” lehetőséget, vagy egy webes módot TCP-porttal vagy Unix-sockettel.',
     'errorMountPathReserved' => 'A(z) %%path%% útvonalat a Plesk használja (webstatisztika vagy tanúsítvány-ellenőrzés), ezért nem továbbítható proxyval.',
     'errorMaxApps' => 'Ez az előfizetés már elérte az engedélyezett alkalmazások maximális számát (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'Az alapértelmezett PHP-kiszolgáló (php -S) nem tud Unix-socketen figyelni: telepítsen FrankenPHP-eszközláncot, vagy válassza a TCP-t.',
     'errorFetchSha256' => 'A SHA-256 ellenőrző összegnek 64 hexadecimális karakterből kell állnia.',
     'errorFetchFilename' => 'A fájlnév csak betűket, számjegyeket és . _ + - karaktereket tartalmazhat (legfeljebb 128 karakter).',
+    'errorUpdateVersion' => 'A verziónak 1.2.3-1 formátumúnak kell lennie.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memóriakorlát (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'A mintaalkalmazás létrejött (%%count%% fájl), a beállítások frissültek.',
     'messageSampleWrittenOne' => 'A mintaalkalmazás létrejött (egy fájl), a beállítások frissültek.',
     'messageFetchStarted' => 'A letöltés elindult. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
+    'messageUpdateStarted' => 'Elindult a Runway frissítése a(z) %%version%% verzióra. Az előrehaladása alább látható.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'A beállított alkalmazások és állapotuk listázása.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'A telepített eszközláncok és az azokat használó domainek listázása.',
     'cli.commands.install-toolchain' => 'Eszközlánc telepítése az eredmény megvárásával: --install-toolchain <futtatókörnyezet> <verzió> [-no-wait]',
     'cli.commands.reconcile' => 'Az alkalmazásszolgáltatások összehangolása a Plesk adataival (törölt, átnevezett vagy felfüggesztett domainek).',
+    'cli.commands.check-update' => 'A legújabb Runway-kiadás lekérdezése a GitHubtól, valamint a telepített és a legújabb verzió megjelenítése.',
+    'cli.commands.update' => 'A Runway frissítése a legújabb GitHub-kiadásra az eredmény megvárásával: --update [-no-wait]',
 ];

@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'El camí de comprovació d\'estat ha de ser un camí d\'URL com /healthz.',
     'errorPortRange' => 'El primer port no pot ser més gran que el darrer.',
     'errorSettingRange' => 'Introduïu un nombre enter entre %%min%% i %%max%%.',
+    'errorSettingBoolean' => 'Trieu activat o desactivat.',
     'errorListenMode' => 'Un procés en segon pla no escolta en cap port ni sòcol: trieu "Res" com a mode d\'escolta, o bé un mode web amb un port TCP o un sòcol Unix.',
     'errorMountPathReserved' => 'Plesk utilitza %%path%% (estadístiques web o validació de certificats) i no es pot reenviar a l\'aplicació.',
     'errorMaxApps' => 'Aquesta subscripció ja té el nombre màxim d\'aplicacions habilitades (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'El servidor PHP per defecte (php -S) no pot escoltar en un sòcol Unix: instal·leu una cadena d\'eines FrankenPHP o trieu TCP.',
     'errorFetchSha256' => 'La suma de verificació SHA-256 ha de tenir 64 caràcters hexadecimals.',
     'errorFetchFilename' => 'El nom del fitxer només pot contenir lletres, dígits i . _ + - (màx. 128 caràcters).',
+    'errorUpdateVersion' => 'La versió ha de tenir el format 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límit de memòria (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'S\'ha escrit l\'aplicació d\'exemple (%%count%% fitxers) i s\'ha actualitzat la configuració.',
     'messageSampleWrittenOne' => 'S\'ha escrit l\'aplicació d\'exemple (un fitxer) i s\'ha actualitzat la configuració.',
     'messageFetchStarted' => 'La baixada ha començat. Seguiu-la al registre "Compilació i desplegament".',
+    'messageUpdateStarted' => 'L\'actualització a Runway %%version%% ha començat. El progrés es mostra a sota.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Llista les aplicacions configurades i el seu estat.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Llista les cadenes d\'eines instal·lades i els dominis que les utilitzen.',
     'cli.commands.install-toolchain' => 'Instal·la una cadena d\'eines i espera el resultat: --install-toolchain <entorn-execució> <versió> [-no-wait]',
     'cli.commands.reconcile' => 'Sincronitza els serveis de les aplicacions amb Plesk (dominis suprimits, reanomenats o suspesos).',
+    'cli.commands.check-update' => 'Consulta a GitHub la darrera versió de Runway i mostra la versió instal·lada i la més recent.',
+    'cli.commands.update' => 'Actualitza Runway a la darrera versió de GitHub i espera el resultat: --update [-no-wait]',
 ];

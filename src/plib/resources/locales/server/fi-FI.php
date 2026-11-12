@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'Kuntotarkistuksen polun on oltava URL-polku, kuten /healthz.',
     'errorPortRange' => 'Ensimmäinen portti ei saa olla suurempi kuin viimeinen portti.',
     'errorSettingRange' => 'Anna kokonaisluku väliltä %%min%%–%%max%%.',
+    'errorSettingBoolean' => 'Valitse päällä tai pois.',
     'errorListenMode' => 'Taustaprosessilla ei ole kuuntelijaa: valitse kuuntelutavaksi "Ei mitään" tai web-tila, jossa on TCP-portti tai Unix-soketti.',
     'errorMountPathReserved' => 'Plesk käyttää polkua %%path%% (web-tilastot tai varmenteen vahvistus), eikä sitä voi välittää sovellukselle.',
     'errorMaxApps' => 'Tällä tilauksella on jo enimmäismäärä käytössä olevia sovelluksia (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'PHP:n oletuspalvelin (php -S) ei voi kuunnella Unix-sokettia: asenna FrankenPHP-työkaluketju tai valitse TCP.',
     'errorFetchSha256' => 'SHA-256-tarkistussumman on oltava 64 heksadesimaalimerkkiä.',
     'errorFetchFilename' => 'Tiedostonimi saa sisältää vain kirjaimia, numeroita sekä . _ + - (enintään 128 merkkiä).',
+    'errorUpdateVersion' => 'Version on oltava muotoa 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Muistiraja (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'Esimerkkisovellus kirjoitettiin (%%count%% tiedostoa) ja asetukset päivitettiin.',
     'messageSampleWrittenOne' => 'Esimerkkisovellus kirjoitettiin (yksi tiedosto) ja asetukset päivitettiin.',
     'messageFetchStarted' => 'Lataus on alkanut. Seuraa sitä "Koonti ja käyttöönotto" -lokista.',
+    'messageUpdateStarted' => 'Runwayn päivitys versioon %%version%% on alkanut. Sen edistyminen näkyy alla.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Luettelee määritetyt sovellukset ja niiden tilan.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Luettelee asennetut työkaluketjut ja niitä käyttävät toimialueet.',
     'cli.commands.install-toolchain' => 'Asentaa työkaluketjun ja odottaa tulosta: --install-toolchain <ajoympäristö> <versio> [-no-wait]',
     'cli.commands.reconcile' => 'Saattaa sovelluspalvelut Pleskin mukaisiksi (poistetut, uudelleennimetyt tai keskeytetyt toimialueet).',
+    'cli.commands.check-update' => 'Kysyy GitHubista uusimman Runway-julkaisun ja näyttää asennetun ja uusimman version.',
+    'cli.commands.update' => 'Päivittää Runwayn uusimpaan GitHub-julkaisuun ja odottaa tulosta: --update [-no-wait]',
 ];

@@ -11,6 +11,7 @@
 * [+] Server-wide port range, build timeout and resource limits; per-application memory, CPU and task limits set by the administrator.
 * [+] Customer access through the "Runway applications management" permission of service plans and subscriptions.
 * [+] User interface in every Plesk language (32 locales).
+* [+] Built-in updater: checks the latest GitHub release twice a day, "Update now" on the overview (SHA-256 verified, never a downgrade), optional automatic installation, `plesk ext runway --check-update` / `--update`; every release also ships `runway.zip` for `plesk bin extension --upgrade-url`.
 * [*] Security hardening from the pre-release review: no unit line runs as root (socket directories are created by the helper and systemd-tmpfiles), LD_PRELOAD-style loader variables are refused, a replaced Unix socket path is detected and contained, and the helper's customer-file inspection runs with resource limits.
 * [*] Unix socket mode exports only RUNWAY_SOCKET; Stop persists until the application is started again.
 * [*] Laravel Octane runs with Runway's Caddyfile (admin endpoint off, bound to 127.0.0.1 or the socket).

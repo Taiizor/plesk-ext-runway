@@ -50,6 +50,7 @@ return [
     'errorHealthPath' => 'O caminho da verificação de estado deve ser um caminho de URL como /healthz.',
     'errorPortRange' => 'A primeira porta não pode ser superior à última.',
     'errorSettingRange' => 'Introduza um número inteiro entre %%min%% e %%max%%.',
+    'errorSettingBoolean' => 'Escolha ativado ou desativado.',
     'errorListenMode' => 'Um worker em segundo plano não escuta em lado nenhum: escolha "Nada" como modo de escuta, ou um modo web com uma porta TCP ou um socket Unix.',
     'errorMountPathReserved' => '%%path%% é utilizado pelo Plesk (estatísticas web ou validação de certificados) e não pode ser encaminhado por proxy.',
     'errorMaxApps' => 'Esta subscrição já tem o número máximo de aplicações ativadas (%%max%%).',
@@ -59,6 +60,7 @@ return [
     'errorSampleUnix' => 'O servidor PHP predefinido (php -S) não consegue escutar num socket Unix: instale uma cadeia de ferramentas FrankenPHP ou escolha TCP.',
     'errorFetchSha256' => 'A soma de verificação SHA-256 deve ter 64 caracteres hexadecimais.',
     'errorFetchFilename' => 'O nome do ficheiro só pode conter letras, dígitos e . _ + - (máx. 128 caracteres).',
+    'errorUpdateVersion' => 'A versão deve ter o formato 1.2.3-1.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',
@@ -80,6 +82,7 @@ return [
     'messageSampleWritten' => 'A aplicação de exemplo foi criada (%%count%% ficheiros) e as definições foram atualizadas.',
     'messageSampleWrittenOne' => 'A aplicação de exemplo foi criada (um ficheiro) e as definições foram atualizadas.',
     'messageFetchStarted' => 'A transferência começou. Acompanhe-a no registo "Compilação e implementação".',
+    'messageUpdateStarted' => 'A atualização para o Runway %%version%% começou. O progresso é apresentado abaixo.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Lista as aplicações configuradas e o respetivo estado.',
@@ -93,4 +96,6 @@ return [
     'cli.commands.toolchains' => 'Lista as cadeias de ferramentas instaladas e os domínios que as utilizam.',
     'cli.commands.install-toolchain' => 'Instala uma cadeia de ferramentas e aguarda o resultado: --install-toolchain <ambiente-de-execução> <versão> [-no-wait]',
     'cli.commands.reconcile' => 'Alinha os serviços das aplicações com o Plesk (domínios eliminados, renomeados ou suspensos).',
+    'cli.commands.check-update' => 'Consulta o GitHub para obter a versão mais recente do Runway e mostra a versão instalada e a mais recente.',
+    'cli.commands.update' => 'Atualiza o Runway para a versão mais recente do GitHub e aguarda o resultado: --update [-no-wait]',
 ];
