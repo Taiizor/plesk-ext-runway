@@ -10,6 +10,9 @@
  *  - PLACE_ADMIN_NAVIGATION: the administrator's Service Provider view (Server Management);
  *  - PLACE_HOSTING_PANEL_NAVIGATION: the administrator's Power User view (Plesk 18.0.82 renders
  *    it nowhere else);
+ *  - PLACE_RESELLER_NAVIGATION: the reseller panel (section Hosting Services, like the Node.js
+ *    Toolkit); the overview lists the domains of the reseller's customers whose subscription has
+ *    the Runway permission. Not covered by the tests: the trial license allows no resellers;
  *  - PLACE_HOSTING_PANEL_TABS: the customer panel's navigation (customers with the Runway
  *    permission). Plesk also renders this place as a tab of every subscription page that an
  *    administrator or reseller opens; that tab would lead to the server-wide overview and lose
@@ -52,6 +55,11 @@ class Modules_Runway_CustomButtons extends pm_Hook_CustomButtons
                 'visibility' => [$this, 'isNavigationVisible'],
             ]),
             array_merge($navigation, [
+                'place' => self::PLACE_RESELLER_NAVIGATION,
+                'section' => self::SECTION_NAV_HOSTING,
+                'visibility' => [$this, 'isResellerNavigationVisible'],
+            ]),
+            array_merge($navigation, [
                 'place' => self::PLACE_HOSTING_PANEL_TABS,
                 'visibility' => [$this, 'isCustomerNavigationVisible'],
             ]),
@@ -88,6 +96,25 @@ class Modules_Runway_CustomButtons extends pm_Hook_CustomButtons
     {
         try {
             return (bool)pm_Session::getClient()->isAdmin();
+        } catch (Exception $e) {
+            Modules_Runway_Log::debug('Navigation visibility check failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Navigation entry of the reseller panel (PLACE_RESELLER_NAVIGATION): resellers. The overview
+     * shows them the domains of their customers that they may manage (Runway permission on the
+     * subscription); finding out whether there is one would cost a look at every domain on every
+     * panel request, so the entry is always there for resellers.
+     *
+     * @param array $params Context parameters (empty for navigation buttons)
+     * @return bool
+     */
+    public function isResellerNavigationVisible(array $params = [])
+    {
+        try {
+            return (bool)pm_Session::getClient()->isReseller();
         } catch (Exception $e) {
             Modules_Runway_Log::debug('Navigation visibility check failed: ' . $e->getMessage());
             return false;

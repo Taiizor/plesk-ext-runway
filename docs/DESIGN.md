@@ -266,6 +266,18 @@ Memory of an application unit (`app-status` `service` and `slots`, `apps-list`):
   application's units (a slot without a readable `memory.stat` adds its `memory_bytes` to
   `memory_used_bytes`).
 
+Limits of an application unit: `MemoryMax`, `CPUQuota` and `TasksMax` from `limits`. With a memory
+or CPU limit, systemd 254 and later also get `MemoryPressureWatch=off`. Its default `auto` turns
+the watch on for units with memory accounting and bind-mounts `memory.pressure` writable into the
+cgroup tree that `ProtectControlGroups=yes` mounts read-only; with that second cgroup2 mount in
+`/proc/self/mountinfo` the .NET runtime no longer finds the unit's limits (verified with .NET 10
+under systemd 255, `MemoryMax=2048M`, `CPUQuota=200%`: 16 GC heaps, no heap hard limit and the
+machine's 15.5 GiB as available memory; with the line 2 heaps and a hard limit of 1536 MiB, 75 %).
+Under a 1 GiB limit such an application kept swapping and answered 4 to 13 times slower instead
+of staying within 75 % of the limit. Java 21 finds the limits either way. Units without memory or
+CPU limit and systemd before 254 keep the files of 1.0.0. The line takes effect when the service
+restarts next; `install` re-renders the units without restarting them.
+
 Document roots (`app-inspect`, `app-page`): `document_roots` lists the document roots of the
 webspace relative to the home directory (the panel's `documentRoots`, §6; invalid entries are
 dropped, at most 50). `document_root` of the inspection is the first of them that the
@@ -382,10 +394,14 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   document root. Paths and file names reach the texts as `isolate()`d placeholders, never inside a
   translation, so that they keep their direction in Arabic and Hebrew.
 - **Panel integration** (`hooks/CustomButtons.php`): the navigation entry "Runway" (`nav.png`, the
-  white mark: every view draws its navigation on a dark sidebar) in three places, one per view:
+  white mark: every view draws its navigation on a dark sidebar) in four places, one per view:
   `PLACE_ADMIN_NAVIGATION` (Service Provider view, section Server Management),
   `PLACE_HOSTING_PANEL_NAVIGATION` (the administrator's Power User view; Plesk 18.0.82 renders it
-  nowhere else) and `PLACE_HOSTING_PANEL_TABS` (the customer panel's navigation). Plesk also
+  nowhere else), `PLACE_RESELLER_NAVIGATION` (resellers, section Hosting Services like the Node.js
+  Toolkit; callback `pm_Client::isReseller()`, always for resellers because finding a domain they
+  may manage would read every domain on every request; the overview lists their customers'
+  domains with the permission; not covered by the tests, the trial license allows no resellers)
+  and `PLACE_HOSTING_PANEL_TABS` (the customer panel's navigation). Plesk also
   renders `PLACE_HOSTING_PANEL_TABS` as a tab of every subscription page that an administrator or
   reseller opens (`navigationTabs`); that tab would lead to the server-wide overview and lose the
   subscription, so its visibility callback admits customers only (`pm_Client::isClient()`, also
@@ -475,7 +491,8 @@ Status: implemented for 1.1.0. With the setting off, every contract of §3–§1
   capped by server settings (§12.9).
 - Setting off: units, environment files, sockets, web server snippets and behaviour are byte for
   byte those of 1.0.0, so existing installations upgrade without any change (tested against the
-  1.0.0 helper, §12.11).
+  1.0.0 helper, §12.11). One later exception, independent of this setting: on systemd 254 and
+  later a unit with a memory or CPU limit gets `MemoryPressureWatch=off` (§7, limits).
 - Setting on: "Build & restart", fetch and `tmp/deploy.txt` (build first, as today), Restart
   (button, `api/app/control`, CLI `--restart`), `tmp/restart.txt` and saving the settings (a 1.0
   save restarts the application) replace the running version without a gap. The new version
@@ -1036,7 +1053,8 @@ CLI (§9):
   both slots; Java's and .NET's listen variables of each slot carry its own endpoint (unix mode
   without slot ports, as `app-apply` writes it); a 1.0 state renders byte-identical files compared
   with the 1.0.0 helper (copied from `git show v1.0.0:src/sbin/runway-helper` by
-  `.github/scripts/plesk-e2e.sh`, skipped without it).
+  `.github/scripts/plesk-e2e.sh`, skipped without it), without limits and with a memory limit,
+  whose unit differs only by the `MemoryPressureWatch=off` of §7 on systemd 254 and later.
 - Test-only fault flag `/var/lib/runway/test-switch-fault` (root-owned regular file younger than one
   hour, content `<kill|term>:<point>`, points: the phases of §12.4 plus `moved` after the traffic
   moved and `committed` after the commit): the switch job sends itself SIGKILL or SIGTERM there.

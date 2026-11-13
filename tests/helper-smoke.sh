@@ -216,6 +216,42 @@ else
     echo "SKIP  file cache of a service (cgroup v1: no /sys/fs/cgroup/cgroup.controllers)"
 fi
 
+echo "== limits: MemoryPressureWatch=off with a memory or CPU limit on systemd 254+ (docs/DESIGN.md section 7)"
+SYSTEMD_VERSION=$(systemctl --version | head -1 | awk '{print $2}')
+apply_limits() { # apply_limits LIMITS_JSON: the sample again (same variables) with these limits, restarted
+    local before pid
+    before=$(systemctl show -p MainPID --value runway-app-$ID)
+    call app-apply "{$(base | sed "s/\"limits\": {}/\"limits\": $1/"), \"env\": {\"SMOKE\": \"a \\\"b\\\" \$HOME %h\"}, \"restart\": true}" >/dev/null
+    # app-apply restarts without waiting: wait for the new process and its answer.
+    for _ in $(seq 1 40); do
+        pid=$(systemctl show -p MainPID --value runway-app-$ID)
+        if [ "$pid" != "0" ] && [ "$pid" != "$before" ] && [ "$(curl -s "http://127.0.0.1:$PORT/")" = 'smoke a "b" $HOME %h' ]; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+# The bind mount of memory.pressure that systemd 254+ adds to the read-only cgroup tree: the second
+# cgroup2 mount that hides the unit's limits from .NET.
+pressure_mounts() { awk '$5 ~ /memory\.pressure$/' "/proc/$(systemctl show -p MainPID --value runway-app-$ID)/mountinfo" | wc -l; }
+if apply_limits '{"memory_mb": 512, "cpu_percent": 150}'; then
+    if [ "${SYSTEMD_VERSION:-0}" -ge 254 ] 2>/dev/null; then
+        grep -qx 'MemoryPressureWatch=off' /etc/systemd/system/runway-app-$ID.service && [ "$(pressure_mounts)" = "0" ] \
+            && ok "memory and CPU limit: MemoryPressureWatch=off, no memory.pressure mount in the service (systemd $SYSTEMD_VERSION)" \
+            || bad "memory and CPU limit on systemd $SYSTEMD_VERSION: $(grep -c MemoryPressureWatch /etc/systemd/system/runway-app-$ID.service) line(s), $(pressure_mounts) memory.pressure mount(s)"
+    else
+        grep -q 'MemoryPressureWatch' /etc/systemd/system/runway-app-$ID.service && bad "MemoryPressureWatch on systemd $SYSTEMD_VERSION" \
+            || ok "memory and CPU limit on systemd $SYSTEMD_VERSION: no MemoryPressureWatch line (unknown before 254)"
+    fi
+else
+    bad "the sample with memory and CPU limits does not answer"
+fi
+apply_limits '{"tasks": 512}' && ! grep -q 'MemoryPressureWatch' /etc/systemd/system/runway-app-$ID.service \
+    && ok "a task limit alone keeps the unit without MemoryPressureWatch" || bad "task limit: $(grep MemoryPressureWatch /etc/systemd/system/runway-app-$ID.service)"
+apply_limits '{}' && ! grep -q 'MemoryPressureWatch' /etc/systemd/system/runway-app-$ID.service \
+    && ok "without limits the unit has no MemoryPressureWatch line" || bad "unit without limits: $(grep MemoryPressureWatch /etc/systemd/system/runway-app-$ID.service)"
+
 echo "== trigger files"
 pid1=$(systemctl show -p MainPID --value runway-app-$ID)
 runuser -u "$USER_NAME" -- touch "$APP/tmp/restart.txt"
@@ -929,23 +965,30 @@ new = load("helper_new", "/opt/runway/bin/runway-helper")
 user, home = sys.argv[1], sys.argv[2]
 pw = pwd.getpwnam(user)
 diffs = []
+# The one later change of a 1.0 unit: a unit with a memory or CPU limit gets this line on systemd
+# 254 and later (docs/DESIGN.md section 7, limits).
+watch = "MemoryPressureWatch=off\n"
 for listen in ("tcp", "unix", "none"):
-    payload = {"domain_id": 996, "domain": "same.test", "sysuser": user, "app_root": "apps/smoke-zd", "runtime": "go",
-               "toolchain": "", "build_cmd": "go build", "start_cmd": "./bin/app", "port": 29996, "port_range": [29900, 29999],
-               "enabled": True, "auto_deploy": True, "build_timeout": 600, "limits": {"memory_mb": 256}, "listen": listen,
-               "health_path": "/h", "env": {"A": "x y"}}
-    s_old, _ = old.validate_app(dict(payload))
-    s_new, _ = new.validate_app(dict(payload))
-    for name in ("render_env_file", "render_app_unit"):
-        if getattr(old, name)(s_old, pw) != getattr(new, name)(s_new, pw):
-            diffs.append("%s %s" % (listen, name))
-    for name in ("render_deploy_service", "render_deploy_path"):
-        if getattr(old, name)(s_old) != getattr(new, name)(s_new):
-            diffs.append("%s %s" % (listen, name))
+    for limits in ({}, {"memory_mb": 256}):
+        payload = {"domain_id": 996, "domain": "same.test", "sysuser": user, "app_root": "apps/smoke-zd", "runtime": "go",
+                   "toolchain": "", "build_cmd": "go build", "start_cmd": "./bin/app", "port": 29996, "port_range": [29900, 29999],
+                   "enabled": True, "auto_deploy": True, "build_timeout": 600, "limits": limits, "listen": listen,
+                   "health_path": "/h", "env": {"A": "x y"}}
+        s_old, _ = old.validate_app(dict(payload))
+        s_new, _ = new.validate_app(dict(payload))
+        if old.render_env_file(s_old, pw) != new.render_env_file(s_new, pw):
+            diffs.append("%s %s render_env_file" % (listen, limits))
+        unit_old, unit_new = old.render_app_unit(s_old, pw), new.render_app_unit(s_new, pw)
+        expected = bool(limits) and new.cached_systemd_version() >= 254
+        if unit_new.count(watch) != int(expected) or unit_new.replace(watch, "") != unit_old:
+            diffs.append("%s %s render_app_unit" % (listen, limits))
+        for name in ("render_deploy_service", "render_deploy_path"):
+            if getattr(old, name)(s_old) != getattr(new, name)(s_new):
+                diffs.append("%s %s %s" % (listen, limits, name))
 print("same" if not diffs else "different: " + ", ".join(diffs))
 PYEOF
 )
-    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte" || bad "1.0 rendering: $res"
+    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off)" || bad "1.0 rendering: $res"
 else
     echo "SKIP  byte-identical 1.0 rendering (no /root/runway-helper-1.0.0; plesk-e2e.sh smoke copies it from git)"
 fi

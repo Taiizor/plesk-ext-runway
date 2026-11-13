@@ -1536,6 +1536,12 @@ def render_app_unit(state, pw):
         lines.append("CPUQuota=%d%%" % limits["cpu_percent"])
     if limits["tasks"]:
         lines.append("TasksMax=%d" % limits["tasks"])
+    if (limits["memory_mb"] or limits["cpu_percent"]) and cached_systemd_version() >= 254:
+        # systemd 254+ (MemoryPressureWatch=auto) bind-mounts memory.pressure writable into the
+        # cgroup tree that ProtectControlGroups made read-only; with that second cgroup2 mount the
+        # .NET runtime no longer finds the unit's MemoryMax and CPUQuota and sizes its heap for the
+        # whole machine. Without the watch it sees the limits again (docs/DESIGN.md section 7).
+        lines.append("MemoryPressureWatch=off")
     lines += ["", "[Install]", "WantedBy=multi-user.target", ""]
     return "\n".join(lines)
 

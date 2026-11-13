@@ -12,9 +12,10 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
-- **Runway** in the navigation of the administrator's Power User view and of the customer panel
-  (customers with the *Runway applications management* permission); the Service Provider view
-  keeps its entry under *Server Management*, and the page of a subscription gets no Runway tab.
+- **Runway** in the navigation of the administrator's Power User view, of resellers (*Hosting
+  Services*) and of the customer panel (customers with the *Runway applications management*
+  permission); the Service Provider view keeps its entry under *Server Management*, and the page
+  of a subscription gets no Runway tab.
 - Runway's mark among the icons of a domain row in *Websites & Domains* (and the administrator's
   domain list) for domains whose Runway application is enabled, like the Node.js and .NET Toolkit
   icons (Plesk 18.0.41 and later). The mark is mid grey, so it stays visible in the dark theme.
@@ -37,6 +38,14 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Changed
 
+- **Behaviour change** on systemd 254 and later (Ubuntu 24.04, Debian 13, EL 10): the unit of an
+  application with a memory or CPU limit gets `MemoryPressureWatch=off`. systemd's default memory
+  pressure watch adds a second cgroup mount to the service, and .NET then did not see the limits:
+  it sized its heap and its garbage collector heaps for the whole server, grew past the memory
+  limit and kept swapping (4 to 13 times slower in a test with a 1 GiB limit). It now keeps its
+  heap within 75 % of the limit, so an application that ran above that can get an
+  `OutOfMemoryException` instead; raise its limit then. Takes effect when the application restarts
+  next; units without memory or CPU limit and older systemd versions are unchanged.
 - The hints of *Application root* and *Static paths* say why the application belongs outside the
   document root (the web server can serve its files there, whenever it does not pass a request to
   the application, so sources and settings files with secrets could be downloaded) and that static

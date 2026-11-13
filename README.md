@@ -124,8 +124,9 @@ extensionUpload = true
 Then use *Extensions > My Extensions > Upload Extension*.
 
 After the installation **Runway** appears in the administrator's navigation (in the Service
-Provider view under *Server Management*, in the Power User view as an entry of its own) and in
-every domain's *Dev Tools* (*Websites & Domains*). Customers see it, in their navigation too, when
+Provider view under *Server Management*, in the Power User view as an entry of its own), in the
+resellers' navigation (*Hosting Services*) and in every domain's *Dev Tools* (*Websites &
+Domains*). Customers see it, in their navigation too, when
 their service plan or subscription has the **Runway applications management** permission
 (*Service Plans > Permissions*). In *Websites & Domains* a domain whose Runway application is
 enabled shows Runway's mark among the icons of its row (a Node.js or .NET icon in a row comes from
@@ -361,6 +362,15 @@ the cache is large. In .NET serve files with `app.UseStaticFiles()` or return th
 load (up to the garbage collector's heap limit, by default 75 % of the application's memory limit
 when it has one).
 
+.NET reads the memory and CPU limits of the application (*Memory*, *CPU* on the domain page) from
+its cgroup and sizes its heap and the number of garbage collector heaps by them. On systemd 254
+and later (Ubuntu 24.04, Debian 13, EL 10) the unit of an application with such a limit
+therefore has `MemoryPressureWatch=off`: the memory pressure watch that systemd turns on by
+default adds a second cgroup mount to the service, and .NET then took the whole server for its
+own, grew past the limit and kept swapping. An application that ran above 75 % of its limit that
+way can now get an `OutOfMemoryException` instead; raise the limit then. The line takes effect
+when the application restarts next.
+
 The figures come from the service's cgroup (`memory.stat`). To look at them on the server (with
 zero-downtime deployments the unit is `runway-app-<id>-a` or `-b`):
 
@@ -515,7 +525,8 @@ browser ── Plesk panel (React UI) ── JSON API (PHP, psaadm)
 - Services run as the system user with `NoNewPrivileges`, `ProtectSystem=full`, `PrivateTmp`,
   `PrivateDevices`, `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`,
   `RestrictSUIDSGID`, `RestrictRealtime`, `LockPersonality`, the per-port bind restriction and
-  the configured `MemoryMax`/`CPUQuota`/`TasksMax`. Builds always have a task limit.
+  the configured `MemoryMax`/`CPUQuota`/`TasksMax` (with a memory or CPU limit on systemd 254 and
+  later also `MemoryPressureWatch=off`, see *Memory*). Builds always have a task limit.
 - Suspending a domain, subscription, customer or reseller stops its applications and any
   running build; a deployment re-checks the state before it restarts anything.
 - Toolchains are downloaded over HTTPS from the official sources only and verified against the
