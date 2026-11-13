@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Thư mục mà máy chủ web dùng để phục vụ các đường dẫn tĩnh (và, ở chế độ đường dẫn URL, cả phần còn lại của trang web), tương đối so với thư mục chủ của thuê bao. Đây là thư mục gốc tài liệu của tên miền này trong Plesk, cũng chính là thiết lập trong cài đặt lưu trữ của tên miền: thay đổi ở đây cũng sẽ thay đổi ở đó. Plesk sẽ tạo thư mục nếu chưa có.',
             'documentRootExample' => 'Ví dụ: với thư mục gốc ứng dụng %%appRoot%%, thư mục gốc tài liệu %%documentRoot%% và đường dẫn tĩnh %%prefix%%, máy chủ web tự phục vụ các tệp trong %%folder%% và chuyển mọi thứ khác đến ứng dụng.',
             'documentRootReadOnly' => 'Chỉ những người dùng được phép quản lý cài đặt lưu trữ của tên miền này trong Plesk mới có thể thay đổi mục này.',
-            'documentRootBuildChmod' => 'Máy chủ web phải đọc được các tệp ở đó: các tệp do quá trình biên dịch tạo ra chỉ thuê bao mới đọc được, vì vậy hãy kết thúc lệnh biên dịch bằng %%command%%.',
+            'documentRootBuildChmod' => 'Quá trình biên dịch tạo ra các tệp mà chỉ thuê bao mới đọc được: sau mỗi lần biên dịch và tải xuống, cũng như khi thư mục gốc tài liệu được thay đổi tại đây, Runway sẽ làm cho máy chủ web đọc được các tệp và thư mục ở đó. Các tệp và thư mục có tên bắt đầu bằng dấu chấm (chẳng hạn .htaccess) và đích của các liên kết tượng trưng được giữ nguyên: hãy tự làm cho chúng đọc được khi máy chủ web cần đến.',
             'documentRootPathMode' => 'Ở chế độ đường dẫn URL, thư mục gốc tài liệu cũng phục vụ phần còn lại của trang web, bên ngoài đường dẫn URL của ứng dụng.',
             'documentRootSuggestion' => 'Đề xuất: %%path%%',
             'documentRootUseSuggestion' => 'Dùng đề xuất này',

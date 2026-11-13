@@ -10,6 +10,25 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Added
+
+- Static files from a document root inside the application root work without `chmod -R o+rX` in
+  the build command: builds and downloads create files that only the subscription can read (umask
+  027), so after every successful build or fetch (before the new version starts) and when the
+  document root is changed on the Runway page, Runway makes the files and folders there readable
+  for the web server (`o+r` for files, `o+rx` for folders), and lets the web server pass the
+  folders between the application root and the document root that a build may create anew
+  (`.output` of `.output/public`; `o+x` only). Only for a document root strictly inside the
+  application root (with symbolic links resolved; never the application root itself, a folder
+  above it or one elsewhere), as the system user, without following symbolic links, skipping
+  names that start with `.` (a `.htaccess` the build writes there still needs `chmod o+r`), only
+  the subscription's own files, read permission only, at most 200,000 entries and 60 seconds per
+  run; the deploy log reports what it changed. The helper keeps a copy of the domain's document
+  root in the application's state (`document_root` of `app-apply`, the new command `app-docroot`,
+  `apps-list`; Reconcile keeps it in line with Plesk); unit and environment files do not change.
+  The form's note under *Document root* says so instead of naming a command. README section
+  *Static files and the document root*.
+
 ## [1.2.0] - 2026-11-13
 
 Feedback from a production server: Runway in every panel view, the application's real memory,

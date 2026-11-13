@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Kansio, josta web-palvelin palvelee staattiset polut (ja polkutilassa myös muun sivuston), suhteessa tilauksen kotihakemistoon. Se on tämän toimialueen sivuston juurihakemisto Pleskissä, sama asetus kuin sen hosting-asetuksissa: täällä tehty muutos muuttaa sen myös siellä. Plesk luo puuttuvan kansion.',
             'documentRootExample' => 'Esimerkki: kun sovelluksen juurihakemisto on %%appRoot%%, sivuston juurihakemisto %%documentRoot%% ja staattinen polku %%prefix%%, web-palvelin palvelee itse kansion %%folder%% tiedostot ja välittää kaiken muun sovellukselle.',
             'documentRootReadOnly' => 'Vain käyttäjät, joilla on Pleskissä oikeus hallita tämän toimialueen hosting-asetuksia, voivat muuttaa sitä.',
-            'documentRootBuildChmod' => 'Web-palvelimen on voitava lukea siellä olevat tiedostot: koonnin luomia tiedostoja voi lukea vain tilaus, joten lopeta koontikomento komennolla %%command%%.',
+            'documentRootBuildChmod' => 'Koonnit luovat tiedostoja, joita vain tilaus voi lukea: jokaisen koonnin ja latauksen jälkeen sekä silloin, kun sivuston juurihakemisto muuttuu täällä, Runway tekee siellä olevista tiedostoista ja kansioista web-palvelimen luettavia. Pisteellä alkavat nimet (kuten .htaccess) ja symbolisten linkkien kohteet jäävät ennalleen: tee niistä itse luettavia, jos web-palvelin tarvitsee niitä.',
             'documentRootPathMode' => 'Polkutilassa sivuston juurihakemisto palvelee myös muun sivuston URL-polun ulkopuolella.',
             'documentRootSuggestion' => 'Ehdotus: %%path%%',
             'documentRootUseSuggestion' => 'Käytä',

@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Mappen som webbservern levererar de statiska sökvägarna från (och, i URL-sökvägsläge, resten av webbplatsen), relativt abonnemangets hemkatalog. Det är domänens dokumentrot i Plesk, samma inställning som i dess webbhotellsinställningar: en ändring här ändrar den även där. Plesk skapar mappen om den saknas.',
             'documentRootExample' => 'Exempel: med applikationsroten %%appRoot%%, dokumentroten %%documentRoot%% och den statiska sökvägen %%prefix%% levererar webbservern själv filerna i %%folder%% och skickar allt annat vidare till applikationen.',
             'documentRootReadOnly' => 'Endast användare som får hantera domänens webbhotellsinställningar i Plesk kan ändra den.',
-            'documentRootBuildChmod' => 'Webbservern måste kunna läsa filerna där: filer som skapas av ett bygge kan bara läsas av abonnemanget, så avsluta byggkommandot med %%command%%.',
+            'documentRootBuildChmod' => 'Byggen skapar filer som bara abonnemanget kan läsa: efter varje bygge och nedladdning, och när dokumentroten ändras här, gör Runway filerna och mapparna där läsbara för webbservern. Filer och mappar vars namn börjar med en punkt (till exempel .htaccess) och målen för symboliska länkar lämnas som de är: gör dem läsbara själv när webbservern behöver dem.',
             'documentRootPathMode' => 'I URL-sökvägsläge levererar dokumentroten även resten av webbplatsen, utanför applikationens URL-sökväg.',
             'documentRootSuggestion' => 'Förslag: %%path%%',
             'documentRootUseSuggestion' => 'Använd förslaget',

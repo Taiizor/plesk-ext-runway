@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'De map van waaruit de webserver de statische paden aanbiedt (en in padmodus de rest van de website), relatief ten opzichte van de hoofdmap van het abonnement. Het is de documenthoofdmap van dit domein in Plesk, dezelfde instelling als in de hostinginstellingen: een wijziging hier wijzigt deze ook daar. Plesk maakt een ontbrekende map aan.',
             'documentRootExample' => 'Voorbeeld: met de applicatiehoofdmap %%appRoot%%, de documenthoofdmap %%documentRoot%% en het statische pad %%prefix%% biedt de webserver de bestanden in %%folder%% zelf aan en geeft al het andere door aan de applicatie.',
             'documentRootReadOnly' => 'Alleen gebruikers die de hostinginstellingen van dit domein in Plesk mogen beheren, kunnen deze wijzigen.',
-            'documentRootBuildChmod' => 'De webserver moet de bestanden daar kunnen lezen: bestanden die door een build worden aangemaakt, zijn alleen leesbaar voor het abonnement, dus sluit de buildopdracht af met %%command%%.',
+            'documentRootBuildChmod' => 'Builds maken bestanden aan die alleen het abonnement kan lezen: na elke build en download, en wanneer de documenthoofdmap hier wordt gewijzigd, maakt Runway de bestanden en mappen daar leesbaar voor de webserver. Namen die met een punt beginnen (zoals .htaccess) en de doelen van symbolische links blijven ongewijzigd: maak ze zelf leesbaar wanneer de webserver ze nodig heeft.',
             'documentRootPathMode' => 'In padmodus biedt de documenthoofdmap ook de rest van de website aan, buiten het URL-pad.',
             'documentRootSuggestion' => 'Suggestie: %%path%%',
             'documentRootUseSuggestion' => 'Suggestie gebruiken',

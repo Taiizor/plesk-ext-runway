@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Mappen som webserveren leverer de statiske banene fra (og i banemodus resten av nettstedet), relativt til abonnementets hjemmemappe. Det er dokumentroten til dette domenet i Plesk, den samme innstillingen som i webhotellinnstillingene: en endring her endrer den også der. Plesk oppretter en mappe som mangler.',
             'documentRootExample' => 'Eksempel: med applikasjonsroten %%appRoot%%, dokumentroten %%documentRoot%% og den statiske banen %%prefix%% leverer webserveren selv filene i %%folder%% og sender alt annet videre til applikasjonen.',
             'documentRootReadOnly' => 'Bare brukere som kan administrere webhotellinnstillingene for dette domenet i Plesk, kan endre den.',
-            'documentRootBuildChmod' => 'Webserveren må kunne lese filene der: filer som opprettes av en bygging, kan bare leses av abonnementet, så avslutt byggkommandoen med %%command%%.',
+            'documentRootBuildChmod' => 'Bygginger oppretter filer som bare abonnementet kan lese: etter hver bygging og nedlasting, og når dokumentroten endres her, gjør Runway filene og mappene der lesbare for webserveren. Navn som begynner med punktum (for eksempel .htaccess), og målene for symbolske lenker forblir som de er: gjør dem lesbare selv hvis webserveren trenger dem.',
             'documentRootPathMode' => 'I banemodus leverer dokumentroten også resten av nettstedet, utenfor URL-banen.',
             'documentRootSuggestion' => 'Forslag: %%path%%',
             'documentRootUseSuggestion' => 'Bruk forslaget',

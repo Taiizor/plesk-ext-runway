@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Web sunucusunun statik yolları (yol modunda sitenin geri kalanını da) sunduğu klasör; abonelik ana dizinine göre yazılır. Bu, alan adının Plesk\'teki belge köküdür; barındırma ayarlarındakiyle aynı ayardır: burada yapılan değişiklik orada da geçerli olur. Plesk, olmayan bir klasörü kendisi oluşturur.',
             'documentRootExample' => 'Örnek: uygulama kökü %%appRoot%%, belge kökü %%documentRoot%% ve statik yol %%prefix%% olduğunda web sunucusu %%folder%% klasöründeki dosyaları kendisi sunar, geri kalan her şeyi uygulamaya iletir.',
             'documentRootReadOnly' => 'Bunu yalnızca Plesk\'te bu alan adının barındırma ayarlarını yönetebilen kullanıcılar değiştirebilir.',
-            'documentRootBuildChmod' => 'Web sunucusunun oradaki dosyaları okuyabilmesi gerekir: derlemenin oluşturduğu dosyaları yalnızca abonelik okuyabilir; bu yüzden derleme komutunu %%command%% ile bitirin.',
+            'documentRootBuildChmod' => 'Derlemeler yalnızca aboneliğin okuyabildiği dosyalar oluşturur: Runway her derleme ve indirmeden sonra ve belge kökü burada değiştiğinde oradaki dosya ve klasörleri web sunucusunun okuyabileceği hâle getirir. Adı nokta ile başlayanlar (.htaccess gibi) ve sembolik bağlantıların hedefleri olduğu gibi kalır: web sunucusunun bunlara ihtiyacı varsa onları kendiniz okunabilir yapın.',
             'documentRootPathMode' => 'Yol modunda belge kökü, URL yolunun dışında kalan sitenin geri kalanını da sunar.',
             'documentRootSuggestion' => 'Öneri: %%path%%',
             'documentRootUseSuggestion' => 'Bunu kullan',

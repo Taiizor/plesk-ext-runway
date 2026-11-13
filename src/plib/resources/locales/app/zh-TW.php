@@ -395,7 +395,7 @@ return [
             'documentRootHint' => '網頁伺服器用來提供靜態路徑（在 URL 路徑模式下也包括網站其餘部分）的資料夾，相對於訂閱的主目錄。它就是此域名在 Plesk 中的文件根目錄，與其託管設定中的設定相同：在此變更也會變更那裡的設定。若資料夾不存在，Plesk 會建立它。',
             'documentRootExample' => '範例：當應用程式根目錄為 %%appRoot%%、文件根目錄為 %%documentRoot%%、靜態路徑為 %%prefix%% 時，網頁伺服器會自行提供 %%folder%% 中的檔案，並將其他所有請求轉送給應用程式。',
             'documentRootReadOnly' => '只有可在 Plesk 中管理此域名託管設定的使用者才能變更它。',
-            'documentRootBuildChmod' => '網頁伺服器必須能讀取其中的檔案：建置所建立的檔案只有訂閱能讀取，因此請在建置指令結尾加上 %%command%%。',
+            'documentRootBuildChmod' => '建置所建立的檔案只有訂閱能讀取：每次建置和下載之後，以及在此變更文件根目錄時，Runway 都會讓其中的檔案和資料夾可供網頁伺服器讀取。名稱以點開頭的檔案和資料夾（例如 .htaccess）以及符號連結的目標會維持原狀：若網頁伺服器需要它們，請自行將其設為可讀取。',
             'documentRootPathMode' => '在 URL 路徑模式下，文件根目錄也會提供應用程式 URL 路徑以外的網站其餘部分。',
             'documentRootSuggestion' => '建議：%%path%%',
             'documentRootUseSuggestion' => '使用此建議',

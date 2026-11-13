@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Den mappe, som webserveren leverer de statiske stier fra (og i stitilstand også resten af webstedet), relativt til abonnementets hjemmemappe. Det er dokumentroden for dette domæne i Plesk, den samme indstilling som i dets hostingindstillinger: en ændring her ændrer den også der. Plesk opretter en manglende mappe.',
             'documentRootExample' => 'Eksempel: med applikationsroden %%appRoot%%, dokumentroden %%documentRoot%% og den statiske sti %%prefix%% leverer webserveren selv filerne i %%folder%% og sender alt andet videre til applikationen.',
             'documentRootReadOnly' => 'Kun brugere, der må administrere hostingindstillingerne for dette domæne i Plesk, kan ændre den.',
-            'documentRootBuildChmod' => 'Webserveren skal kunne læse filerne der: filer, der oprettes af et build, kan kun læses af abonnementet, så afslut build-kommandoen med %%command%%.',
+            'documentRootBuildChmod' => 'Builds opretter filer, som kun abonnementet kan læse: efter hvert build og hver download, og når dokumentroden ændres her, gør Runway filerne og mapperne der læsbare for webserveren. Navne, der starter med et punktum (såsom .htaccess), og målene for symbolske links forbliver uændrede: gør dem selv læsbare, når webserveren har brug for dem.',
             'documentRootPathMode' => 'I stitilstand leverer dokumentroden også resten af webstedet uden for URL-stien.',
             'documentRootSuggestion' => 'Forslag: %%path%%',
             'documentRootUseSuggestion' => 'Brug den',

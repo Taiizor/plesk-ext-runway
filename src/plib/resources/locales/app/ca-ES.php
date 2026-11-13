@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'La carpeta des de la qual el servidor web serveix els camins estàtics (i, en el mode de camí, la resta del lloc), relativa al directori d\'inici de la subscripció. És l\'arrel de documents d\'aquest domini a Plesk, el mateix paràmetre que a la seva configuració d\'allotjament: un canvi aquí també la canvia allà. Plesk crea la carpeta si no existeix.',
             'documentRootExample' => 'Exemple: amb l\'arrel de l\'aplicació %%appRoot%%, l\'arrel de documents %%documentRoot%% i el camí estàtic %%prefix%%, el servidor web serveix ell mateix els fitxers de %%folder%% i passa tota la resta a l\'aplicació.',
             'documentRootReadOnly' => 'Només la poden canviar els usuaris que poden gestionar la configuració d\'allotjament d\'aquest domini a Plesk.',
-            'documentRootBuildChmod' => 'El servidor web ha de poder llegir-hi els fitxers: els fitxers creats per una compilació només els pot llegir la subscripció, així que acabeu l\'ordre de compilació amb %%command%%.',
+            'documentRootBuildChmod' => 'Les compilacions creen fitxers que només pot llegir la subscripció: després de cada compilació i baixada, i quan l\'arrel de documents canvia aquí, Runway fa que el servidor web pugui llegir els fitxers i les carpetes que s\'hi troben. Els noms que comencen amb un punt (com ara .htaccess) i les destinacions dels enllaços simbòlics es queden com estan: feu-los llegibles pel vostre compte quan el servidor web els necessiti.',
             'documentRootPathMode' => 'En el mode de camí, l\'arrel de documents també serveix la resta del lloc, fora del camí d\'URL.',
             'documentRootSuggestion' => 'Suggeriment: %%path%%',
             'documentRootUseSuggestion' => 'Utilitza-la',

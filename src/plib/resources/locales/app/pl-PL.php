@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Folder, z którego serwer WWW obsługuje ścieżki statyczne (a w trybie ścieżki także resztę witryny), względem katalogu domowego subskrypcji. Jest to katalog główny dokumentów tej domeny w Plesk, to samo ustawienie co w jej ustawieniach hostingu: zmiana tutaj zmienia je również tam. Plesk tworzy brakujący folder.',
             'documentRootExample' => 'Przykład: przy katalogu głównym aplikacji %%appRoot%%, katalogu głównym dokumentów %%documentRoot%% i ścieżce statycznej %%prefix%% serwer WWW sam obsługuje pliki w %%folder%%, a wszystko inne przekazuje do aplikacji.',
             'documentRootReadOnly' => 'Zmienić go mogą tylko użytkownicy uprawnieni do zarządzania ustawieniami hostingu tej domeny w Plesk.',
-            'documentRootBuildChmod' => 'Serwer WWW musi móc odczytać znajdujące się tam pliki: pliki utworzone przez kompilację może odczytać tylko subskrypcja, dlatego zakończ polecenie kompilacji poleceniem %%command%%.',
+            'documentRootBuildChmod' => 'Kompilacje tworzą pliki, które może odczytać tylko subskrypcja: po każdej kompilacji i każdym pobraniu, a także gdy katalog główny dokumentów zostanie zmieniony tutaj, Runway udostępnia serwerowi WWW do odczytu znajdujące się tam pliki i foldery. Nazwy zaczynające się od kropki (np. .htaccess) i cele dowiązań symbolicznych pozostają bez zmian: jeśli serwer WWW ich potrzebuje, udostępnij je do odczytu samodzielnie.',
             'documentRootPathMode' => 'W trybie ścieżki katalog główny dokumentów obsługuje także resztę witryny, poza ścieżką URL.',
             'documentRootSuggestion' => 'Sugestia: %%path%%',
             'documentRootUseSuggestion' => 'Użyj sugestii',

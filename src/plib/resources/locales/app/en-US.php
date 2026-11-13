@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'The folder from which the web server serves the static paths (and, in path mode, the rest of the site), relative to the subscription home directory. It is the document root of this domain in Plesk, the same setting as in its hosting settings: a change here changes it there. Plesk creates a missing folder.',
             'documentRootExample' => 'Example: with the application root %%appRoot%%, the document root %%documentRoot%% and the static path %%prefix%%, the web server serves the files in %%folder%% itself and passes everything else to the application.',
             'documentRootReadOnly' => 'Only users who may manage the hosting settings of this domain in Plesk can change it.',
-            'documentRootBuildChmod' => 'The web server must be able to read the files there: files created by a build are readable for the subscription only, so end the build command with %%command%%.',
+            'documentRootBuildChmod' => 'Builds create files that only the subscription can read: after every build and download, and when the document root changes here, Runway makes the files and folders there readable for the web server. Names that start with a dot (such as .htaccess) and the targets of symbolic links stay as they are: make them readable yourself when the web server needs them.',
             'documentRootPathMode' => 'In path mode the document root also serves the rest of the site, outside the mount path.',
             'documentRootSuggestion' => 'Suggestion: %%path%%',
             'documentRootUseSuggestion' => 'Use it',

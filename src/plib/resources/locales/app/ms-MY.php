@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Folder tempat pelayan web melayan laluan statik (dan, dalam mod laluan, selebihnya laman web), relatif kepada direktori rumah langganan. Ia ialah akar dokumen domain ini dalam Plesk, tetapan yang sama seperti dalam tetapan pengehosannya: perubahan di sini turut mengubahnya di sana. Plesk mencipta folder yang belum wujud.',
             'documentRootExample' => 'Contoh: dengan akar aplikasi %%appRoot%%, akar dokumen %%documentRoot%% dan laluan statik %%prefix%%, pelayan web melayan sendiri fail dalam %%folder%% dan menghantar selebihnya kepada aplikasi.',
             'documentRootReadOnly' => 'Hanya pengguna yang dibenarkan mengurus tetapan pengehosan domain ini dalam Plesk boleh mengubahnya.',
-            'documentRootBuildChmod' => 'Pelayan web mesti dapat membaca fail di sana: fail yang dicipta oleh binaan hanya boleh dibaca oleh langganan, jadi akhiri perintah bina dengan %%command%%.',
+            'documentRootBuildChmod' => 'Binaan mencipta fail yang hanya boleh dibaca oleh langganan: selepas setiap binaan dan muat turun, dan apabila akar dokumen diubah di sini, Runway menjadikan fail dan folder di sana boleh dibaca oleh pelayan web. Nama yang bermula dengan titik (seperti .htaccess) dan sasaran pautan simbolik kekal seperti sedia ada: tetapkan sendiri supaya ia boleh dibaca jika pelayan web memerlukannya.',
             'documentRootPathMode' => 'Dalam mod laluan, akar dokumen turut melayan selebihnya laman web, di luar laluan URL.',
             'documentRootSuggestion' => 'Cadangan: %%path%%',
             'documentRootUseSuggestion' => 'Gunakan cadangan ini',

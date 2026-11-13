@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'A pasta a partir da qual o servidor web serve os caminhos estáticos (e, no modo de caminho, o restante do site), relativa ao diretório inicial da assinatura. É a raiz do documento deste domínio no Plesk, a mesma configuração das configurações de hospedagem dele: uma alteração aqui também a altera lá. O Plesk cria a pasta se ela não existir.',
             'documentRootExample' => 'Exemplo: com a raiz do aplicativo %%appRoot%%, a raiz do documento %%documentRoot%% e o caminho estático %%prefix%%, o próprio servidor web serve os arquivos em %%folder%% e repassa todo o resto ao aplicativo.',
             'documentRootReadOnly' => 'Somente usuários que podem gerenciar as configurações de hospedagem deste domínio no Plesk podem alterá-la.',
-            'documentRootBuildChmod' => 'O servidor web precisa conseguir ler os arquivos que estão lá: os arquivos criados por uma compilação só podem ser lidos pela assinatura, então termine o comando de compilação com %%command%%.',
+            'documentRootBuildChmod' => 'As compilações criam arquivos que só a assinatura pode ler: após cada compilação e cada download, e quando a raiz do documento é alterada aqui, o Runway torna legíveis para o servidor web os arquivos e as pastas que estão lá. Os nomes que começam com ponto (como .htaccess) e os destinos de links simbólicos permanecem como estão: torne-os legíveis você mesmo quando o servidor web precisar deles.',
             'documentRootPathMode' => 'No modo de caminho, a raiz do documento também serve o restante do site, fora do caminho de URL.',
             'documentRootSuggestion' => 'Sugestão: %%path%%',
             'documentRootUseSuggestion' => 'Usar sugestão',

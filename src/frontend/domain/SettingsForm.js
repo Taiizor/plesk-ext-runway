@@ -235,11 +235,11 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
         ? data.documentRootSuggestions[values.runtime] : [];
     const suggestion = documentRootAllowed && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
         && typeof suggestions[0] === 'string' && suggestions[0] !== typedValue ? suggestions[0] : null;
-    // A document root inside the application root: files that a build creates there (umask 027)
-    // are not readable for the web server; the hint names the command that makes them readable.
+    // A document root inside the application root: builds create files that the web server cannot
+    // read (umask 027), so Runway makes the files there readable after every build and when the
+    // document root changes (docs/DESIGN.md section 6); the hint says so.
     const appRootPath = normalRoot(values.appRoot);
-    const rootInApp = supportsBuild && appRootPath && typedRoot.indexOf(`${appRootPath}/`) === 0
-        ? typedRoot.slice(appRootPath.length + 1) : '';
+    const rootInApp = Boolean(supportsBuild && appRootPath && typedRoot.indexOf(`${appRootPath}/`) === 0);
     // The expected response content and the health watch need a health check path: disabled
     // without one, unless they are set (so they can still be cleared or turned off). Any character
     // keeps the content field open: the server trims fewer characters than String.trim() does.
@@ -540,7 +540,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                                     {rootInApp ? (
                                         <span>
                                             {' '}
-                                            <Translate content="Domain.form.documentRootBuildChmod" params={{ command: isolate(`chmod -R o+rX ${rootInApp}`) }} />
+                                            <Translate content="Domain.form.documentRootBuildChmod" />
                                         </span>
                                     ) : null}
                                     {values.mode === 'path' ? (

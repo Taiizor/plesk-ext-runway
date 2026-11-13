@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Web 服务器从中提供静态路径（在 URL 路径模式下还包括网站的其余部分）的文件夹，相对于订阅的主目录。它就是此域名在 Plesk 中的文档根目录，与其主机设置中的设置相同：在此处更改也会更改那里的设置。如果文件夹不存在，Plesk 会创建它。',
             'documentRootExample' => '示例：当应用程序根目录为 %%appRoot%%、文档根目录为 %%documentRoot%%、静态路径为 %%prefix%% 时，Web 服务器会自行提供 %%folder%% 中的文件，并将其他所有请求转发给应用程序。',
             'documentRootReadOnly' => '只有可以在 Plesk 中管理此域名主机设置的用户才能更改它。',
-            'documentRootBuildChmod' => 'Web 服务器必须能够读取其中的文件：构建创建的文件只有订阅可以读取，因此请在构建命令末尾加上 %%command%%。',
+            'documentRootBuildChmod' => '构建创建的文件只有订阅可以读取：每次构建和下载之后，以及在此处更改文档根目录时，Runway 都会使其中的文件和文件夹可供 Web 服务器读取。名称以点开头的文件和文件夹（例如 .htaccess）以及符号链接的目标保持不变：如果 Web 服务器需要它们，请自行将其设为可读。',
             'documentRootPathMode' => '在 URL 路径模式下，文档根目录还会提供应用程序 URL 路径之外的网站其余部分。',
             'documentRootSuggestion' => '建议：%%path%%',
             'documentRootUseSuggestion' => '使用此建议',

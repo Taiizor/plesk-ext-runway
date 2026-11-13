@@ -221,7 +221,8 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/app/sample` | POST | domain | `{runtime, listen, force?}` (message: one file / %%count%% files) → writes the sample app into the app root (helper `app-sample`, as the user), points the config at it (runtime, listen, toolchain chosen by the helper, default commands), applies it like `api/app/save` and answers like `api/app` plus `{written, build, buildError, message}`. A non-empty app root without `force` → field error `force`; `listen: unix` without a toolchain that supports sockets (PHP without FrankenPHP) → field error `listen` |
 | `api/app/fetch` | POST | domain | `{url (https:// only; http:// only with the helper's test flag), sha256?, extract?: bool, filename?, build?: bool}` → starts a deploy job in `fetch` mode (download as the user into the app root, verify, chmod +x / extract, optional build, restart unless stopped) → `{job, message}`; needs a configured app (the UI disables the button until the settings are saved) |
 
-Document root (`documentRoot` of `api/app/save`; Plesk is the source of truth, Runway never stores it):
+Document root (`documentRoot` of `api/app/save`; Plesk is the source of truth, Runway never stores it
+in the panel; the helper keeps a copy for the step of §7 *Public files*, see below):
 
 - Format: relative to the home directory without a leading slash, like `appRoot` and the paths of
   `documentRoots` (`httpdocs`, `apps/example.com/wwwroot`; `App::relativeDocumentRoot()`). The value
@@ -260,6 +261,22 @@ Document root (`documentRoot` of `api/app/save`; Plesk is the source of truth, R
   only the document root changed (§8). Otherwise the save message gets `messageDocumentRootChanged`
   appended. A failure of the configuration after a changed document root leaves the document root
   changed, and the error message ends with `messageDocumentRootChanged` so the user knows.
+- After a successful change the helper's state of the application learns the new document root
+  and the files that exist in it become readable for the web server (§7 *Public files*):
+  `App::syncDocumentRoot()`, helper `app-docroot` with `open: true` (a failure is only logged).
+  A body with only `documentRoot` calls it right after `docroot-access`; a save with configuration
+  fields after `applyAndDeploy()`, whose `app-apply` already stored the new value, so the step uses
+  the application root that was just applied (before it, the old application root could make a
+  folder of the new one count as "inside"). A failed `applyAndDeploy()` skips it (Reconcile brings
+  the stored copy in line). A domain without an application changes nothing.
+- The helper keeps a copy of the document root in the application's state (`document_root`, §7):
+  `app-apply` gets `App::documentRootPayload()` with every apply (`relativeDocumentRoot()` when it
+  passes `isValidDocumentRoot()`, else `""`; `""` for workers). `relativeDocumentRoot()` answers the
+  value that `changeDocumentRoot()` set in the same request (`pm_Domain` keeps the old one, below).
+  Reconcile compares it with `apps-list`'s `document_root` and sends a differing one with `open:
+  false` (a change in Plesk's own hosting settings, a state written before the field existed;
+  post-install runs Reconcile): the state follows, no file changes. Plesk stays the source of
+  truth; the copy only tells the deploy job where to open files.
 - A value that starts with the home directory (`/var/www/vhosts/example.com/apps/x`, pasted from a
   shell) is taken relative to it (`apps/x`); any other leading `/` is dropped as well.
 - `pm_Domain` keeps the document root it read for the rest of the request (verified: after `site
@@ -283,8 +300,10 @@ regenerates the nginx and Apache configuration of the domain within the call (ab
 root. The web server (nginx and Apache are members of `psaserv`) cannot pass a directory of mode
 0750 and group `psacln`, which is what `call_as_user` creates (umask 027): an application root
 that Runway created, with the document root inside it, answered 403 until the search permission
-for others was added (`docroot-access`). Builds also create files with umask 027 (0640): files a
-build writes into the document root need e.g. `chmod -R o+rX` at the end of the build command.
+for others was added (`docroot-access`). Builds and fetches also create files with umask 027
+(0640, directories 0750, group `psacln`): the web server answered 403 for them until they were
+readable for others, which Runway now does itself for a document root inside the application root
+(§7 *Public files*).
 
 Config fields (JSON, camelCase on the API, snake_case toward the helper):
 `enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, healthMatch (string, default "" = off; trimmed like PHP's trim(), at most 200 characters, no control characters (C0, DEL, C1): field error errorHealthMatch; text that starts with "{" must be a JSON object: errorHealthMatchJson; needs healthPath: errorHealthMatchPath; a non-string: errorInvalidValue), healthWatch (bool, needs healthPath: field error errorHealthWatchPath), healthWatchInterval (10-3600, default 30), healthWatchFailures (1-20, default 3), buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10). Workers (listen `none`) keep a stored `healthMatch`, but the payload sends `health_match: ""` for them and whenever `healthPath` is empty.
@@ -302,13 +321,13 @@ their code.
 | `toolchains` | — | `{runtimes:{key:{installed:[{id,label,path,version?,kind?}], in_use:{id:[domains]}, toolchain, build_deps}}, build_deps, job}`; `kind` (`detected\|managed`) marks PHP entries (`plesk-<x.y>` vs `frankenphp-<ver>`), `version` the resolved version of channels (rust `stable` → `1.x.y`) |
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
-| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, health_match, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
+| `app-apply` | config incl. `listen, mode, mount_path, static_paths, document_root, health_path, health_match, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started); `document_root` (the domain's document root relative to the home directory, §6) is stored in the state (`v_state_document_root`: the rules of `v_document_root`, anything invalid or missing is `""`; always `""` for workers) and used only by the step of *Public files* below, never by a unit or environment file |
 | `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, public_dirs, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
 | `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health_match, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params, health_watch` (null while off, see below), and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
-| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
+| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, document_root, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
 | `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
@@ -316,6 +335,7 @@ their code.
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
 | `docroot-check` | `{sysuser, document_root}` | `{exists, real, document_root}`: as the system user, the document root (relative, `v_document_root`: the rules of an application root, at most 255 characters, no segment that starts with `-`) must stay strictly inside the home directory once `os.path.realpath` resolved the links (code `docroot_outside`) and, when it exists (`lexists`), be a directory (code `docroot_not_dir`); `real` is the resolved path relative to the home directory. A missing path is fine. Changes nothing |
 | `docroot-access` | `{sysuser, document_root}` | `{changed, blocked, document_root}`: run by the panel after Plesk changed the document root. As the system user, every directory of the resolved path below the home directory, the document root included, that the web server group cannot pass (neither group `psaserv` with `g+x` nor `o+x`) gets `o+x` (`fchmod` through an `O_NOFOLLOW` descriptor, never the read bit); directories of other owners and unopenable ones are reported in `blocked`, never changed |
+| `app-docroot` | `{domain_id, document_root, open?}` | `{configured, document_root, public}`: the domain's document root for the application's state (§6): stored like `app-apply`'s `document_root` (under the state lock, `""` for workers and invalid values); with `open: true` the step of *Public files* runs at once (`public`: its result, `null` when it does not apply, `{error}` when it failed; the state is stored anyway). Without a state `configured: false` and nothing changes |
 | `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
 | `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
 | `_health [now]` (internal) | — | run by `runway-health.service` every 10 s (`runway-health.timer`): the health watch below; `now` checks every watched application at once, without the interval and the start grace (tests, by hand) |
@@ -428,6 +448,71 @@ then works as follows; without it the code path is the 1.0 one (status line only
   path and a content in the panel shows neither). Unit and environment files never depend on
   it (an application without it renders the files of 1.0.0).
 
+Public files (`open_public_files`, the step that makes the files of a document root inside the
+application root readable for the web server): builds and fetches run with umask 027, so what they
+write into the document root is 0640 (directories 0750) with the group `psacln`, which nginx and
+Apache (group `psaserv`) cannot read: static paths answered 403 until the build command ended with
+`chmod -R o+rX <folder>`. The step does that itself:
+- When: in the deploy job after a successful build or fetch (modes `build` and `fetch`, also
+  without a build command and for a stopped application, whose document root the web server serves
+  all the same), before the restart or the zero-downtime switch, with the state read after the
+  build; and through `app-docroot` with `open: true` after a change on the Runway page (§6). Not for
+  workers (no `document_root`), not for a restart without a build.
+- Where: only when the document root's real path (`os.path.realpath` as the system user) lies
+  strictly inside the application root's real path. Equal to it or a parent of it would publish
+  the sources and settings files (`appsettings.json`, `.env`); a document root elsewhere
+  (`httpdocs`) is none of Runway's business. Nothing happens then, and for a missing document root.
+- How (`_user_open_public_files`, as the system user through `call_as_user`, never as root): the
+  document root is opened from the application root one directory at a time with `O_RDONLY |
+  O_DIRECTORY | O_NOFOLLOW` (no component can be a link swapped in after the check), and the tree
+  is walked through directory descriptors (`os.scandir(fd)`, `lstat` of every entry through
+  `fstatat`, children opened `O_NOFOLLOW` relative to their parent). Symbolic links are skipped and
+  counted (`chmod` follows links, and the target may be any file of the user: `../appsettings.json`
+  or `/etc/hostname`); names that start with `.` are skipped, directories with everything below them
+  (`.git`, `.env`, `.well-known`); only entries the user owns change (`st_uid == getuid()`).
+  Directories that their owner can read and search get `o+rx` (`fchmod` on their descriptor),
+  regular files `o+r` through a descriptor of the file itself (`O_RDONLY | O_NOFOLLOW | O_NONBLOCK`,
+  `fstat` must show the listed inode, a regular file of the user; a file its owner cannot read
+  stays as it is). Nothing else changes: no write bit, no group, no bit removed.
+- The way down: the directories strictly between the application root and the document root
+  (`.output` of `.output/public`, `dist/app` of `dist/app/browser`, `target/classes` of
+  `target/classes/static`) are often removed and created anew by the build (Nitro, Angular's
+  `deleteOutputPath`, `mvn clean`, `rm -rf out && dotnet publish -o out`), 0750 with the group
+  `psacln` again, which the web server cannot pass. During the descent each of them gets what
+  `docroot-access` gives: `o+x` (search only, never the read bit, also for names that start with
+  `.`), `fchmod` on the descriptor of the descent, only for a directory of the user that the web
+  server group cannot pass (neither group `psaserv` with `g+x` nor `o+x`; the parent passes the
+  gid of `psaserv`). The application root itself and the directories above it stay as they are
+  (`docroot-access` covers them when the document root changes on the Runway page; a build does not
+  create them anew).
+- Bounds: at most `PUBLIC_FILES_MAX` = 200 000 entries, `PUBLIC_FILES_SECONDS` = 60 s and
+  `PUBLIC_FILES_DEPTH` = 100 directory levels per run (the child's deadline is 90 s); at a bound
+  the walk stops and reports `truncated`. Every run walks from the start and counts every entry
+  (open ones, links and dot names included): with more entries than the bound, the entries beyond
+  it (in directory order) and the directories below the depth bound stay as they are on every run;
+  keep the document root below the bounds or make the rest readable by hand. Only at the time bound
+  can a later run get further (an entry that is open already costs one `lstat`).
+- Result `{changed, skipped_links, truncated, passable}` (`passable`: directories on the way that
+  got `o+x`). The deploy log gets one line: *Made N files and folders in <document root> readable
+  for the web server* (plus the directories on the way made passable, the skipped links and the
+  bound that stopped it); a failure is a `WARNING:` line and never fails the deployment (a SIGTERM
+  of the deploy unit still ends it).
+- Dot names stay closed also where the web server needs them: a `.htaccess` that a build or fetch
+  writes into the document root (0640) is unreadable for Apache, which then answers 403 for the
+  whole folder and everything below it (with `AllowOverride`: path mode outside the mount path,
+  and every static path request that nginx passes to Apache), and files under `.well-known` are not
+  served. The user makes them readable by hand or in the build command (`chmod o+r
+  wwwroot/.htaccess`); README and the form's note say so.
+- Security reasoning: it runs with the user's own rights, so it can do nothing the user could not
+  do with `chmod`, and it only adds read permission for others to files that the web server is
+  meant to serve: the content of the document root. Links are excluded because their targets lie
+  anywhere (a file that a link in the document root should serve keeps its mode: make it readable
+  by hand), dot names because that is where secrets and repositories live (`.env`, `.git`); the
+  inside-only rule keeps the application root itself (sources, settings) closed. Other owners'
+  files are not the user's to change. The directories on the way get the search permission only:
+  the web server can pass them but not list them, and the files in them that a build created stay
+  0640 (the same trade-off as `docroot-access`, README *Static files and the document root*).
+
 Candidate document roots (`app-inspect`, `app-page`, `app-sample`'s inspection): `public_dirs` is
 `{<runtime>: [name, ...]}` with an entry for every runtime: the names of `Runtime.public_dirs` that
 are real directories directly inside the application root (`os.lstat`, so a symbolic link never
@@ -457,8 +542,9 @@ carry `title_key` (`install, update, build_deps, self_update` (params `{version}
 them (`Domain.status.listenerDetail.*`, `Domain.status.healthDetail.*`, `Common.jobTitle.*`) and
 shows the English text when a key is missing. Helper error messages stay English.
 
-Deploy job: `TimeoutStartSec = min(1800, build_timeout) + build_timeout + 300`; SIGTERM (timeout,
-disabled/suspended app) marks the job failed with the reason. A trigger file touched while the
+Deploy job: after a successful build or fetch it runs the step of *Public files* above, then
+restarts or switches. `TimeoutStartSec = min(1800, build_timeout) + build_timeout + 300`; SIGTERM
+(timeout, disabled/suspended app) marks the job failed with the reason. A trigger file touched while the
 job runs starts another round after it (at most three; when no time is left, a transient
 `runway-redeploy-<id>` timer starts the deploy unit again a minute later).
 
@@ -572,8 +658,11 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   application root's `appRootInDocroot` warning only while it would be sent. Live notes under the
   field: in path mode the warning that the document root also serves the rest of the site outside
   the mount path; for a document root inside the application root of a runtime with builds, the
-  build command hint
-  `chmod -R o+rX <folder inside the application root>`; and *Suggestion: <path>* with the button
+  note that Runway makes the files there readable for the web server after every build and
+  download and when the document root changes here, except names that start with a dot (such as
+  `.htaccess`) and the targets of symbolic links, which the user makes readable
+  (`Domain.form.documentRootBuildChmod`, no parameters: no command to copy); and *Suggestion:
+  <path>* with the button
   *Use it* (fills the field) for the first entry of `documentRootSuggestions[<runtime>]` while the
   typed application root is the inspected one and the suggestion differs from the field.
 - **Panel integration** (`hooks/CustomButtons.php`): the navigation entry "Runway" (`nav.png`, the
@@ -808,8 +897,9 @@ for every port allocation.
 ### 12.4 The switch (deploy job)
 
 The switch runs in `runway-deploy-<id>.service` under the deploy lock, after the fetch and build
-steps (unchanged), when the application is enabled, not suspended, not stopped, switchable,
-`restart_plain` is false and the live unit is active; otherwise the job restarts plainly (§12.5).
+steps (unchanged) and the step of §7 *Public files*, when the application is enabled, not
+suspended, not stopped, switchable, `restart_plain` is false and the live unit is active; otherwise
+the job restarts plainly (§12.5).
 L is the live instance (`slot`), N the target: the other slot while the setting is on (`b` when L
 is `""` or `a`, else `a`), the 1.0 unit (`""`) when the setting is off and a slot is live (turning
 it off, §12.5).

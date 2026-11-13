@@ -395,7 +395,7 @@ return [
             'documentRootHint' => '웹 서버가 정적 경로(경로 모드에서는 웹사이트의 나머지 부분도)를 제공하는 폴더이며 구독 홈 디렉터리에 대한 상대 경로입니다. Plesk에서 이 도메인의 문서 루트이며, 호스팅 설정에 있는 것과 같은 설정입니다. 여기에서 변경하면 그곳도 변경됩니다. 없는 폴더는 Plesk가 생성합니다.',
             'documentRootExample' => '예: 애플리케이션 루트가 %%appRoot%%, 문서 루트가 %%documentRoot%%, 정적 경로가 %%prefix%%이면 웹 서버는 %%folder%%의 파일을 직접 제공하고 나머지는 모두 애플리케이션으로 전달합니다.',
             'documentRootReadOnly' => 'Plesk에서 이 도메인의 호스팅 설정을 관리할 수 있는 사용자만 변경할 수 있습니다.',
-            'documentRootBuildChmod' => '웹 서버가 그곳의 파일을 읽을 수 있어야 합니다. 빌드로 생성된 파일은 구독만 읽을 수 있으므로 빌드 명령 끝에 %%command%%을(를) 추가하십시오.',
+            'documentRootBuildChmod' => '빌드로 생성된 파일은 구독만 읽을 수 있습니다. 따라서 Runway는 빌드와 다운로드가 끝날 때마다, 그리고 여기에서 문서 루트가 변경될 때 그곳의 파일과 폴더를 웹 서버가 읽을 수 있도록 만듭니다. 점으로 시작하는 이름(.htaccess 등)과 심볼릭 링크의 대상은 그대로 유지됩니다. 웹 서버에 필요한 경우 직접 읽을 수 있도록 설정하십시오.',
             'documentRootPathMode' => '경로 모드에서는 문서 루트가 URL 경로 밖에 있는 웹사이트의 나머지 부분도 제공합니다.',
             'documentRootSuggestion' => '제안: %%path%%',
             'documentRootUseSuggestion' => '제안 사용',

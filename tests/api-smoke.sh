@@ -28,7 +28,8 @@
 #
 # Document roots (Plesk's setting, api/app/save documentRoot): validation errors on DOMAIN, then a
 # folder inside the application root as the document root of DOMAIN (with RUNWAY_SMOKE_DEPLOY=1
-# together with the static path /media, served by nginx from there) and of the subdomain (path
+# together with the static path /media, served by nginx from there, then a folder of files that
+# only the subscription can read, which the change makes readable) and of the subdomain (path
 # mode: its static path /api/static); both are restored through the API, and cleanup restores
 # them through Plesk's CLI whenever a run stops before that.
 #
@@ -223,7 +224,7 @@ cleanup() {
         dock exec "$CONTAINER" plesk bin site --update "$SUB_DOMAIN" -www-root "/$DR_SUB_BEFORE" >/dev/null 2>&1 \
             || echo "cleanup: the document root of $SUB_DOMAIN could not be restored to $DR_SUB_BEFORE"
     fi
-    dock exec "$CONTAINER" sh -c "rm -rf '/var/www/vhosts/$DOMAIN/$APP_ROOT/runway-smoke-docroot' '/var/www/vhosts/$DOMAIN/runway-smoke-out' '/var/www/vhosts/$DOMAIN/runway-smoke-file'" >/dev/null 2>&1
+    dock exec "$CONTAINER" sh -c "rm -rf '/var/www/vhosts/$DOMAIN/$APP_ROOT/runway-smoke-docroot' '/var/www/vhosts/$DOMAIN/$APP_ROOT/runway-smoke-docroot-open' '/var/www/vhosts/$DOMAIN/runway-smoke-out' '/var/www/vhosts/$DOMAIN/runway-smoke-file'" >/dev/null 2>&1
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
     if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
     if [ -n "$ZD_BEFORE" ]; then post settings "$ZD_BEFORE" >/dev/null; fi
@@ -592,7 +593,9 @@ fi
 dock exec "$CONTAINER" rm -f "$HOME_DIR/runway-smoke-out" "$HOME_DIR/runway-smoke-file"
 # A folder inside the application root that does not exist yet: Plesk creates it.
 DR_TARGET=$APP_ROOT/runway-smoke-docroot
-dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET"
+# A second folder inside the application root, with files that only the subscription can read.
+DR_OPEN=$APP_ROOT/runway-smoke-docroot-open
+dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET" "$HOME_DIR/$DR_OPEN"
 RUNNING=False
 if [ "$CONFIGURED" = "True" ]; then
     for _ in $(seq 1 15); do
@@ -615,8 +618,12 @@ else
         "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_TARGET' and d['data']['documentRootChanged'] is True and d['data']['job'] is None and d['data']['build'] is False" "$out"
 fi
 [ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_TARGET" ] && ok "Plesk stores the new document root of $DOMAIN" || bad "Plesk's document root of $DOMAIN: $(docroot_info "$DOMAIN")"
-[ "$(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1)" = "$SYSUSER:psaserv 750" ] && ok "Plesk created the missing folder ($SYSUSER:psaserv 0750)" \
-    || bad "the new document root folder: $(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1)"
+# Plesk creates the folder as <user>:psaserv 0750; inside the application root of a configured
+# application that is not a worker, Runway then adds o+rx (it opens the files of the new document root).
+DR_OPENED=$(get "app?site_id=$SITE_ID" | jexpr "d['data']['configured'] and d['data']['config']['listen'] != 'none' and '$DR_TARGET'.startswith(d['data']['config']['appRoot'].strip('/') + '/')")
+if [ "$DR_OPENED" = "True" ]; then DR_MODE=755; DR_NOTE="0750, then o+rx from Runway"; else DR_MODE=750; DR_NOTE="0750"; fi
+[ "$(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1)" = "$SYSUSER:psaserv $DR_MODE" ] && ok "Plesk created the missing folder ($SYSUSER:psaserv $DR_NOTE)" \
+    || bad "the new document root folder: $(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1) (expected $SYSUSER:psaserv $DR_MODE)"
 check "app: domain.documentRoot follows Plesk" "d['data']['domain']['documentRoot'] == '$DR_TARGET' and [r['path'] for r in d['data']['documentRoots'] if r['own']] == ['$DR_TARGET']" "$(get "app?site_id=$SITE_ID")"
 if [ "$CONFIGURED" = "True" ]; then
     cli --status "$DOMAIN" | grep -q "^Document root: *$DR_TARGET\$" && ok "CLI --status shows the document root" || bad "CLI --status Document root: $(cli --status "$DOMAIN" | grep -i 'document root')"
@@ -635,6 +642,22 @@ if [ "$RUNNING" = "True" ]; then
     body=$(wait_body "$DOMAIN" /media/smoke.txt runway-smoke-static)
     [ "$body" = "runway-smoke-static" ] && ok "nginx serves the static path /media from $DR_TARGET/media" || bad "/media/smoke.txt answered: $(echo "$body" | head -c 200)"
     https_get "$DOMAIN" /runway-smoke-page | grep -q 'Hello from Go' && ok "every other path still reaches the application" || bad "/runway-smoke-page: $(https_get "$DOMAIN" /runway-smoke-page | head -c 200)"
+    # Files that only the subscription can read (umask 027, as builds create them) in a folder inside
+    # the application root: changing the document root to it on the Runway page makes them readable
+    # for the web server (docs/DESIGN.md section 6), so nginx serves the static path from there.
+    dock exec "$CONTAINER" runuser -u "$SYSUSER" -- sh -c "umask 027; rm -rf '$HOME_DIR/$DR_OPEN' && mkdir -p '$HOME_DIR/$DR_OPEN/media' && echo runway-smoke-open > '$HOME_DIR/$DR_OPEN/media/open.txt'"
+    modes=$(dock exec "$CONTAINER" stat -c %a "$HOME_DIR/$DR_OPEN" "$HOME_DIR/$DR_OPEN/media" "$HOME_DIR/$DR_OPEN/media/open.txt" | tr -d '\r' | tr '\n' ' ')
+    [ "$modes" = "750 750 640 " ] || bad "files created with umask 027: $modes"
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_OPEN\"}")
+    check "app/save: only the document root, a folder of files that the web server cannot read ($DR_OPEN)" \
+        "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_OPEN' and d['data']['documentRootChanged'] is True and d['data']['job'] is None" "$out"
+    modes=$(dock exec "$CONTAINER" stat -c %a "$HOME_DIR/$DR_OPEN" "$HOME_DIR/$DR_OPEN/media" "$HOME_DIR/$DR_OPEN/media/open.txt" | tr -d '\r' | tr '\n' ' ')
+    [ "$modes" = "755 755 644 " ] && ok "the change made the files there readable for the web server ($modes)" || bad "modes after the change: $modes"
+    state_root=$(dock exec "$CONTAINER" python3 -c "import json; print(json.load(open('/var/lib/runway/apps/$SITE_ID.json')).get('document_root'))" | tr -d '\r')
+    [ "$state_root" = "$DR_OPEN" ] && ok "the helper's state of the application has the new document root" || bad "state document_root: $state_root"
+    body=$(wait_body "$DOMAIN" /media/open.txt runway-smoke-open)
+    [ "$body" = "runway-smoke-open" ] && ok "nginx serves the static path /media/open.txt (created with umask 027) from $DR_OPEN" \
+        || bad "/media/open.txt answered: $(echo "$body" | head -c 200)"
 else
     skip "static path from the new document root: the application of $DOMAIN is not running (run with RUNWAY_SMOKE_DEPLOY=1)"
 fi
@@ -652,7 +675,7 @@ if [ "$(echo "$out" | jexpr "d['status'] == 'success' and d['data']['documentRoo
 else
     bad "restoring the document root of $DOMAIN: $out"
 fi
-dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET"
+dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET" "$HOME_DIR/$DR_OPEN"
 
 echo "== CLI (plesk ext runway)"
 out=$(cli --help)

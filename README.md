@@ -297,9 +297,10 @@ usual folder of the runtime when it exists in the application directory (`wwwroo
 the document root, for example `public` with `STATIC_ROOT` set to `public/static`.
 
 - It is the same setting as in Plesk (*Websites & Domains > Hosting & DNS > Hosting*): Runway
-  never stores it, shows what Plesk has, and changes it through Plesk (`plesk bin site --update
-  <domain> -www-root`), which checks the path itself and regenerates the web server
-  configuration. A change made in Plesk shows up on the Runway page.
+  shows what Plesk has and changes it through Plesk (`plesk bin site --update <domain>
+  -www-root`), which checks the path itself and regenerates the web server configuration. A
+  change made in Plesk shows up on the Runway page. Runway keeps a copy only to know where to make
+  the files of a build readable for the web server (see below).
 - The path is relative to the subscription's home directory: letters, digits and `. _ - @ + /`,
   no `.` or `..` segment, no folder name that starts with `-`, at most 255 characters, and inside
   the subscription also when symbolic links are followed. A missing folder is created by Plesk
@@ -308,19 +309,53 @@ the document root, for example `public` with `STATIC_ROOT` set to `public/static
 - The web server reads the files as a member of the group `psaserv`. When Runway changes the
   document root, it gives the directories on the way that the web server could not pass the
   search permission for others (`o+x`, never the read permission; Runway creates application
-  directories with mode 0750). The files themselves must be readable too: builds create files
-  that only the subscription can read (umask 027), so a build that writes into the document root
-  ends with, for example, `chmod -R o+rX wwwroot` (the form names the command).
+  directories with mode 0750).
+- The files themselves must be readable too, but builds and downloads (*Fetch binary from URL*)
+  create files that only the subscription can read (umask 027: files 0640, folders 0750, group
+  `psacln`), which the web server answers with 403. When the document root lies **inside the
+  application directory**, Runway therefore makes the files and folders there readable for the web
+  server after every successful build or download (before the new version starts; the deploy log
+  says how many it changed) and when the document root is changed on the Runway page (for the
+  files that exist already). The build command needs no `chmod -R o+rX` any more. The rules:
+  - only a document root strictly inside the application directory, with symbolic links resolved:
+    one equal to the application directory or above it (that would publish the sources and
+    settings files) or anywhere else (`httpdocs`) is left alone;
+  - symbolic links are never followed and never changed (a link to a file elsewhere keeps that
+    file's mode);
+  - names that start with `.` (`.env`, `.git`, `.htaccess`, `.well-known`, ...) are skipped,
+    folders with everything in them;
+  - only the subscription's own files and folders; files of other owners stay as they are;
+  - only read permission is added: `o+r` for files, `o+rx` for folders; no write permission, no
+    group change, nothing removed (files that the subscription itself cannot read stay as they are);
+  - the folders between the application directory and the document root (`.output` of
+    `.output/public`, `out` of `out/wwwroot`), which many builds remove and create anew, get the
+    search permission for others (`o+x`, never the read permission) when the web server could not
+    pass them, as when the document root changes; the application directory itself and the folders
+    above it are left alone;
+  - at most 200,000 entries and 60 seconds per run (the deploy log says when it stopped early);
+    every run starts from the beginning, so in a document root with more entries the rest stays
+    closed on every run: keep it smaller, or make the rest readable yourself;
+  - not for workers, which serve nothing.
+
+  Everything in the document root is public anyway, so keep secrets out of it. What is skipped
+  stays as the build created it: a `.htaccess` that a build writes into the document root (Apache
+  answers 403 for the whole folder when it cannot read one), files under `.well-known` and the
+  targets of symbolic links that the web server should serve need `chmod o+r` by hand or at the end
+  of the build command (for example `chmod o+r wwwroot/.htaccess`).
 - The `o+x` stays when the document root moves elsewhere later or the application is removed.
   It only lets the web server pass these directories, never list them, but a file in the
   application directory that is readable for others (mode 0644, as FTP and the File Manager create
   files) can then be read by every member of `psaserv` that knows its name. Keep settings files such
   as `appsettings.json` or `.env` at mode 0640 or 0600, or remove the permission with
   `chmod o-x <folder>` once the document root is elsewhere.
-- Runway adjusts these permissions only when the document root is changed on the Runway page. After
-  a change in Plesk's own hosting settings, a folder that Runway created on the way (mode 0750) stops
-  the web server (403 for the static paths): run `chmod o+x` on it, or change the document root on
-  the Runway page instead.
+- Runway opens the directories from the home directory down to the application directory, and the
+  files that exist already, only when the document root is changed on the Runway page. After a
+  change in Plesk's own hosting settings, a folder that Runway created on the way (mode 0750, such
+  as the application directory) stops the web server (403 for the static paths): run `chmod o+x`
+  on it, or change the document root on the Runway page instead. Runway learns such a change with
+  its next reconcile (on Plesk's change event, at the latest within 10 minutes); from then on every
+  build makes the files in the new document root readable and the folders between the application
+  directory and it passable, as above.
 - In **path mode** the document root also serves the rest of the site, everything outside the
   mount path. Workers have no static paths: the field is hidden for them.
 - Administrators can always change it. Customers (and resellers, through the same checks) need,
@@ -641,6 +676,12 @@ browser ── Plesk panel (React UI) ── JSON API (PHP, psaadm)
   customers only with Plesk's **Hosting settings management** permission as well; the helper
   first resolves the symbolic links of the path as the system user, so it cannot lead outside
   the subscription.
+- Making the files of a document root inside the application directory readable for the web
+  server runs as the system user as well, through directory descriptors that never follow a
+  symbolic link; it only adds read permission to the subscription's own files (never to names
+  that start with `.`) and the search permission to the folders between the application directory
+  and the document root, and never when the document root is the application directory itself or
+  lies above or outside it.
 
 See [SECURITY.md](SECURITY.md) for the threat model and how to report a vulnerability.
 

@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Folder tempat server web melayani jalur statis (dan, dalam mode jalur, sisa situs web), relatif terhadap direktori home langganan. Ini adalah root dokumen domain ini di Plesk, pengaturan yang sama seperti di pengaturan hosting-nya: perubahan di sini juga mengubahnya di sana. Plesk membuat folder yang belum ada.',
             'documentRootExample' => 'Contoh: dengan root aplikasi %%appRoot%%, root dokumen %%documentRoot%%, dan jalur statis %%prefix%%, server web melayani sendiri file di %%folder%% dan meneruskan semua permintaan lainnya ke aplikasi.',
             'documentRootReadOnly' => 'Hanya pengguna yang boleh mengelola pengaturan hosting domain ini di Plesk yang dapat mengubahnya.',
-            'documentRootBuildChmod' => 'Server web harus dapat membaca file di sana: file yang dibuat oleh build hanya dapat dibaca oleh langganan, jadi akhiri perintah build dengan %%command%%.',
+            'documentRootBuildChmod' => 'Build membuat file yang hanya dapat dibaca oleh langganan: setelah setiap build dan unduhan, serta saat root dokumen diubah di sini, Runway membuat file dan folder di sana dapat dibaca oleh server web. Nama yang diawali titik (seperti .htaccess) dan target tautan simbolik dibiarkan apa adanya: atur sendiri agar dapat dibaca jika server web membutuhkannya.',
             'documentRootPathMode' => 'Dalam mode jalur, root dokumen juga melayani sisa situs web, di luar jalur URL.',
             'documentRootSuggestion' => 'Saran: %%path%%',
             'documentRootUseSuggestion' => 'Gunakan saran ini',

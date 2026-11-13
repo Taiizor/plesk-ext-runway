@@ -132,6 +132,12 @@ CHILD_FSIZE = 64 * 1024 * 1024
 # Directory listings in those children: names kept per listing, and the most entries counted.
 LIST_KEEP_ROOT = 10000
 LIST_COUNT_CAP = 10000
+# The step that makes the files in a document root inside the application root readable for the
+# web server (open_public_files, docs/DESIGN.md section 7, Public files): at most this many entries,
+# seconds and directory levels per run.
+PUBLIC_FILES_MAX = 200000
+PUBLIC_FILES_SECONDS = 60
+PUBLIC_FILES_DEPTH = 100
 DEFAULT_BUILD_TASKS = 4096
 # Crash-loop guard of the app units: systemd gives up after this many starts within 120 s.
 APP_START_LIMIT_BURST = 10
@@ -598,6 +604,10 @@ def validate_app(payload):
         "mode": mode,
         "mount_path": v_url_prefix(payload.get("mount_path"), "mount path") if mode == "path" else "",
         "static_paths": v_static_paths(payload.get("static_paths")),
+        # The domain's document root as the panel sent it last (docs/DESIGN.md section 6): the deploy
+        # job makes the files in it readable for the web server when it lies inside the application
+        # root (open_public_files). Workers serve nothing. Never rendered into a file.
+        "document_root": v_state_document_root(payload.get("document_root"), pw.pw_dir) if listen != "none" else "",
         "health_path": health_path,
         # Expected response content (opt-in): the health check also reads the body; nothing to
         # check without a health path (workers have none).
@@ -975,6 +985,20 @@ def v_document_root(value, home):
     return rel, absolute
 
 
+def v_state_document_root(value, home):
+    """The document_root of an application state (app-apply, app-docroot): the domain's document
+    root as the panel sent it last, relative to the home directory and validated like
+    v_document_root. Anything else (missing, empty, invalid) is "" (unknown). Only the step that
+    makes the files in it readable for the web server uses it (open_public_files); unit and
+    environment files never depend on it."""
+    if not isinstance(value, str) or not value.strip().strip("/"):
+        return ""
+    try:
+        return v_document_root(value, home)[0]
+    except HelperError:
+        return ""
+
+
 def _relative_to(path, root):
     return path[len(root.rstrip("/")) + 1:]
 
@@ -1028,6 +1052,165 @@ def _user_open_document_root(path, home, web_gid):
         finally:
             os.close(fd)
     return {"changed": changed, "blocked": blocked}
+
+
+def _open_dir_below(root, rel, on_way=None):
+    """A descriptor of the directory root/rel, reached from root one directory at a time with
+    O_NOFOLLOW, so no component of rel can be a symbolic link. on_way(fd), when given, is called
+    with the descriptor of every directory strictly between root and root/rel. Raises OSError."""
+    fd = os.open(root, _DIR_FLAGS)
+    parts = rel.split("/")
+    for index, part in enumerate(parts):
+        try:
+            child = os.open(part, _DIR_FLAGS, dir_fd=fd)
+        finally:
+            os.close(fd)
+        fd = child
+        if on_way is not None and index < len(parts) - 1:
+            try:
+                on_way(fd)
+            except BaseException:
+                os.close(fd)
+                raise
+    return fd
+
+
+def _public_file(dir_fd, name, listed, uid):
+    """Adds the read permission for others to a regular file of the user through a descriptor of the
+    file itself (O_NOFOLLOW: a symbolic link swapped in after the listing is never followed), only
+    while it is still the listed file. A file its owner cannot read cannot be opened and stays as it
+    is. Returns True when the mode changed."""
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY, dir_fd=dir_fd)
+    except OSError:
+        return False
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != uid or st.st_mode & stat.S_IROTH \
+                or (st.st_dev, st.st_ino) != (listed.st_dev, listed.st_ino):
+            return False
+        os.fchmod(fd, stat.S_IMODE(st.st_mode) | stat.S_IROTH)
+        return True
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
+
+
+def _user_open_public_files(app_root, document_root, max_entries, seconds, web_gid=-1):
+    """Runs as the customer (deploy job after a build or fetch, app-docroot after the document root
+    was changed on the Runway page): makes the files in the document root readable for the web
+    server (nginx and Apache, group psaserv), which cannot read what builds and fetches create with
+    umask 027 (files 0640, directories 0750, group psacln). Only when the document root's real path
+    lies strictly inside the application root's real path (os.path.realpath): equal to it or a
+    parent of it would expose the sources and settings files, and a document root elsewhere is none
+    of Runway's business; None then, and for a missing document root.
+
+    The walk never follows a symbolic link: the document root is reached from the application root
+    one O_NOFOLLOW directory at a time, every directory is read through its own descriptor, and
+    links inside are skipped (counted, never changed: chmod would follow them). Entries whose name
+    starts with "." are skipped (directories with everything below them). Only the user's own
+    entries change, and only by the read permission for others: directories that the owner can read
+    and search get o+rx, regular files o+r (through a descriptor of the file itself, see
+    _public_file); no write bit, no group, nothing removed. Bounded by max_entries entries, `seconds`
+    and PUBLIC_FILES_DEPTH levels: the walk stops at a bound and reports truncated (the rest stays
+    as it is, on every run: each run walks from the start).
+
+    The directories between the application root and the document root (".output" of
+    ".output/public": builds often remove and create them anew, 0750 psacln) get the search
+    permission for others where the web server group (web_gid) cannot pass them, as docroot-access
+    does: own directories only, o+x only (never the read bit, also for names that start with "."),
+    through the descriptor of the descent. The application root itself and the directories above it
+    stay as they are (docroot-access covers them when the document root changes).
+    Returns {changed, skipped_links, truncated, passable} (passable: directories on the way that got
+    o+x)."""
+    try:
+        real_app = os.path.realpath(app_root).rstrip("/")
+        real_doc = os.path.realpath(document_root)
+    except (OSError, ValueError):
+        return None
+    if not real_app or not real_doc.startswith(real_app + "/") or not os.path.lexists(real_doc):
+        return None
+    uid = os.getuid()
+    result = {"changed": 0, "skipped_links": 0, "truncated": False, "passable": 0}
+
+    def pass_through(dir_fd):
+        # A directory on the way: o+x when it is the user's and the web server group cannot pass it.
+        try:
+            st = os.fstat(dir_fd)
+            if st.st_uid != uid or (st.st_gid == web_gid and st.st_mode & stat.S_IXGRP) or st.st_mode & stat.S_IXOTH:
+                return
+            os.fchmod(dir_fd, stat.S_IMODE(st.st_mode) | stat.S_IXOTH)
+            result["passable"] += 1
+        except OSError:
+            pass
+
+    try:
+        top = _open_dir_below(real_app, _relative_to(real_doc, real_app), pass_through)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise HelperError("The document root %s cannot be opened: %s" % (document_root, exc.strerror or exc))
+    deadline = time.monotonic() + seconds
+    stack = []
+
+    def enter(dir_fd):
+        # o+rx for a directory of the user that its owner can read and search, then list it.
+        try:
+            st = os.fstat(dir_fd)
+            if st.st_uid == uid and st.st_mode & 0o500 == 0o500 and st.st_mode & 0o005 != 0o005:
+                os.fchmod(dir_fd, stat.S_IMODE(st.st_mode) | 0o005)
+                result["changed"] += 1
+        except OSError:
+            pass
+        try:
+            stack.append((dir_fd, os.scandir(dir_fd)))
+        except OSError:
+            os.close(dir_fd)
+
+    seen = 0
+    try:
+        enter(top)
+        while stack:
+            dir_fd, entries = stack[-1]
+            try:
+                entry = next(entries, None)
+            except OSError:
+                entry = None
+            if entry is None:
+                stack.pop()
+                entries.close()
+                os.close(dir_fd)
+                continue
+            seen += 1
+            if seen > max_entries or time.monotonic() > deadline:
+                result["truncated"] = True
+                break
+            if entry.name.startswith("."):
+                continue
+            try:
+                st = entry.stat(follow_symlinks=False)
+            except OSError:
+                continue
+            if stat.S_ISLNK(st.st_mode):
+                result["skipped_links"] += 1
+            elif stat.S_ISDIR(st.st_mode):
+                if len(stack) >= PUBLIC_FILES_DEPTH:
+                    result["truncated"] = True
+                    continue
+                try:
+                    child = os.open(entry.name, _DIR_FLAGS, dir_fd=dir_fd)
+                except OSError:
+                    continue
+                enter(child)
+            elif stat.S_ISREG(st.st_mode) and st.st_uid == uid and not st.st_mode & stat.S_IROTH:
+                if _public_file(dir_fd, entry.name, st, uid):
+                    result["changed"] += 1
+    finally:
+        for dir_fd, entries in stack:
+            entries.close()
+            os.close(dir_fd)
+    return result
 
 
 def _user_document_root(app_root, roots):
@@ -6602,6 +6785,37 @@ def cmd_docroot_access(payload):
     return result
 
 
+def cmd_app_docroot(payload):
+    """The domain's document root as Plesk has it now (docs/DESIGN.md section 6): the panel sends it
+    after it changed the document root on the Runway page (open: true), Reconcile when the stored
+    copy differs from Plesk's (open: false). Stores it in the application's state like app-apply
+    ("" for workers and invalid values) and, with open, makes the files in it readable for the web
+    server when it lies inside the application root (open_public_files; a failure is reported in
+    "public", the state is stored anyway). Without a state: configured false, nothing changes."""
+    payload = payload or {}
+    domain_id = v_domain_id(payload.get("domain_id"))
+    nothing = {"configured": False, "document_root": "", "public": None}
+    if not isinstance(read_json(app_state_path(domain_id)), dict):
+        return nothing
+    state, pw = load_app_state(domain_id)
+    rel = v_state_document_root(payload.get("document_root"), pw.pw_dir) if state["listen"] != "none" else ""
+    with FileLock("ports"):
+        stored = read_json(app_state_path(domain_id))
+        if not isinstance(stored, dict):
+            return nothing
+        if stored.get("document_root") != rel:
+            stored["document_root"] = rel
+            write_json(app_state_path(domain_id), stored)
+    state["document_root"] = rel
+    public = None
+    if payload.get("open"):
+        try:
+            public = open_public_files(state, pw)
+        except HelperError as exc:
+            public = {"error": str(exc)}
+    return {"configured": True, "document_root": rel, "public": public}
+
+
 def cmd_apps_list(payload):
     """Every application with the state of its live unit. converge: true (the panel's scheduled
     Reconcile only) also repairs zero-downtime slots and pointers (docs/DESIGN.md section 12.8)."""
@@ -6674,6 +6888,8 @@ def cmd_apps_list(payload):
             "enabled": state.get("enabled"),
             "listen": state.get("listen", "tcp"),
             "mode": state.get("mode", "web"),
+            # The stored copy of the document root (Reconcile sends Plesk's when it differs).
+            "document_root": state.get("document_root") if isinstance(state.get("document_root"), str) else "",
             "updated_epoch": state.get("updated_epoch"),
             "suspended": bool(state.get("suspended")),
             "stopped": bool(state.get("stopped")),
@@ -6945,6 +7161,59 @@ def internal_deploy(domain_id):
         lock.release()
 
 
+def open_public_files(state, pw):
+    """The step that makes the files in the application's document root readable for the web
+    server (docs/DESIGN.md section 7, Public files), as the system user: None when the application
+    has no stored document root (workers never have one) or it does not lie strictly inside the
+    application root, else {changed, skipped_links, truncated, passable} (_user_open_public_files).
+    Raises HelperError."""
+    rel = state.get("document_root") or ""
+    if not rel or state.get("listen") == "none":
+        return None
+    try:
+        absolute = v_document_root(rel, pw.pw_dir)[1]
+    except HelperError:
+        return None
+    try:
+        web_gid = grp.getgrnam(WEB_GROUP).gr_gid
+    except KeyError:
+        web_gid = -1
+    return call_as_user(pw, _user_open_public_files, state["app_dir"], absolute, PUBLIC_FILES_MAX,
+                        PUBLIC_FILES_SECONDS, web_gid, timeout=PUBLIC_FILES_SECONDS + 30)
+
+
+def public_files_summary(result, path):
+    """One line about a run of open_public_files() (deploy log)."""
+    notes = []
+    if result.get("passable"):
+        count = int(result["passable"])
+        notes.append("o+x for %d folder%s on the way to it" % (count, "" if count == 1 else "s"))
+    if result.get("skipped_links"):
+        count = int(result["skipped_links"])
+        notes.append("%d symbolic link%s skipped" % (count, "" if count == 1 else "s"))
+    if result.get("truncated"):
+        notes.append("stopped at the limit of %d entries, %d seconds or %d folder levels: the rest was not checked"
+                     % (PUBLIC_FILES_MAX, PUBLIC_FILES_SECONDS, PUBLIC_FILES_DEPTH))
+    return "Made %d files and folders in %s readable for the web server%s" % (
+        int(result.get("changed") or 0), path, " (%s)" % "; ".join(notes) if notes else "")
+
+
+def deploy_open_public_files(state, pw, log):
+    """Deploy job, after a build or fetch: open_public_files() as one line of the deploy log. A
+    failure is logged and never fails the deployment (a SIGTERM of the deploy unit still ends it)."""
+    path = os.path.normpath(pw.pw_dir) + "/" + state["document_root"] if state.get("document_root") else ""
+    try:
+        result = open_public_files(state, pw)
+    except DeployTerminated:
+        raise
+    except Exception as exc:  # noqa: BLE001 - the deployment goes on
+        log.line("WARNING: the files in the document root %s could not be made readable for the web server: %s"
+                 % (path, exc))
+        return
+    if result is not None:
+        log.line(public_files_summary(result, path))
+
+
 def _deploy_lock_busy(domain_id, job):
     """The deploy lock stayed busy: a panel request fails with the reason, and the job starts again
     a minute later so a trigger file is not lost."""
@@ -7063,7 +7332,12 @@ def _deploy_once(domain_id, job):
             log.line("No build command configured; skipping build.")
         # The build may have taken long: never start an app that was disabled or whose
         # domain was suspended in the meantime.
-        fresh, _pw = load_app_state(domain_id)
+        fresh, fresh_pw = load_app_state(domain_id)
+        if mode in ("build", "fetch"):
+            # Files the build or fetch wrote into a document root inside the application root
+            # become readable for the web server, before the new version starts (also for a
+            # stopped application: the web server serves the document root without it).
+            deploy_open_public_files(fresh, fresh_pw, log)
         if not fresh["enabled"] or fresh["suspended"]:
             raise HelperError("The application was disabled or the domain suspended during the build; "
                               "it was not restarted.")
@@ -8428,6 +8702,7 @@ COMMANDS = {
     "app-inspect": cmd_app_inspect,
     "docroot-check": cmd_docroot_check,
     "docroot-access": cmd_docroot_access,
+    "app-docroot": cmd_app_docroot,
     "apps-list": cmd_apps_list,
     "reapply-all": cmd_reapply_all,
     "web-reconfigure": cmd_web_reconfigure,

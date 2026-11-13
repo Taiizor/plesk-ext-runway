@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'La carpeta desde la que el servidor web sirve las rutas estáticas (y, en el modo de ruta, el resto del sitio), relativa al directorio principal de la suscripción. Es la raíz del documento de este dominio en Plesk, el mismo ajuste que en su configuración de hosting: un cambio aquí la cambia también allí. Plesk crea la carpeta si no existe.',
             'documentRootExample' => 'Ejemplo: con la raíz de la aplicación %%appRoot%%, la raíz del documento %%documentRoot%% y la ruta estática %%prefix%%, el servidor web sirve por sí mismo los archivos de %%folder%% y pasa todo lo demás a la aplicación.',
             'documentRootReadOnly' => 'Solo pueden cambiarla los usuarios que pueden administrar la configuración de hosting de este dominio en Plesk.',
-            'documentRootBuildChmod' => 'El servidor web debe poder leer los archivos que hay allí: los archivos creados por una compilación solo los puede leer la suscripción, así que termine el comando de compilación con %%command%%.',
+            'documentRootBuildChmod' => 'Las compilaciones crean archivos que solo puede leer la suscripción: después de cada compilación y descarga, y cuando la raíz del documento cambia aquí, Runway hace que el servidor web pueda leer los archivos y carpetas que hay allí. Los nombres que empiezan por un punto (como .htaccess) y los destinos de los enlaces simbólicos se quedan como están: hágalos legibles usted mismo cuando el servidor web los necesite.',
             'documentRootPathMode' => 'En el modo de ruta, la raíz del documento también sirve el resto del sitio, fuera de la ruta URL.',
             'documentRootSuggestion' => 'Sugerencia: %%path%%',
             'documentRootUseSuggestion' => 'Usar',

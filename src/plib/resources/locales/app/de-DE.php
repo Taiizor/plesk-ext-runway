@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Der Ordner, aus dem der Webserver die statischen Pfade (und im Pfadmodus auch den Rest der Website) ausliefert, relativ zum Home-Verzeichnis des Abonnements. Dies ist der Dokumentstamm dieser Domain in Plesk, dieselbe Einstellung wie in ihren Hosting-Einstellungen: Eine Änderung hier ändert ihn auch dort. Einen fehlenden Ordner legt Plesk an.',
             'documentRootExample' => 'Beispiel: Mit dem Anwendungsstamm %%appRoot%%, dem Dokumentstamm %%documentRoot%% und dem statischen Pfad %%prefix%% liefert der Webserver die Dateien in %%folder%% selbst aus und leitet alles andere an die Anwendung weiter.',
             'documentRootReadOnly' => 'Nur Benutzer, die in Plesk die Hosting-Einstellungen dieser Domain verwalten dürfen, können ihn ändern.',
-            'documentRootBuildChmod' => 'Der Webserver muss die Dateien dort lesen können: Von einem Build erstellte Dateien sind nur für das Abonnement lesbar, beenden Sie den Build-Befehl daher mit %%command%%.',
+            'documentRootBuildChmod' => 'Builds erstellen Dateien, die nur das Abonnement lesen kann: Nach jedem Build und Download sowie wenn sich der Dokumentstamm hier ändert, macht Runway die Dateien und Ordner dort für den Webserver lesbar. Namen, die mit einem Punkt beginnen (wie .htaccess), und die Ziele symbolischer Links bleiben unverändert: Machen Sie sie selbst lesbar, wenn der Webserver sie benötigt.',
             'documentRootPathMode' => 'Im Pfadmodus liefert der Dokumentstamm auch den Rest der Website außerhalb des URL-Pfads aus.',
             'documentRootSuggestion' => 'Vorschlag: %%path%%',
             'documentRootUseSuggestion' => 'Übernehmen',

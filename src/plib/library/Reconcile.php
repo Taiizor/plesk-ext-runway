@@ -9,7 +9,9 @@
  *  - apps whose domain name, system user or home directory changed are re-applied;
  *  - apps of suspended/disabled domains are stopped, and started again on activation;
  *  - enabled apps that systemd gave up on (start limit hit, e.g. their database was not up yet
- *    after a reboot) are started again, unless the user stopped them.
+ *    after a reboot) are started again, unless the user stopped them;
+ *  - the helper's copy of the domain's document root follows Plesk (helper app-docroot, without
+ *    touching any file; docs/DESIGN.md section 6).
  * Applications stopped by the user (Stop) stay stopped: re-applies keep the helper's flag.
  * Zero-downtime deployments (docs/DESIGN.md section 12.8): apps-list also converges the slots and
  * pointers of every application (converge: true), and an application is re-applied (without a
@@ -86,6 +88,13 @@ class Modules_Runway_Reconcile
                     // unit, a failed save after app-apply, restored domain settings).
                     || $switchable !== !empty($stored['switchable'])
                     || (!$switchable && isset($app['port']) && (int)$app['port'] !== (int)(isset($stored['port']) ? $stored['port'] : 0));
+                if (!$changed && isset($app['document_root']) && (string)$app['document_root'] !== $model->documentRootPayload()) {
+                    // The helper's copy of the document root (the step after every build that makes
+                    // the files in a document root inside the application root readable for the web
+                    // server): a change in Plesk's own hosting settings, or a state from before it
+                    // was kept. Only the state changes; a re-apply sends it anyway.
+                    Modules_Runway_App::syncDocumentRoot($domain, $model->documentRootPayload(), false);
+                }
                 if ($changed) {
                     $model->apply($identityChanged);
                     $summary['reapplied'][] = $id;

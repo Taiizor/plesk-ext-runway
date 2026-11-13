@@ -116,6 +116,15 @@ class Modules_Runway_App
         'binary' => ['', './app'],
     ];
 
+    /**
+     * Document roots that changeDocumentRoot() set in this request, by domain id: pm_Domain keeps
+     * the value it read for the rest of the request (docs/DESIGN.md section 6), so
+     * relativeDocumentRoot() answers these instead.
+     *
+     * @var string[]
+     */
+    private static $changedDocumentRoots = [];
+
     /** @var pm_Domain */
     private $domain;
 
@@ -336,14 +345,20 @@ class Modules_Runway_App
     /**
      * The domain's own document root relative to its home directory, in the format of
      * documentRoots() and of the application root ("httpdocs", "apps/example.com/wwwroot"). Plesk is
-     * the source of truth: Runway never stores it. pm_Domain keeps the value it read for the rest of
-     * the request, so a document root changed in this request is not reflected here.
+     * the source of truth: Runway never stores it (the helper keeps a copy for the step that makes
+     * the files in it readable for the web server, see documentRootPayload()). pm_Domain keeps the
+     * value it read for the rest of the request, so a document root that changeDocumentRoot() set in
+     * this request is answered from its own record.
      *
      * @param pm_Domain $domain
      * @return string|null null when unknown or not inside the home directory
      */
     public static function relativeDocumentRoot(pm_Domain $domain)
     {
+        $id = (int)$domain->getId();
+        if (isset(self::$changedDocumentRoots[$id])) {
+            return self::$changedDocumentRoots[$id];
+        }
         try {
             $home = rtrim((string)$domain->getHomePath(), '/');
             $root = rtrim((string)$domain->getDocumentRoot(), '/');
@@ -435,6 +450,7 @@ class Modules_Runway_App
             throw new Modules_Runway_Exception(self::pleskMessage($output !== '' ? $output : 'exit code ' . $code));
         }
         Modules_Runway_Log::info('Document root of ' . $domain->getName() . ' changed to ' . $path);
+        self::$changedDocumentRoots[(int)$domain->getId()] = (string)$path;
         try {
             $access = Modules_Runway_Helper::call('docroot-access', [
                 'sysuser' => (string)$domain->getSysUserLogin(),
@@ -455,6 +471,43 @@ class Modules_Runway_App
                 . ': ' . implode(', ', $blocked));
         }
         return $blocked;
+    }
+
+    /**
+     * Hands the domain's document root to the helper's state of its application (helper
+     * app-docroot, docs/DESIGN.md section 6), for the step that makes the files in a document root
+     * inside the application root readable for the web server after every build and fetch. With
+     * $open the step also runs now (after a change on the Runway page, so that files that exist
+     * already become readable). A domain without an application changes nothing; a failure is only
+     * logged.
+     *
+     * @param pm_Domain $domain
+     * @param string $path documentRootPayload() of the domain's application ("" = none)
+     * @param bool $open Run the step now
+     * @return array|null The helper's answer {configured, document_root, public}, null on a failure
+     */
+    public static function syncDocumentRoot(pm_Domain $domain, $path, $open)
+    {
+        try {
+            $result = Modules_Runway_Helper::call('app-docroot', [
+                'domain_id' => (int)$domain->getId(),
+                'document_root' => (string)$path,
+                'open' => (bool)$open,
+            ]);
+        } catch (Exception $e) {
+            Modules_Runway_Log::warn('app-docroot for ' . $domain->getName() . ' failed: ' . $e->getMessage());
+            return null;
+        }
+        $public = isset($result['public']) && is_array($result['public']) ? $result['public'] : null;
+        if ($public !== null && isset($public['error'])) {
+            Modules_Runway_Log::warn('The files in the document root ' . $path . ' of ' . $domain->getName()
+                . ' could not be made readable for the web server: ' . $public['error']);
+        } elseif ($public !== null) {
+            Modules_Runway_Log::info('Made ' . (int)(isset($public['changed']) ? $public['changed'] : 0) . ' files and folders in the document root '
+                . $path . ' of ' . $domain->getName() . ' readable for the web server'
+                . (!empty($public['truncated']) ? ' (stopped at the limit: the rest was not checked)' : ''));
+        }
+        return $result;
     }
 
     /**
@@ -1366,6 +1419,9 @@ class Modules_Runway_App
             // Only meaningful in path mode / for applications that listen.
             'mount_path' => $this->data['mode'] === self::MODE_PATH ? (string)$this->data['mountPath'] : '',
             'static_paths' => is_array($this->data['staticPaths']) ? array_values($this->data['staticPaths']) : [],
+            // The domain's document root: the deploy job makes the files in it readable for the web
+            // server when it lies inside the application root (never for workers).
+            'document_root' => $this->documentRootPayload(),
             'health_path' => $this->data['listen'] !== self::LISTEN_NONE ? (string)$this->data['healthPath'] : '',
             // Expected response content of the health check: only with a health check path (never for workers).
             'health_match' => $this->data['listen'] !== self::LISTEN_NONE && (string)$this->data['healthPath'] !== ''
@@ -1400,6 +1456,23 @@ class Modules_Runway_App
             $payload['env'] = (object)$this->env;
         }
         return $payload;
+    }
+
+    /**
+     * The document root the helper keeps in the application's state ("document_root" of app-apply
+     * and app-docroot, docs/DESIGN.md section 6): relativeDocumentRoot() when it is valid
+     * (isValidDocumentRoot(), the helper's rules), "" when it is unknown or invalid and for workers,
+     * which serve nothing.
+     *
+     * @return string
+     */
+    public function documentRootPayload()
+    {
+        if ($this->data['listen'] === self::LISTEN_NONE || $this->data['mode'] === self::MODE_WORKER) {
+            return '';
+        }
+        $root = self::relativeDocumentRoot($this->domain);
+        return $root !== null && self::isValidDocumentRoot($root) ? $root : '';
     }
 
     /**

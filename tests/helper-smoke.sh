@@ -634,6 +634,115 @@ chgrp psaserv "$HOME_DIR/smoke-acc/app/wwwroot" && chmod 750 "$HOME_DIR/smoke-ac
     && [ "$(stat -c %a /etc)" = "755" ] && ok "docroot-access: never follows a link outside the home directory" || bad "docroot-access through a link outside"
 rm -rf "$HOME_DIR/apps/smoke-pub" "$HOME_DIR/smoke-acc" "$HOME_DIR/apps/smoke-out" "$HOME_DIR/apps/smoke-in" "$HOME_DIR/apps/smoke-up"
 
+echo "== open public files: a document root inside the application root (deploy job, app-docroot; docs/DESIGN.md section 6)"
+# Builds create files with umask 027 (0640, folders 0750, group psacln) that the web server (group
+# psaserv) cannot read. After a build or fetch the deploy job adds o+r (files) and o+rx (folders) in
+# a document root strictly inside the application root: own entries only, never through a symbolic
+# link, never for names that start with ".".
+PUB=$APP/wwwroot
+PUB_OUT=$HOME_DIR/smoke-pubout
+rm -rf "$PUB" "$PUB_OUT" "$APP/outside.txt" "$APP/later-root.txt" "$APP"/pub-link-* "$APP/.output" "$APP/out" "$APP/rootdir"
+runuser -u "$USER_NAME" -- bash -c "umask 027; mkdir -p '$PUB' && echo old > '$APP/outside.txt'"
+# A file of another owner (root) in the document root.
+echo root > "$PUB/root.txt" && chmod 640 "$PUB/root.txt"
+pub_modes() { (cd "$PUB" && stat -c %a "$@" 2>&1 | tr '\n' ' ' | sed 's/ $//'); }
+# The application root outside the document root: every mode before the deployment.
+app_snap() { find "$APP" -path "$PUB" -prune -o -printf '%p %m\n' | sort; }
+APP_BEFORE=$(app_snap)
+HOSTNAME_MODE=$(stat -c %a /etc/hostname)
+PUB_BUILD='mkdir -p wwwroot/sub wwwroot/.hidden && echo a > wwwroot/a.txt && echo b > wwwroot/sub/b.txt && echo s > wwwroot/.env && echo h > wwwroot/.hidden/h.txt && echo secret > outside.txt && ln -sfn ../outside.txt wwwroot/link-out && ln -sfn /etc/hostname wwwroot/link-etc'
+out=$(call app-apply "{$(base), \"build_cmd\": \"$PUB_BUILD\", \"document_root\": \"/apps/smoke/wwwroot/\", \"start\": false}")
+[ "$(echo "$out" | jexpr "(d['ok'], d['state']['document_root'])")" = "(True, 'apps/smoke/wwwroot')" ] && ok "app-apply stores the document root (state document_root)" || bad "app-apply document_root: $out"
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+[ "$(wait_job deploy-$ID)" = "succeeded" ] && ok "a build that writes into the document root" || bad "deploy with a document root: $(tail -5 /var/lib/runway/jobs/deploy-$ID.log)"
+[ "$(pub_modes . a.txt sub sub/b.txt)" = "755 644 755 644" ] && ok "files of the build get o+r, folders o+rx (the document root included)" || bad "modes after the build: $(pub_modes . a.txt sub sub/b.txt)"
+[ "$(pub_modes .env .hidden .hidden/h.txt)" = "640 750 640" ] && ok "names that start with . (and everything below them) stay as they are" || bad "dot entries: $(pub_modes .env .hidden .hidden/h.txt)"
+[ "$(stat -c '%U %a' "$PUB/root.txt")" = "root 640" ] && ok "a file of another owner (root) stays as it is" || bad "root's file: $(stat -c '%U %a' "$PUB/root.txt")"
+[ -L "$PUB/link-out" ] && [ -L "$PUB/link-etc" ] && [ "$(stat -c %a "$APP/outside.txt")" = "640" ] && [ "$(stat -c %a /etc/hostname)" = "$HOSTNAME_MODE" ] \
+    && ok "symbolic links are skipped: their targets (outside.txt of the user, /etc/hostname) keep their modes" \
+    || bad "link targets: outside.txt $(stat -c %a "$APP/outside.txt"), /etc/hostname $(stat -c %a /etc/hostname) (was $HOSTNAME_MODE)"
+[ "$(app_snap)" = "$APP_BEFORE" ] && ok "the application root outside the document root is unchanged" \
+    || bad "application root changed: $(diff <(echo "$APP_BEFORE") <(app_snap) | head -6 | tr '\n' ' ')"
+grep -qF "Made 4 files and folders in $PUB readable for the web server (2 symbolic links skipped)" /var/lib/runway/jobs/deploy-$ID.log \
+    && ok "the deploy log reports the step" || bad "deploy log: $(grep -i 'readable\|WARNING' /var/lib/runway/jobs/deploy-$ID.log)"
+# A change of the document root on the Runway page (app-docroot, open: true): files that exist
+# already become readable.
+runuser -u "$USER_NAME" -- bash -c "umask 027; echo n > '$PUB/new.txt' && mkdir '$PUB/newdir'"
+out=$(call app-docroot "{\"domain_id\": $ID, \"document_root\": \"apps/smoke/wwwroot\", \"open\": true}")
+[ "$(echo "$out" | jexpr "(d['configured'], d['document_root'], d['public'])")" = "(True, 'apps/smoke/wwwroot', {'changed': 2, 'passable': 0, 'skipped_links': 2, 'truncated': False})" ] \
+    && [ "$(pub_modes new.txt newdir)" = "644 755" ] && ok "app-docroot (open: true) makes the files that exist already readable" || bad "app-docroot: $out ($(pub_modes new.txt newdir))"
+# The bounds (200000 entries, 60 s): with a limit of 3 entries the walk stops and says so.
+res=$(runuser -u "$USER_NAME" -- bash -c "cd /tmp && python3 - '$APP' '$PUB'" <<'PYEOF'
+import importlib.machinery, importlib.util, sys
+loader = importlib.machinery.SourceFileLoader("runway_helper", "/opt/runway/bin/runway-helper")
+spec = importlib.util.spec_from_loader("runway_helper", loader)
+module = importlib.util.module_from_spec(spec)
+loader.exec_module(module)
+print(module._user_open_public_files(sys.argv[1], sys.argv[2], 3, 60)["truncated"])
+PYEOF
+)
+[ "$res" = "True" ] && ok "the walk stops at its entry limit and reports truncated" || bad "entry limit: $res"
+# Equal to the application root (its sources would be served) or outside it: nothing changes.
+runuser -u "$USER_NAME" -- bash -c "umask 027; echo l > '$PUB/later.txt' && echo l > '$APP/later-root.txt' && mkdir -p '$PUB_OUT' && echo x > '$PUB_OUT/x.txt'"
+for item in "apps/smoke equal to the application root" "smoke-pubout outside the application root"; do
+    root=${item%% *}
+    call app-apply "{$(base), \"build_cmd\": \"\", \"document_root\": \"$root\", \"start\": false}" >/dev/null
+    call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+    st=$(wait_job deploy-$ID)
+    modes="$(pub_modes later.txt) $(stat -c %a "$APP/later-root.txt" "$PUB_OUT" "$PUB_OUT/x.txt" | tr '\n' ' ')"
+    [ "$st" = "succeeded" ] && [ "$modes" = "640 640 750 640 " ] && ! grep -q 'readable for the web server' /var/lib/runway/jobs/deploy-$ID.log \
+        && ok "a document root ${item#* }: the deployment changes nothing" || bad "document root $root: $st, modes $modes, $(grep -i 'readable' /var/lib/runway/jobs/deploy-$ID.log)"
+done
+# Symbolic links decide by the real path: into the application root counts, out of it (or to the
+# application root itself) does not.
+runuser -u "$USER_NAME" -- bash -c "ln -sfn ../../smoke-pubout '$APP/pub-link-out' && ln -sfn . '$APP/pub-link-self' && ln -sfn wwwroot '$APP/pub-link-in'"
+dr_open() { call app-docroot "{\"domain_id\": $ID, \"document_root\": \"$1\", \"open\": true}" | jexpr "(d['document_root'], d['public'])"; }
+[ "$(dr_open apps/smoke/pub-link-out)" = "('apps/smoke/pub-link-out', None)" ] && [ "$(stat -c %a "$PUB_OUT/x.txt")" = "640" ] \
+    && ok "a document root that a link leads out of the application root: nothing changes" || bad "link out: $(dr_open apps/smoke/pub-link-out)"
+[ "$(dr_open apps/smoke/pub-link-self)" = "('apps/smoke/pub-link-self', None)" ] && [ "$(stat -c %a "$APP/later-root.txt")" = "640" ] \
+    && ok "a document root that is a link to the application root itself: nothing changes" || bad "link to the application root: $(dr_open apps/smoke/pub-link-self)"
+out=$(dr_open apps/smoke/pub-link-in)
+[ "$out" = "('apps/smoke/pub-link-in', {'changed': 1, 'passable': 0, 'skipped_links': 2, 'truncated': False})" ] && [ "$(pub_modes later.txt)" = "644" ] \
+    && ok "a document root that is a link to a folder inside the application root counts" || bad "link in: $out"
+[ "$(call apps-list '{}' | jexpr "[a['document_root'] for a in d['apps'] if a['domain_id'] == $ID]")" = "['apps/smoke/pub-link-in']" ] \
+    && ok "apps-list reports the stored document root" || bad "apps-list document_root"
+[ "$(call app-docroot "{\"domain_id\": $ID, \"document_root\": \"../etc\", \"open\": true}" | jexpr "(d['configured'], d['document_root'], d['public'])")" = "(True, '', None)" ] \
+    && [ "$(call app-docroot '{"domain_id": 998, "document_root": "httpdocs"}' | jexpr "(d['ok'], d['configured'])")" = "(True, False)" ] \
+    && ok "app-docroot: an invalid value is stored as unknown; no application, nothing to store" || bad "app-docroot invalid / not configured"
+# Folders between the application root and the document root that the build removes and creates
+# anew (Nuxt's .output of .output/public, 0750 psacln): the deploy job lets the web server pass
+# them (o+x only, also for a name that starts with "."); the rest of .output stays closed.
+NEST_BUILD='rm -rf .output && mkdir -p .output/public/_nuxt .output/server && echo a > .output/public/_nuxt/app.js && echo s > .output/server/index.mjs'
+call app-apply "{$(base), \"build_cmd\": \"$NEST_BUILD\", \"document_root\": \"apps/smoke/.output/public\", \"start\": false}" >/dev/null
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+st=$(wait_job deploy-$ID)
+modes=$(cd "$APP/.output" && stat -c %a . public public/_nuxt public/_nuxt/app.js server server/index.mjs 2>&1 | tr '\n' ' ')
+[ "$st" = "succeeded" ] && [ "$modes" = "751 755 755 644 750 640 " ] \
+    && grep -qF "Made 3 files and folders in $APP/.output/public readable for the web server (o+x for 1 folder on the way to it)" /var/lib/runway/jobs/deploy-$ID.log \
+    && ok "a folder on the way that the build created anew gets o+x (the document root below it o+rx, files o+r)" \
+    || bad "nested document root: $st, modes $modes, $(grep -i 'readable\|WARNING' /var/lib/runway/jobs/deploy-$ID.log)"
+# Two folders on the way, through app-docroot (open: true).
+runuser -u "$USER_NAME" -- bash -c "umask 027; rm -rf '$APP/out' && mkdir -p '$APP/out/site/wwwroot' && echo i > '$APP/out/site/wwwroot/index.html'"
+out=$(dr_open apps/smoke/out/site/wwwroot)
+modes=$(cd "$APP/out" && stat -c %a . site site/wwwroot site/wwwroot/index.html 2>&1 | tr '\n' ' ')
+[ "$out" = "('apps/smoke/out/site/wwwroot', {'changed': 2, 'passable': 2, 'skipped_links': 0, 'truncated': False})" ] && [ "$modes" = "751 751 755 644 " ] \
+    && ok "app-docroot: every folder on the way gets o+x, never the read permission" || bad "app-docroot nested: $out, modes $modes"
+# A document root that the user cannot open (root's, 0700): the deploy log says so, the deployment
+# succeeds all the same.
+mkdir -p "$APP/rootdir" && chmod 700 "$APP/rootdir"
+call app-apply "{$(base), \"build_cmd\": \"\", \"document_root\": \"apps/smoke/rootdir\", \"start\": false}" >/dev/null
+call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$st" = "succeeded" ] && grep -qF "WARNING: the files in the document root $APP/rootdir could not be made readable for the web server" /var/lib/runway/jobs/deploy-$ID.log \
+    && [ "$(stat -c '%U %a' "$APP/rootdir")" = "root 700" ] && ok "a failure of the step is a warning in the deploy log, never a failed deployment" \
+    || bad "unopenable document root: $st, $(grep -i 'readable' /var/lib/runway/jobs/deploy-$ID.log)"
+out=$(call app-apply "{$(base), \"listen\": \"none\", \"build_cmd\": \"\", \"start_cmd\": \"exec sleep 600\", \"document_root\": \"apps/smoke/wwwroot\", \"start\": false}")
+[ "$(echo "$out" | jexpr "repr(d['state']['document_root'])")" = "''" ] \
+    && [ "$(call app-docroot "{\"domain_id\": $ID, \"document_root\": \"apps/smoke/wwwroot\", \"open\": true}" | jexpr "(d['document_root'], d['public'])")" = "('', None)" ] \
+    && ok "workers keep no document root (nothing to open)" || bad "worker document_root: $out"
+call app-apply "{$(base), \"build_cmd\": \"\", \"enabled\": false}" >/dev/null
+rm -rf "$PUB" "$PUB_OUT" "$APP/outside.txt" "$APP/later-root.txt" "$APP"/pub-link-* "$APP/.output" "$APP/out" "$APP/rootdir"
+
 echo "== adapter metadata (docs/DESIGN.md section 5.1)"
 [ "$(call runtimes '{}' | jexpr "sorted(r['key'] for r in d['runtimes']) == sorted(['go','rust','bun','java','dotnet','python','ruby','php','binary']) and all(set(['key','label','toolchain','version_re','hint','docs_url','default_listen','supports_build','install_help','detected_only']) <= set(r) for r in d['runtimes'])")" = "True" ] && ok "all runtimes with full metadata" || bad "runtime metadata"
 [ "$(call runtimes '{}' | jexpr "dict((r['key'], r['toolchain']) for r in d['runtimes']) == {'go':'managed','rust':'managed','bun':'managed','java':'managed','dotnet':'managed','python':'managed','ruby':'detected','php':'detected','binary':'none'}")" = "True" ] && ok "toolchain kinds" || bad "toolchain kinds"
@@ -689,6 +798,7 @@ print(json.dumps({'domain_id': $ID, 'domain': 'smoke.test', 'sysuser': '$USER_NA
     'health_path': '/health', 'start': False}))")
     out=$(call app-apply "$payload")
     [ "$(echo "$out" | field "['ok']")" = "True" ] || { bad "$rt apply ($listen): $out"; return 1; }
+    SAMPLE_PAYLOAD=$payload
     PORT=$(echo "$out" | field "['port']")
     call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
     [ "$(wait_job deploy-$ID)" = "succeeded" ] || { bad "$rt $tc deploy ($listen): $(tail -4 /var/lib/runway/jobs/deploy-$ID.log)"; return 1; }
@@ -851,7 +961,9 @@ SRV=/root/runway-fetch-srv
 rm -rf $SRV && mkdir -p $SRV/pkg/static
 sample_app binary "" tcp
 cp "$HOME_DIR/apps/smoke-binary/app" $SRV/app && rm -f "$HOME_DIR/apps/smoke-binary/app"
-echo "hello static" > $SRV/pkg/static/hello.txt && tar -czf $SRV/bundle.tar.gz -C $SRV/pkg static
+# The archive's static folder carries the modes of umask 027 (0750, 0640).
+echo "hello static" > $SRV/pkg/static/hello.txt && chmod 750 $SRV/pkg/static && chmod 640 $SRV/pkg/static/hello.txt \
+    && tar -czf $SRV/bundle.tar.gz -C $SRV/pkg static
 SUM=$(sha256sum $SRV/app | cut -d' ' -f1)
 touch /etc/runway/allow-insecure-fetch
 python3 -m http.server 18999 --bind 127.0.0.1 --directory $SRV >/dev/null 2>&1 &
@@ -862,8 +974,16 @@ call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"http://127.0.0.1:18
 call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"http://127.0.0.1:18999/app\", \"sha256\": \"$SUM\", \"extract\": false}}" >/dev/null
 [ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(stat -c '%U %a' "$HOME_DIR/apps/smoke-binary/app")" = "$USER_NAME 750" ] && ok "fetch saves ./app as $USER_NAME (0750)" || bad "fetch binary: $(tail -4 /var/lib/runway/jobs/deploy-$ID.log)"
 case "$(curl -s --max-time 5 "http://127.0.0.1:$PORT/")" in "Hello from"*) ok "fetched binary serves after restart" ;; *) bad "fetched binary does not answer" ;; esac
+# The document root apps/smoke-binary/static (inside the application root): the step after the
+# fetch makes the extracted files readable for the web server.
+out=$(call app-apply "$(echo "$SAMPLE_PAYLOAD" | python3 -c "import json, sys; d = json.load(sys.stdin); d['document_root'] = 'apps/smoke-binary/static'; print(json.dumps(d))")")
+[ "$(echo "$out" | jexpr "(d['ok'], d['state']['document_root'])")" = "(True, 'apps/smoke-binary/static')" ] || bad "fetch app-apply with a document root: $out"
 call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"http://127.0.0.1:18999/bundle.tar.gz\", \"extract\": true}}" >/dev/null
 [ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(stat -c %U "$HOME_DIR/apps/smoke-binary/static/hello.txt" 2>/dev/null)" = "$USER_NAME" ] && ok "fetch extracts a .tar.gz as $USER_NAME" || bad "fetch extract: $(tail -4 /var/lib/runway/jobs/deploy-$ID.log)"
+[ "$(stat -c %a "$HOME_DIR/apps/smoke-binary/static" "$HOME_DIR/apps/smoke-binary/static/hello.txt" 2>&1 | tr '\n' ' ')" = "755 644 " ] \
+    && grep -qF "Made 2 files and folders in $HOME_DIR/apps/smoke-binary/static readable for the web server" /var/lib/runway/jobs/deploy-$ID.log \
+    && ok "the files of a fetch in the document root become readable for the web server (0750/0640 in the archive)" \
+    || bad "fetch into the document root: $(stat -c %a "$HOME_DIR/apps/smoke-binary/static" "$HOME_DIR/apps/smoke-binary/static/hello.txt" 2>&1 | tr '\n' ' '), $(grep -i 'readable\|WARNING' /var/lib/runway/jobs/deploy-$ID.log)"
 rm -f /etc/runway/allow-insecure-fetch
 call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"http://127.0.0.1:18999/app\"}}" | grep -q 'Only https' && ok "fetch refuses http:// URLs" || bad "fetch accepted http://"
 call app-deploy "{\"domain_id\": $ID, \"fetch\": {\"url\": \"https://127.0.0.1:8443/\"}}" >/dev/null
@@ -1277,10 +1397,18 @@ for listen in ("tcp", "unix", "none"):
                 new.render_deploy_path(s_match)) != (new.render_env_file(s_new, pw), unit_new, new.render_deploy_service(s_new),
                                                      new.render_deploy_path(s_new)):
             diffs.append("%s %s files depend on health_match" % (listen, limits))
+        # Nor does the document root (stored for the step that opens its files; workers keep none).
+        s_root, _ = new.validate_app(dict(payload, document_root="apps/smoke-zd/wwwroot"))
+        if s_root["document_root"] != ("" if listen == "none" else "apps/smoke-zd/wwwroot"):
+            diffs.append("%s %s document_root %r" % (listen, limits, s_root["document_root"]))
+        if (new.render_env_file(s_root, pw), new.render_app_unit(s_root, pw), new.render_deploy_service(s_root),
+                new.render_deploy_path(s_root)) != (new.render_env_file(s_new, pw), unit_new, new.render_deploy_service(s_new),
+                                                    new.render_deploy_path(s_new)):
+            diffs.append("%s %s files depend on document_root" % (listen, limits))
 print("same" if not diffs else "different: " + ", ".join(diffs))
 PYEOF
 )
-    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off; an expected response content changes no file)" || bad "1.0 rendering: $res"
+    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off; an expected response content and a document root change no file)" || bad "1.0 rendering: $res"
 else
     echo "SKIP  byte-identical 1.0 rendering (no /root/runway-helper-1.0.0; plesk-e2e.sh smoke copies it from git)"
 fi

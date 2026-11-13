@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'Složka, ze které webový server obsluhuje statické cesty (a v režimu cesty i zbytek webu), relativně k domovskému adresáři předplatného. Je to kořenový adresář dokumentů této domény v panelu Plesk, stejné nastavení jako v jejím nastavení hostingu: změna zde jej změní i tam. Chybějící složku Plesk vytvoří.',
             'documentRootExample' => 'Příklad: s kořenovým adresářem aplikace %%appRoot%%, kořenovým adresářem dokumentů %%documentRoot%% a statickou cestou %%prefix%% obsluhuje webový server soubory ve složce %%folder%% sám a vše ostatní předává aplikaci.',
             'documentRootReadOnly' => 'Změnit jej mohou pouze uživatelé, kteří smějí v panelu Plesk spravovat nastavení hostingu této domény.',
-            'documentRootBuildChmod' => 'Webový server musí mít možnost soubory v něm číst: soubory vytvořené sestavením může číst pouze předplatné, proto příkaz pro sestavení ukončete příkazem %%command%%.',
+            'documentRootBuildChmod' => 'Sestavení vytvářejí soubory, které může číst pouze předplatné: po každém sestavení a stažení a při změně kořenového adresáře dokumentů zde Runway zpřístupní soubory a složky v něm webovému serveru ke čtení. Názvy začínající tečkou (například .htaccess) a cíle symbolických odkazů zůstávají beze změny: pokud je webový server potřebuje, zpřístupněte je ke čtení sami.',
             'documentRootPathMode' => 'V režimu cesty obsluhuje kořenový adresář dokumentů i zbytek webu mimo cestu URL.',
             'documentRootSuggestion' => 'Návrh: %%path%%',
             'documentRootUseSuggestion' => 'Použít',

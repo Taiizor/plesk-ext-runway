@@ -634,7 +634,9 @@ class ApiController extends pm_Controller_Action
      * current one); when Plesk refuses, the answer is a field error on documentRoot and the
      * configuration is not saved. Then the configuration is applied as before (an explicit start that
      * restarts the application). A request that carries the document root and no configuration field
-     * leaves the application alone.
+     * leaves the application alone. After a change the helper's state of the application gets the new
+     * document root and makes the files in it readable for the web server when it lies inside the
+     * application root (App::syncDocumentRoot(), after the configuration was applied).
      *
      * @return array
      */
@@ -678,6 +680,11 @@ class ApiController extends pm_Controller_Action
             }
         }
         if ($onlyDocumentRoot) {
+            if ($newRoot !== null) {
+                // The application's state learns the new document root, and files that exist there
+                // already become readable for the web server (inside the application root only).
+                Modules_Runway_App::syncDocumentRoot($domain, $app->documentRootPayload(), true);
+            }
             return [
                 'config' => $app->config(),
                 'limits' => $app->limits(),
@@ -700,6 +707,11 @@ class ApiController extends pm_Controller_Action
             $error = new Modules_Runway_Exception($e->getMessage() . ' ' . $rootNote, (int)$e->getCode(), $e);
             $error->setHelperCode($e->getHelperCode());
             throw $error;
+        }
+        if ($newRoot !== null) {
+            // app-apply stored the new document root; the files that exist there already become
+            // readable for the web server, with the application root that was just applied.
+            Modules_Runway_App::syncDocumentRoot($domain, $app->documentRootPayload(), true);
         }
         if ($result['buildError'] !== null) {
             $message = pm_Locale::lmsg('messageSavedBuildNotStarted', ['details' => $result['buildError']]);

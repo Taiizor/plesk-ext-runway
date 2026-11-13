@@ -395,7 +395,7 @@ return [
             'documentRootHint' => 'La cartella da cui il server web serve i percorsi statici (e, in modalità percorso, il resto del sito), relativa alla home directory dell\'abbonamento. È la root del documento di questo dominio in Plesk, la stessa impostazione presente nelle sue impostazioni di hosting: una modifica qui la cambia anche lì. Plesk crea la cartella se non esiste.',
             'documentRootExample' => 'Esempio: con la root dell\'applicazione %%appRoot%%, la root del documento %%documentRoot%% e il percorso statico %%prefix%%, il server web serve direttamente i file in %%folder%% e inoltra tutto il resto all\'applicazione.',
             'documentRootReadOnly' => 'Possono modificarla solo gli utenti autorizzati a gestire le impostazioni di hosting di questo dominio in Plesk.',
-            'documentRootBuildChmod' => 'Il server web deve poter leggere i file che vi si trovano: i file creati da una build sono leggibili solo dall\'abbonamento, quindi termina il comando di build con %%command%%.',
+            'documentRootBuildChmod' => 'Le build creano file che solo l\'abbonamento può leggere: dopo ogni build e ogni download, e quando la root del documento viene modificata qui, Runway rende leggibili per il server web i file e le cartelle che vi si trovano. I nomi che iniziano con un punto (come .htaccess) e le destinazioni dei link simbolici restano invariati: rendili leggibili tu stesso se il server web ne ha bisogno.',
             'documentRootPathMode' => 'In modalità percorso la root del documento serve anche il resto del sito, al di fuori del percorso URL.',
             'documentRootSuggestion' => 'Suggerimento: %%path%%',
             'documentRootUseSuggestion' => 'Usa il suggerimento',
