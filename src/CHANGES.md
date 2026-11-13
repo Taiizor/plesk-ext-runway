@@ -1,3 +1,13 @@
+# 1.2.0-1 (13 November 2026)
+
+* [+] Runway in the navigation of the Power User view, of resellers and of the customer panel, and Runway's mark among the icons of a domain row for domains with an enabled application.
+* [+] Document root on the Runway page (Advanced, above the static paths, every runtime): the domain's document root in Plesk, so static files can be served from a folder inside the application root (e.g. wwwroot) while the application's files stay out of reach; the form suggests the runtime's usual folder.
+* [+] Health watch (opt-in): restarts an application in place when its health check path keeps failing; at most 3 restarts an hour.
+* [+] Expected response content of the health check (opt-in): a JSON object such as {"status":"ok"} or a text the answer must contain; used by the status card, the health watch and zero-downtime deployments.
+* [+] The application's memory without the file cache, with the file cache shown apart; a warning while the application root lies in a document root.
+* [*] Behaviour change on systemd 254 and later: applications with a memory or CPU limit get MemoryPressureWatch=off, so .NET sees its limits (an application that ran above 75 % of its memory limit may need a higher limit).
+* [-] "Restart in place" no longer looks transparent next to the other buttons of the status card.
+
 # 1.1.0-1 (13 November 2026)
 
 * [+] Zero-downtime deployments (opt-in per application, TCP and Unix socket mode): the new version starts next to the running one and gets the traffic only once it listens and its health check answers; a version that does not become ready never replaces the running one.

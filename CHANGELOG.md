@@ -10,6 +10,14 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-13
+
+Feedback from a production server: Runway in every panel view, the application's real memory,
+an opt-in health watch with an optional expected response content, and the domain's document root
+on the Runway page, so static files can be served from a folder inside the application. One
+behaviour change: on systemd 254 and later, applications with a memory or CPU limit get
+`MemoryPressureWatch=off` (see *Changed*).
+
 ### Added
 
 - **Runway** in the navigation of the administrator's Power User view, of resellers (*Hosting
@@ -52,8 +60,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   shows it on the *Health* line.
 - The domain page warns, without blocking the save, while the application root is a document root
   of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one; `api/app` adds
-  `domain.documentRoot`,
-  `documentRoots`, `appRootDocumentRoot` and `defaultAppRoot`. The stored application root also
+  `domain.documentRoot`, `documentRoots`, `appRootDocumentRoot` and `defaultAppRoot`. The stored
+  application root also
   counts when a symbolic link puts it into a document root (`app-inspect` and `app-page` take
   `document_roots` and answer `document_root`, resolved as the system user).
   `plesk ext runway --status` prints the same warning.
@@ -77,9 +85,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   document root only when the field was changed (a change made in Plesk meanwhile is never undone)
   and, when nothing else changed, only it: no build, no restart. A full path inside the home
   directory is taken relative to it; folders on the way that the web server cannot pass are named
-  in the save message,
-  `plesk ext runway --status` prints a *Document root* line. Removing an application never changes
-  the document root. README section *Static files and the document root*.
+  in the save message, and `plesk ext runway --status` prints a *Document root* line. Removing an
+  application never changes the document root. README section *Static files and the document
+  root*.
 
 ### Changed
 
@@ -268,6 +276,7 @@ Hardening from the pre-release security review (no released version was affected
   release workflow fails when the tag and `src/meta.xml` differ. CI runs customer-smoke and the
   Go runtime matrix and fails on every shell syntax error.
 
-[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Taiizor/plesk-ext-runway/releases/tag/v1.0.0

@@ -36,7 +36,7 @@
     <description xml:lang="zh-TW">無需 Docker，即可為每個域名執行 Go、Rust、Bun、Java、.NET、Python、Ruby、PHP 或預先建置的應用程式：安裝工具鏈、以訂閱的系統使用者身分建置，並將每個應用程式作為 nginx 後方經過安全強化的 systemd 服務執行。</description>
     <category>developer</category>
     <category>webserver</category>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <release>1</release>
     <vendor>Taiizor</vendor>
     <url>https://github.com/Taiizor/plesk-ext-runway</url>
