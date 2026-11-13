@@ -44,12 +44,11 @@ await write("src/htdocs/images/nav.png", render(lightGlyph, 64)); // navigation 
 // Plesk's dark theme inverts the whole page (html { filter: invert(0.9) hue-rotate(180deg) }) and
 // inverts images back, so an image keeps its colours: #7a7a7a has a contrast of at least 3:1 on
 // the white and light grey rows of the light theme and on the dark rows of the dark theme, where a
-// black mark would vanish. An SVG, so it stays sharp at any pixel density.
-const rowMark = inner(glyph)
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/ fill="#[0-9a-f]{6}"/gi, "")
-    .replace(/>\s+</g, "><")
-    .trim();
+// black mark would vanish. An SVG, so it stays sharp at any pixel density. It takes the <path>
+// elements of the master (flat fills only, see assets/logo.svg) without their own fills.
+const rowPaths = inner(glyph).match(/<path\b[^>]*\/>/g);
+if (!rowPaths) throw new Error("assets/logo.svg has no <path/> elements");
+const rowMark = rowPaths.map((path) => path.replace(/ fill="#[0-9a-f]{6}"/gi, "")).join("");
 const rowIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="#7a7a7a"><title>Runway</title>${rowMark}</svg>\n`;
 await Bun.write(resolve(ROOT, "src/htdocs/images/header.svg"), rowIcon);
 console.log(`src/htdocs/images/header.svg (${rowIcon.length} bytes)`);
