@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'De verwachte inhoud van het antwoord mag maximaal %%max%% tekens lang zijn en mag geen regeleinden of stuurtekens bevatten.',
     'errorHealthMatchJson' => 'De verwachte inhoud van het antwoord begint met { maar is geen geldig JSON-object.',
     'errorHealthMatchPath' => 'De verwachte inhoud van het antwoord vereist een healthcheck-pad: voer er een in of maak de inhoud leeg.',
+    'errorDocumentRoot' => 'De documenthoofdmap moet een map binnen het abonnement zijn (letters, cijfers en . _ - @ + /, maximaal %%max%% tekens), zonder segmenten "." of ".." en zonder mapnaam die met "-" begint.',
+    'errorDocumentRootOutside' => '%%path%% leidt via een symbolische link naar buiten het abonnement en kan niet de documenthoofdmap zijn.',
+    'errorDocumentRootNotDir' => '%%path%% bestaat, maar is geen map.',
+    'errorDocumentRootDenied' => 'Voor het wijzigen van de documenthoofdmap is de machtiging nodig om de hostinginstellingen van dit domein in Plesk te beheren.',
+    'errorDocumentRootChange' => 'Plesk heeft de documenthoofdmap niet gewijzigd: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Geheugenlimiet (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'De instellingen zijn opgeslagen. De nieuwe versie start naast de draaiende versie en neemt het over zodra deze gereed is; volg de voortgang in het logboek "Build en deploy".',
     'messageSwitchStarted' => 'De nieuwe versie start naast de draaiende versie en neemt het over zodra deze gereed is. Volg de voortgang in het logboek "Build en deploy".',
     'messageAction_restartPlain' => 'De applicatie wordt ter plaatse herstart.',
+    'messageDocumentRootChanged' => 'De documenthoofdmap is nu %%path%%.',
+    'messageDocumentRootUnchanged' => 'De documenthoofdmap blijft %%path%%.',
+    'messageDocumentRootBlocked' => 'De webserver kan onderweg niet door deze mappen heen, dus kan hij de bestanden niet aanbieden: %%paths%%. Sta dit toe met chmod o+x op deze mappen.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Toont de geconfigureerde applicaties en hun status.',

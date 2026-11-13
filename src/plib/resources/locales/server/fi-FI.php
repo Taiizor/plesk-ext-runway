@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Vastauksen odotetussa sisällössä saa olla enintään %%max%% merkkiä, eikä se saa sisältää rivinvaihtoja tai ohjausmerkkejä.',
     'errorHealthMatchJson' => 'Vastauksen odotettu sisältö alkaa merkillä {, mutta se ei ole kelvollinen JSON-objekti.',
     'errorHealthMatchPath' => 'Vastauksen odotettu sisältö vaatii kuntotarkistuksen polun: anna polku tai tyhjennä sisältö.',
+    'errorDocumentRoot' => 'Sivuston juurihakemiston on oltava tilauksen sisällä oleva kansio (kirjaimia, numeroita sekä . _ - @ + /, enintään %%max%% merkkiä) ilman "."- tai ".."-osia ja ilman kansion nimeä, joka alkaa merkillä "-".',
+    'errorDocumentRootOutside' => '%%path%% johtaa symbolisen linkin kautta tilauksen ulkopuolelle, eikä se voi olla sivuston juurihakemisto.',
+    'errorDocumentRootNotDir' => '%%path%% on olemassa, mutta se ei ole kansio.',
+    'errorDocumentRootDenied' => 'Sivuston juurihakemiston muuttaminen edellyttää oikeutta hallita tämän toimialueen hosting-asetuksia Pleskissä.',
+    'errorDocumentRootChange' => 'Plesk ei muuttanut sivuston juurihakemistoa: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Muistiraja (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Asetukset tallennettiin. Uusi versio käynnistyy käynnissä olevan rinnalle ja ottaa liikenteen vastaan, kun se on valmis; seuraa sitä "Koonti ja käyttöönotto" -lokista.',
     'messageSwitchStarted' => 'Uusi versio käynnistyy käynnissä olevan rinnalle ja ottaa liikenteen vastaan, kun se on valmis. Seuraa sitä "Koonti ja käyttöönotto" -lokista.',
     'messageAction_restartPlain' => 'Sovellus käynnistyy uudelleen paikallaan.',
+    'messageDocumentRootChanged' => 'Sivuston juurihakemisto on nyt %%path%%.',
+    'messageDocumentRootUnchanged' => 'Sivuston juurihakemisto on edelleen %%path%%.',
+    'messageDocumentRootBlocked' => 'Web-palvelin ei pääse näiden matkan varrella olevien kansioiden läpi, joten se ei voi palvella tiedostoja: %%paths%%. Salli se komennolla chmod o+x näille kansioille.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Luettelee määritetyt sovellukset ja niiden tilan.',

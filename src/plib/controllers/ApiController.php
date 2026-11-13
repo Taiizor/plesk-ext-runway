@@ -351,7 +351,7 @@ class ApiController extends pm_Controller_Action
         $page = null;
         $pageError = null;
         // Document roots of the webspace: the form warns when the application root lies in one,
-        // and names the domain's own one for static paths.
+        // and shows the domain's own one (Plesk's setting) in its Document root field.
         $documentRoots = Modules_Runway_App::documentRoots($domain);
         try {
             $page = $app->loadPage($documentRoots);
@@ -391,6 +391,13 @@ class ApiController extends pm_Controller_Action
                 isset($page['inspect']['document_root']) ? $page['inspect']['document_root'] : null
             ),
             'defaultAppRoot' => Modules_Runway_App::defaultAppRoot($domain),
+            // The document root (domain.documentRoot) is Plesk's setting: whether this user may change
+            // it here, and the candidate directories of the inspected application root per runtime.
+            'documentRootAllowed' => Modules_Runway_Access::canChangeDocumentRoot($domain),
+            'documentRootSuggestions' => (object)Modules_Runway_App::documentRootSuggestions(
+                (string)$app->get('appRoot'),
+                isset($page['inspect']) ? $page['inspect'] : null
+            ),
             'configured' => $app->isConfigured(),
             'config' => $app->config(),
             // null when the stored variables could not be loaded: omit "env" when saving then.
@@ -619,21 +626,80 @@ class ApiController extends pm_Controller_Action
     }
 
     /**
+     * POST api/app/save: configuration fields (partial update) and the optional documentRoot.
+     *
+     * Order (docs/DESIGN.md section 6): everything is validated first (the configuration and the
+     * document root, whose symbolic links the helper resolves as the system user); on any error
+     * nothing changes. Then the document root is changed in Plesk (only when it differs from the
+     * current one); when Plesk refuses, the answer is a field error on documentRoot and the
+     * configuration is not saved. Then the configuration is applied as before (an explicit start that
+     * restarts the application). A request that carries the document root and no configuration field
+     * leaves the application alone.
+     *
      * @return array
      */
     private function appSave()
     {
         $this->requirePost();
         $app = $this->appModel();
-        $errors = $app->update($this->body(), Modules_Runway_Access::isAdmin());
+        $body = $this->body();
+        $domain = $app->getDomain();
+        $current = Modules_Runway_App::relativeDocumentRoot($domain);
+        $documentRootSent = array_key_exists('documentRoot', $body) && $body['documentRoot'] !== null;
+        $onlyDocumentRoot = $documentRootSent && !array_diff(array_keys($body), ['site_id', 'documentRoot']);
+
+        $errors = $onlyDocumentRoot ? [] : $app->update($body, Modules_Runway_Access::isAdmin());
+        $newRoot = $documentRootSent ? self::documentRootChange($domain, $body['documentRoot'], $current, $errors) : null;
         if ($errors) {
             throw new Modules_Runway_ValidationException($errors);
+        }
+        $blocked = [];
+        if ($newRoot !== null) {
+            try {
+                $blocked = Modules_Runway_App::changeDocumentRoot($domain, $newRoot);
+            } catch (Modules_Runway_Exception $e) {
+                Modules_Runway_Log::warn('Changing the document root of ' . $domain->getName() . ' to ' . $newRoot . ' failed: ' . $e->getMessage());
+                throw new Modules_Runway_ValidationException(['documentRoot' => [
+                    pm_Locale::lmsg('errorDocumentRootChange', ['details' => $e->getMessage()]),
+                ]]);
+            }
+        }
+        $documentRoot = [
+            'documentRoot' => $newRoot !== null ? $newRoot : $current,
+            'documentRootChanged' => $newRoot !== null,
+        ];
+        // What the user has to know about a changed document root: the new path and the directories
+        // on the way that the web server cannot pass (docroot-access could not open them up).
+        $rootNote = '';
+        if ($newRoot !== null) {
+            $rootNote = pm_Locale::lmsg('messageDocumentRootChanged', ['path' => $newRoot]);
+            if ($blocked) {
+                $rootNote .= ' ' . pm_Locale::lmsg('messageDocumentRootBlocked', ['paths' => implode(', ', $blocked)]);
+            }
+        }
+        if ($onlyDocumentRoot) {
+            return [
+                'config' => $app->config(),
+                'limits' => $app->limits(),
+                'build' => false,
+                'buildError' => null,
+                'job' => null,
+                'message' => $newRoot !== null
+                    ? $rootNote
+                    : pm_Locale::lmsg('messageDocumentRootUnchanged', ['path' => (string)$current]),
+            ] + $documentRoot;
         }
         try {
             $result = $app->applyAndDeploy();
         } catch (Modules_Runway_Exception $e) {
-            Modules_Runway_Log::warn('Applying the configuration of ' . $app->getDomain()->getName() . ' failed: ' . $e->getMessage());
-            throw $e;
+            Modules_Runway_Log::warn('Applying the configuration of ' . $domain->getName() . ' failed: ' . $e->getMessage());
+            if ($newRoot === null) {
+                throw $e;
+            }
+            // The document root has changed already: the error must not read as "nothing happened".
+            $error = new Modules_Runway_Exception($e->getMessage() . ' ' . $rootNote, (int)$e->getCode(), $e);
+            $error->setHelperCode($e->getHelperCode());
+            throw $error;
         }
         if ($result['buildError'] !== null) {
             $message = pm_Locale::lmsg('messageSavedBuildNotStarted', ['details' => $result['buildError']]);
@@ -645,6 +711,9 @@ class ApiController extends pm_Controller_Action
         } else {
             $message = pm_Locale::lmsg($app->isEnabled() ? 'messageSavedEnabled' : 'messageSavedDisabled');
         }
+        if ($rootNote !== '') {
+            $message .= ' ' . $rootNote;
+        }
         return [
             'config' => $app->config(),
             'limits' => $app->limits(),
@@ -652,7 +721,66 @@ class ApiController extends pm_Controller_Action
             'buildError' => $result['buildError'],
             'job' => $result['job'],
             'message' => $message,
-        ];
+        ] + $documentRoot;
+    }
+
+    /**
+     * Validates the documentRoot of api/app/save. The current value (as typed with surrounding
+     * blanks or slashes) is not a change and is never refused. A change needs the permission
+     * (Access::canChangeDocumentRoot()), a valid path (App::isValidDocumentRoot()) and passes the
+     * helper's check as the system user (inside the home directory with symbolic links resolved; an
+     * existing path must be a directory).
+     *
+     * @param pm_Domain $domain
+     * @param mixed $value
+     * @param string|null $current The current document root (App::relativeDocumentRoot())
+     * @param array $errors Validation errors keyed by field (output)
+     * @return string|null The new document root, null when it does not change (or on an error)
+     */
+    private static function documentRootChange(pm_Domain $domain, $value, $current, array &$errors)
+    {
+        if (!is_string($value)) {
+            $errors['documentRoot'][] = pm_Locale::lmsg('errorInvalidValue');
+            return null;
+        }
+        // A full path pasted from a shell: relative to the home directory, as everywhere else.
+        $value = trim($value);
+        try {
+            $home = rtrim((string)$domain->getHomePath(), '/');
+        } catch (Exception $e) {
+            $home = '';
+        }
+        if ($home !== '' && ($value === $home || strpos($value, $home . '/') === 0)) {
+            $value = (string)substr($value, strlen($home));
+        }
+        $path = Modules_Runway_App::normalizeDocumentRoot($value);
+        if ($current !== null && $path === $current) {
+            return null;
+        }
+        if (!Modules_Runway_Access::canChangeDocumentRoot($domain)) {
+            $errors['documentRoot'][] = pm_Locale::lmsg('errorDocumentRootDenied');
+            return null;
+        }
+        if (!Modules_Runway_App::isValidDocumentRoot($path)) {
+            $errors['documentRoot'][] = pm_Locale::lmsg('errorDocumentRoot', ['max' => Modules_Runway_App::MAX_DOCUMENT_ROOT]);
+            return null;
+        }
+        try {
+            Modules_Runway_App::checkDocumentRoot($domain, $path);
+        } catch (Modules_Runway_Exception $e) {
+            switch ($e->getHelperCode()) {
+                case 'docroot_outside':
+                    $errors['documentRoot'][] = pm_Locale::lmsg('errorDocumentRootOutside', ['path' => $path]);
+                    break;
+                case 'docroot_not_dir':
+                    $errors['documentRoot'][] = pm_Locale::lmsg('errorDocumentRootNotDir', ['path' => $path]);
+                    break;
+                default:
+                    $errors['documentRoot'][] = pm_Locale::lmsg('errorDocumentRootChange', ['details' => $e->getMessage()]);
+            }
+            return null;
+        }
+        return $path;
     }
 
     /**

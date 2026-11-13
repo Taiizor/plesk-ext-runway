@@ -67,9 +67,12 @@ class Modules_Runway_App
     const MAX_HEALTH_PATH = 255;
     /** Total length of all static paths together. */
     const MAX_STATIC_CHARS = 1000;
+    /** Document root of a domain, relative to the home directory (a Plesk setting, never stored by Runway). */
+    const MAX_DOCUMENT_ROOT = 255;
 
     const RE_ENV_KEY = '/^[A-Za-z_][A-Za-z0-9_]{0,127}$/';
-    const RE_APP_ROOT = '#^[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$#';
+    // D: "$" must not match before a trailing line feed ("apps/x\n" is not a valid root).
+    const RE_APP_ROOT = '#^[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$#D';
     /** URL prefix (mount path, static paths): docs/DESIGN.md section 5.3 */
     const RE_URL_PREFIX = '#^/[A-Za-z0-9._~-]+(/[A-Za-z0-9._~-]+)*$#';
     /** Health check path (may carry a query string); same rule as RE_HEALTH_PATH in the helper. */
@@ -328,6 +331,171 @@ class Modules_Runway_App
             ];
         }
         return $roots;
+    }
+
+    /**
+     * The domain's own document root relative to its home directory, in the format of
+     * documentRoots() and of the application root ("httpdocs", "apps/example.com/wwwroot"). Plesk is
+     * the source of truth: Runway never stores it. pm_Domain keeps the value it read for the rest of
+     * the request, so a document root changed in this request is not reflected here.
+     *
+     * @param pm_Domain $domain
+     * @return string|null null when unknown or not inside the home directory
+     */
+    public static function relativeDocumentRoot(pm_Domain $domain)
+    {
+        try {
+            $home = rtrim((string)$domain->getHomePath(), '/');
+            $root = rtrim((string)$domain->getDocumentRoot(), '/');
+        } catch (Exception $e) {
+            return null;
+        }
+        if ($home === '' || strpos($root, $home . '/') !== 0) {
+            return null;
+        }
+        return substr($root, strlen($home) + 1);
+    }
+
+    /**
+     * A document root as typed: surrounding blanks and slashes removed ("/apps/x/" => "apps/x").
+     * Backslashes and every other character stay, so that isValidDocumentRoot() refuses them.
+     *
+     * @param string $value
+     * @return string
+     */
+    public static function normalizeDocumentRoot($value)
+    {
+        return trim((string)$value, " /");
+    }
+
+    /**
+     * Whether a normalised document root may be handed to Plesk (docs/DESIGN.md section 6): a
+     * non-empty relative path of "/"-separated segments with the characters of an application root
+     * (RE_APP_ROOT: no blank, backslash or control character), no "." or ".." segment, no segment that
+     * starts with "-" (the path reaches Plesk's command line), at most MAX_DOCUMENT_ROOT characters.
+     *
+     * @param string $path
+     * @return bool
+     */
+    public static function isValidDocumentRoot($path)
+    {
+        $path = (string)$path;
+        return $path !== '' && strlen($path) <= self::MAX_DOCUMENT_ROOT && preg_match(self::RE_APP_ROOT, $path) === 1
+            && !preg_match('#(^|/)\.{1,2}(/|$)#', $path) && !preg_match('#(^|/)-#', $path);
+    }
+
+    /**
+     * Checks a document root as the subscription's system user before Plesk is asked to use it
+     * (helper docroot-check): with symbolic links resolved it must stay inside the home directory,
+     * and an existing path must be a directory. A missing directory is fine: Plesk creates it.
+     *
+     * @param pm_Domain $domain
+     * @param string $path Valid document root (isValidDocumentRoot())
+     * @return array {exists, real, document_root}
+     * @throws Modules_Runway_Exception With the helper code docroot_outside or docroot_not_dir
+     */
+    public static function checkDocumentRoot(pm_Domain $domain, $path)
+    {
+        return Modules_Runway_Helper::call('docroot-check', [
+            'sysuser' => (string)$domain->getSysUserLogin(),
+            'document_root' => (string)$path,
+        ]);
+    }
+
+    /**
+     * Changes the domain's document root in Plesk: "plesk bin site --update <domain> -www-root
+     * /<path>" through pm_ApiCli ("site" is Plesk's utility for every kind of site; verified for main
+     * domains and subdomains, docs/DESIGN.md section 6). Plesk applies its own checks (no "..", no service directory, no symbolic link
+     * leading outside the webspace), creates a missing directory with its parents (<user>:psaserv
+     * 0750, plus its default index.html) and regenerates the web server configuration. The
+     * arguments are an array (no shell) and the path starts with "/", so Plesk never reads it as an
+     * option. Afterwards the helper lets the web server pass the directories on the way
+     * (docroot-access); a failure there is only logged.
+     *
+     * @param pm_Domain $domain
+     * @param string $path Valid document root (isValidDocumentRoot()), relative to the home directory
+     * @return string[] Directories on the way that the web server cannot pass and docroot-access did
+     *                  not open up (other owners), relative to the home directory
+     * @throws Modules_Runway_Exception With Plesk's message when Plesk refused the change
+     */
+    public static function changeDocumentRoot(pm_Domain $domain, $path)
+    {
+        if (!self::isValidDocumentRoot($path)) {
+            throw new Modules_Runway_Exception(pm_Locale::lmsg('errorDocumentRoot', ['max' => self::MAX_DOCUMENT_ROOT]));
+        }
+        try {
+            $result = pm_ApiCli::call('site', ['--update', (string)$domain->getName(), '-www-root', '/' . $path], pm_ApiCli::RESULT_FULL);
+        } catch (Exception $e) {
+            throw new Modules_Runway_Exception(self::pleskMessage($e->getMessage()));
+        }
+        $code = is_array($result) && isset($result['code']) ? (int)$result['code'] : 1;
+        if ($code !== 0) {
+            $output = trim((is_array($result) && isset($result['stderr']) ? (string)$result['stderr'] : '') . "\n"
+                . (is_array($result) && isset($result['stdout']) ? (string)$result['stdout'] : ''));
+            throw new Modules_Runway_Exception(self::pleskMessage($output !== '' ? $output : 'exit code ' . $code));
+        }
+        Modules_Runway_Log::info('Document root of ' . $domain->getName() . ' changed to ' . $path);
+        try {
+            $access = Modules_Runway_Helper::call('docroot-access', [
+                'sysuser' => (string)$domain->getSysUserLogin(),
+                'document_root' => (string)$path,
+            ]);
+        } catch (Exception $e) {
+            Modules_Runway_Log::warn('docroot-access for ' . $domain->getName() . ' failed: ' . $e->getMessage());
+            return [];
+        }
+        $blocked = [];
+        foreach (isset($access['blocked']) && is_array($access['blocked']) ? $access['blocked'] : [] as $item) {
+            if (is_string($item) && $item !== '') {
+                $blocked[] = $item;
+            }
+        }
+        if ($blocked) {
+            Modules_Runway_Log::warn('The web server may not reach the document root ' . $path . ' of ' . $domain->getName()
+                . ': ' . implode(', ', $blocked));
+        }
+        return $blocked;
+    }
+
+    /**
+     * The essential part of an error of a Plesk command line utility: without the generic
+     * "An error occurred during ...:" prefixes and the "exit status" line, on one line.
+     *
+     * @param string $text
+     * @return string
+     */
+    private static function pleskMessage($text)
+    {
+        $text = preg_replace('/^\s*exit status \d+\s*$/mi', '', (string)$text);
+        $text = trim(preg_replace('/\s+/', ' ', (string)$text));
+        $text = preg_replace('/^(An error occurred (during|while) [^:]{1,80}:\s*)+/i', '', $text);
+        return substr($text !== '' ? $text : 'unknown error', 0, 500);
+    }
+
+    /**
+     * Suggested document roots per runtime: the candidate directories that the inspection of the
+     * application root found (helper public_dirs, real directories only), as paths relative to the
+     * home directory.
+     *
+     * @param string $appRoot The inspected application root
+     * @param array|null $inspect Inspection of app-page or app-inspect
+     * @return array runtime => [path, ...]
+     */
+    public static function documentRootSuggestions($appRoot, $inspect)
+    {
+        $found = is_array($inspect) && isset($inspect['public_dirs']) && is_array($inspect['public_dirs']) ? $inspect['public_dirs'] : [];
+        $base = trim((string)$appRoot, '/');
+        $result = [];
+        foreach (Modules_Runway_Runtime::keys() as $key) {
+            $result[$key] = [];
+            foreach (isset($found[$key]) && is_array($found[$key]) ? $found[$key] : [] as $name) {
+                $path = $base . '/' . (is_string($name) ? $name : '');
+                if (is_string($name) && preg_match('#^[A-Za-z0-9._-]+$#', $name) && self::isValidDocumentRoot($path)) {
+                    $result[$key][] = $path;
+                }
+            }
+        }
+        return $result;
     }
 
     /**

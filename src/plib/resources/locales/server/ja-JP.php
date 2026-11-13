@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => '期待する応答内容は %%max%% 文字以内で、改行や制御文字を含めることはできません。',
     'errorHealthMatchJson' => '期待する応答内容は { で始まっていますが、有効な JSON オブジェクトではありません。',
     'errorHealthMatchPath' => '期待する応答内容にはヘルスチェックパスが必要です。パスを入力するか、内容を消去してください。',
+    'errorDocumentRoot' => 'ドキュメントルートはサブスクリプション内のフォルダでなければなりません（英字、数字、. _ - @ + /、最大 %%max%% 文字）。「.」や「..」のセグメント、および「-」で始まるフォルダ名は使用できません。',
+    'errorDocumentRootOutside' => '%%path%% はシンボリックリンクを経由してサブスクリプションの外を指しているため、ドキュメントルートにできません。',
+    'errorDocumentRootNotDir' => '%%path%% は存在しますが、フォルダではありません。',
+    'errorDocumentRootDenied' => 'ドキュメントルートを変更するには、Plesk でこのドメインのホスティング設定を管理する権限が必要です。',
+    'errorDocumentRootChange' => 'Plesk はドキュメントルートを変更しませんでした: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'メモリ上限（MiB）',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => '設定を保存しました。新しいバージョンが実行中のバージョンと並行して起動し、準備ができ次第処理を引き継ぎます。「ビルドとデプロイ」ログで確認できます。',
     'messageSwitchStarted' => '新しいバージョンが実行中のバージョンと並行して起動し、準備ができ次第処理を引き継ぎます。「ビルドとデプロイ」ログで確認できます。',
     'messageAction_restartPlain' => 'アプリケーションをその場で再起動しています。',
+    'messageDocumentRootChanged' => 'ドキュメントルートは %%path%% になりました。',
+    'messageDocumentRootUnchanged' => 'ドキュメントルートは %%path%% のままです。',
+    'messageDocumentRootBlocked' => 'ウェブサーバが途中にある次のフォルダを通過できないため、ファイルを提供できません: %%paths%%。これらのフォルダに chmod o+x を実行して許可してください。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '設定済みのアプリケーションとその状態を一覧表示します。',

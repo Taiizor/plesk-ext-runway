@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'O conteúdo esperado da resposta deve ter no máximo %%max%% caracteres e não pode conter quebras de linha nem caracteres de controle.',
     'errorHealthMatchJson' => 'O conteúdo esperado da resposta começa com {, mas não é um objeto JSON válido.',
     'errorHealthMatchPath' => 'O conteúdo esperado da resposta precisa de um caminho de verificação de integridade: informe um ou limpe o conteúdo.',
+    'errorDocumentRoot' => 'A raiz do documento deve ser uma pasta dentro da assinatura (letras, dígitos e . _ - @ + /, no máximo %%max%% caracteres), sem segmentos "." ou ".." e sem nomes de pasta que comecem com "-".',
+    'errorDocumentRootOutside' => '%%path%% leva para fora da assinatura por meio de um link simbólico e não pode ser a raiz do documento.',
+    'errorDocumentRootNotDir' => '%%path%% existe, mas não é uma pasta.',
+    'errorDocumentRootDenied' => 'Alterar a raiz do documento requer permissão para gerenciar as configurações de hospedagem deste domínio no Plesk.',
+    'errorDocumentRootChange' => 'O Plesk não alterou a raiz do documento: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'As configurações foram salvas. A nova versão é iniciada ao lado da que está em execução e assume quando estiver pronta; acompanhe no log "Compilação e implantação".',
     'messageSwitchStarted' => 'A nova versão é iniciada ao lado da que está em execução e assume quando estiver pronta. Acompanhe no log "Compilação e implantação".',
     'messageAction_restartPlain' => 'O aplicativo está sendo reiniciado no local.',
+    'messageDocumentRootChanged' => 'A raiz do documento agora é %%path%%.',
+    'messageDocumentRootUnchanged' => 'A raiz do documento continua sendo %%path%%.',
+    'messageDocumentRootBlocked' => 'O servidor web não consegue atravessar estas pastas no caminho, então não pode servir os arquivos: %%paths%%. Permita isso com chmod o+x nelas.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Lista os aplicativos configurados e seu estado.',

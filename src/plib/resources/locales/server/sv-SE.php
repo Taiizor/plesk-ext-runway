@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Det förväntade innehållet i svaret får vara högst %%max%% tecken långt och får inte innehålla radbrytningar eller kontrolltecken.',
     'errorHealthMatchJson' => 'Det förväntade innehållet i svaret börjar med { men är inte ett giltigt JSON-objekt.',
     'errorHealthMatchPath' => 'Det förväntade innehållet i svaret kräver en sökväg för hälsokontroll: ange en, eller töm innehållet.',
+    'errorDocumentRoot' => 'Dokumentroten måste vara en mapp inom abonnemanget (bokstäver, siffror och . _ - @ + /, högst %%max%% tecken), utan segmenten "." eller ".." och utan mappnamn som börjar med "-".',
+    'errorDocumentRootOutside' => '%%path%% leder ut ur abonnemanget via en symbolisk länk och kan inte vara dokumentrot.',
+    'errorDocumentRootNotDir' => '%%path%% finns men är inte en mapp.',
+    'errorDocumentRootDenied' => 'För att ändra dokumentroten krävs behörighet att hantera domänens webbhotellsinställningar i Plesk.',
+    'errorDocumentRootChange' => 'Plesk ändrade inte dokumentroten: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnesgräns (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Inställningarna sparades. Den nya versionen startar bredvid den som körs och tar över när den är redo; följ förloppet i loggen "Bygge och driftsättning".',
     'messageSwitchStarted' => 'Den nya versionen startar bredvid den som körs och tar över när den är redo. Följ förloppet i loggen "Bygge och driftsättning".',
     'messageAction_restartPlain' => 'Applikationen startas om på plats.',
+    'messageDocumentRootChanged' => 'Dokumentroten är nu %%path%%.',
+    'messageDocumentRootUnchanged' => 'Dokumentroten förblir %%path%%.',
+    'messageDocumentRootBlocked' => 'Webbservern kan inte passera dessa mappar på vägen och kan därför inte leverera filerna: %%paths%%. Tillåt det med chmod o+x på dem.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listar de konfigurerade applikationerna och deras status.',

@@ -9,7 +9,7 @@ import {
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
-const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch',
+const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'documentRoot', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch',
     'healthWatchInterval', 'healthWatchFailures', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
     'zeroDowntime', 'readyTimeout', 'drainSeconds'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
@@ -28,6 +28,15 @@ const text = value => (value === null || value === undefined ? '' : String(value
 
 /** An application root as the helper stores it: forward slashes, no leading or trailing slash. */
 const normalRoot = value => String(value || '').split('\\').join('/').replace(/^[ /]+|[ /]+$/g, '');
+
+/** A typed document root as the server compares it: surrounding blanks and slashes removed (nothing else). */
+const normalDocumentRoot = value => String(value || '').replace(/^[ /]+|[ /]+$/g, '');
+
+/**
+ * The domain's document root from api/app (Plesk's setting, relative to the home directory like
+ * the application root), '' when unknown.
+ */
+const currentDocumentRoot = data => (isObject(data.domain) && typeof data.domain.documentRoot === 'string' ? data.domain.documentRoot : '');
 
 /**
  * The document root (an entry of api/app documentRoots: {domain, path}, relative to the
@@ -73,6 +82,8 @@ export const formValues = data => {
         mode: config.mode || (listen === 'none' ? 'worker' : 'web'),
         listen,
         mountPath: text(config.mountPath),
+        // Plesk's setting, not part of the configuration: the current value of the domain.
+        documentRoot: currentDocumentRoot(data),
         staticPaths: Array.isArray(config.staticPaths) ? config.staticPaths.join('\n') : text(config.staticPaths),
         healthPath: text(config.healthPath),
         // Expected response content of the health check ("" = only the status counts).
@@ -101,7 +112,7 @@ export const formValues = data => {
  * command (a hidden one of another runtime must not run). The limits are sent only when the
  * administrator changed them: untouched, the application keeps following the server defaults.
  */
-const requestBody = (values, data, isAdmin, supportsBuild) => {
+const requestBody = (values, data, isAdmin, supportsBuild, openedRoot) => {
     const initial = formValues(data);
     const body = {
         enabled: Boolean(values.enabled),
@@ -142,6 +153,13 @@ const requestBody = (values, data, isAdmin, supportsBuild) => {
     if (typeof data.env === 'string') {
         body.env = values.env;
     }
+    // The document root (Plesk's setting): only when this user may change it, the field is shown (not
+    // for workers) and it differs from the value the form was opened with, so that a change made in
+    // Plesk meanwhile is never undone by saving other settings.
+    if (values.mode !== 'worker' && data.documentRootAllowed === true
+        && normalDocumentRoot(values.documentRoot) !== normalDocumentRoot(openedRoot)) {
+        body.documentRoot = values.documentRoot.trim();
+    }
     if (isAdmin) {
         LIMITS.forEach(key => {
             const raw = String(values[key]).trim();
@@ -160,7 +178,10 @@ const requestBody = (values, data, isAdmin, supportsBuild) => {
  * Validation errors of api/app/save appear under the fields.
  */
 const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
-    const [values, setValues] = useState(() => {
+    // The values the form was opened with (the page remounts the form after every save): the save
+    // compares against them to send the document root only when it was changed, and only it when
+    // nothing else changed.
+    const [opened] = useState(() => {
         const initial = formValues(data);
         // e.g. PHP with the built-in server: its default command cannot use a Unix socket.
         if (initial.listen === 'unix' && !unixSupported(data.defaults, initial.runtime, initial.toolchain)) {
@@ -168,6 +189,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
         }
         return initial;
     });
+    const [values, setValues] = useState(opened);
     const [advanced, setAdvanced] = useState(false);
     // Visible result of the last click on "Use the default commands" ({ applied }, null: none);
     // every click sets a new object, which restarts the timer that hides it.
@@ -189,13 +211,35 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     // Default commands of the chosen runtime, listen mode and toolchain (null: none known).
     const commandDefaults = runtimeDefaults(defaults, values.runtime, values.listen, values.toolchain);
     const fieldErrors = error && error.fieldErrors ? error.fieldErrors : null;
+    // The domain's document root (Plesk's setting): editable when this user may change the hosting
+    // settings of the domain. The typed value replaces the current one in the warnings below only
+    // while the save would send it (requestBody: not for workers, with the permission, changed).
+    const documentRootAllowed = data.documentRootAllowed === true;
+    const documentRoot = currentDocumentRoot(data);
+    const typedValue = normalDocumentRoot(values.documentRoot);
+    const rootSent = !worker && documentRootAllowed && typedValue !== normalDocumentRoot(opened.documentRoot);
+    const typedRoot = rootSent ? typedValue : documentRoot;
+    const rootChanged = typedRoot !== documentRoot;
+    const plannedRoots = (Array.isArray(data.documentRoots) ? data.documentRoots : [])
+        .map(root => (isObject(root) && root.own && typedRoot ? { ...root, path: typedRoot } : root));
     // A warning (never an error: saving stays possible) while the application root lies in a
     // document root: what is typed compared as text, the stored root also with symbolic links
-    // resolved (api/app appRootDocumentRoot).
-    const exposed = documentRootOf(values.appRoot, data.documentRoots)
+    // resolved (api/app appRootDocumentRoot, unless it names this domain's root, which changes).
+    const exposed = documentRootOf(values.appRoot, plannedRoots)
         || (isObject(data.appRootDocumentRoot) && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
+            && !(data.appRootDocumentRoot.own && rootChanged)
             ? data.appRootDocumentRoot : null);
-    const documentRoot = isObject(data.domain) && typeof data.domain.documentRoot === 'string' ? data.domain.documentRoot : '';
+    // Suggested document root: the first candidate directory (wwwroot, dist, public, ...) of the
+    // runtime that the inspection found in the stored application root (api/app documentRootSuggestions).
+    const suggestions = isObject(data.documentRootSuggestions) && Array.isArray(data.documentRootSuggestions[values.runtime])
+        ? data.documentRootSuggestions[values.runtime] : [];
+    const suggestion = documentRootAllowed && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
+        && typeof suggestions[0] === 'string' && suggestions[0] !== typedValue ? suggestions[0] : null;
+    // A document root inside the application root: files that a build creates there (umask 027)
+    // are not readable for the web server; the hint names the command that makes them readable.
+    const appRootPath = normalRoot(values.appRoot);
+    const rootInApp = supportsBuild && appRootPath && typedRoot.indexOf(`${appRootPath}/`) === 0
+        ? typedRoot.slice(appRootPath.length + 1) : '';
     // The expected response content and the health watch need a health check path: disabled
     // without one, unless they are set (so they can still be cleared or turned off). Any character
     // keeps the content field open: the server trims fewer characters than String.trim() does.
@@ -223,7 +267,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const visible = ['enabled', 'runtime', 'appRoot', 'mode', 'startCmd', 'env', 'autoDeploy']
         .concat(supportsBuild ? ['buildCmd'] : [])
         .concat(kind !== 'none' ? ['toolchain'] : [])
-        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch', 'zeroDowntime'])
+        .concat(worker ? [] : ['listen', 'documentRoot', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch', 'zeroDowntime'])
         .concat(!worker && values.healthWatch ? ['healthWatchInterval', 'healthWatchFailures'] : [])
         .concat(!worker && values.zeroDowntime ? ['readyTimeout', 'drainSeconds'] : [])
         .concat(values.mode === 'path' ? ['mountPath'] : [])
@@ -231,6 +275,23 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const otherErrors = fieldErrors
         ? Object.keys(fieldErrors).filter(key => visible.indexOf(key) === -1).map(key => [].concat(fieldErrors[key]).join(' '))
         : [];
+
+    // A configured application whose only change is the document root gets the body {documentRoot}:
+    // the server then changes the document root and leaves the application alone (no build, no
+    // restart, a stopped application stays stopped; docs/DESIGN.md section 6).
+    const onSubmit = () => {
+        const body = requestBody(values, data, isAdmin, supportsBuild, opened.documentRoot);
+        if (data.configured === true && Object.prototype.hasOwnProperty.call(body, 'documentRoot')) {
+            const rest = { ...body };
+            delete rest.documentRoot;
+            const before = requestBody(opened, data, isAdmin, supportsBuild, opened.documentRoot);
+            if (JSON.stringify(rest) === JSON.stringify(before)) {
+                onSave({ documentRoot: body.documentRoot });
+                return;
+            }
+        }
+        onSave(body);
+    };
 
     const onFieldChange = (name, value) => {
         const defaultsChange = DEFAULTS_INPUTS.indexOf(name) !== -1;
@@ -319,7 +380,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                 errors={formErrors(error)}
                 state={saving ? 'submit' : undefined}
                 onFieldChange={onFieldChange}
-                onSubmit={() => onSave(requestBody(values, data, isAdmin, supportsBuild))}
+                onSubmit={onSubmit}
                 submitButton={{ children: <Translate content="Domain.form.save" /> }}
                 applyButton={false}
                 cancelButton={false}
@@ -460,6 +521,52 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                     />
                     {!worker && (
                         <FormFieldText
+                            name="documentRoot"
+                            label={<Translate content="Domain.form.documentRoot" />}
+                            description={(
+                                <span>
+                                    <Translate content="Domain.form.documentRootHint" />
+                                    {' '}
+                                    <Translate
+                                        content="Domain.form.documentRootExample"
+                                        params={{
+                                            appRoot: isolate('apps/example.com'),
+                                            documentRoot: isolate('apps/example.com/wwwroot'),
+                                            prefix: isolate('/media'),
+                                            folder: isolate('apps/example.com/wwwroot/media'),
+                                        }}
+                                    />
+                                    {!documentRootAllowed ? <span>{' '}<Translate content="Domain.form.documentRootReadOnly" /></span> : null}
+                                    {rootInApp ? (
+                                        <span>
+                                            {' '}
+                                            <Translate content="Domain.form.documentRootBuildChmod" params={{ command: isolate(`chmod -R o+rX ${rootInApp}`) }} />
+                                        </span>
+                                    ) : null}
+                                    {values.mode === 'path' ? (
+                                        <span style={{ display: 'block', marginTop: '4px' }}>
+                                            <Text intent="warning"><Translate content="Domain.form.documentRootPathMode" /></Text>
+                                        </span>
+                                    ) : null}
+                                    {suggestion ? (
+                                        <span style={{ display: 'block', marginTop: '4px' }}>
+                                            <Translate content="Domain.form.documentRootSuggestion" params={{ path: isolate(suggestion) }} />
+                                            {' '}
+                                            <Button ghost onClick={() => onFieldChange('documentRoot', suggestion)}>
+                                                <Translate content="Domain.form.documentRootUseSuggestion" />
+                                            </Button>
+                                        </span>
+                                    ) : null}
+                                </span>
+                            )}
+                            size="xl"
+                            disabled={!documentRootAllowed}
+                            placeholder="httpdocs"
+                            inputProps={codeInput}
+                        />
+                    )}
+                    {!worker && (
+                        <FormFieldText
                             name="staticPaths"
                             label={<Translate content="Domain.form.staticPaths" />}
                             description={(
@@ -470,12 +577,6 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                                         content="Domain.form.staticPathsExample"
                                         params={{ prefix: isolate('/assets'), url: isolate('/assets/app.css'), file: isolate('assets/app.css') }}
                                     />
-                                    {documentRoot ? (
-                                        <span>
-                                            {' '}
-                                            <Translate content="Domain.form.staticPathsDocroot" params={{ path: isolate(documentRoot) }} />
-                                        </span>
-                                    ) : null}
                                 </span>
                             )}
                             multiline

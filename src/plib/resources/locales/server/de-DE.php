@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Der erwartete Antwortinhalt darf höchstens %%max%% Zeichen lang sein und keine Zeilenumbrüche oder Steuerzeichen enthalten.',
     'errorHealthMatchJson' => 'Der erwartete Antwortinhalt beginnt mit {, ist aber kein gültiges JSON-Objekt.',
     'errorHealthMatchPath' => 'Der erwartete Antwortinhalt benötigt einen Health-Check-Pfad: Geben Sie einen ein oder leeren Sie den Inhalt.',
+    'errorDocumentRoot' => 'Der Dokumentstamm muss ein Ordner innerhalb des Abonnements sein (Buchstaben, Ziffern und . _ - @ + /, höchstens %%max%% Zeichen), ohne „.“- oder „..“-Segmente und ohne einen Ordnernamen, der mit „-“ beginnt.',
+    'errorDocumentRootOutside' => '%%path%% führt über einen symbolischen Link aus dem Abonnement hinaus und kann nicht der Dokumentstamm sein.',
+    'errorDocumentRootNotDir' => '%%path%% existiert, ist aber kein Ordner.',
+    'errorDocumentRootDenied' => 'Zum Ändern des Dokumentstamms ist die Berechtigung erforderlich, die Hosting-Einstellungen dieser Domain in Plesk zu verwalten.',
+    'errorDocumentRootChange' => 'Plesk hat den Dokumentstamm nicht geändert: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Speicherlimit (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Die Einstellungen wurden gespeichert. Die neue Version startet neben der laufenden und übernimmt, sobald sie bereit ist; verfolgen Sie den Vorgang im Protokoll „Build & Bereitstellung“.',
     'messageSwitchStarted' => 'Die neue Version startet neben der laufenden und übernimmt, sobald sie bereit ist. Verfolgen Sie den Vorgang im Protokoll „Build & Bereitstellung“.',
     'messageAction_restartPlain' => 'Die Anwendung wird direkt neu gestartet.',
+    'messageDocumentRootChanged' => 'Der Dokumentstamm ist jetzt %%path%%.',
+    'messageDocumentRootUnchanged' => 'Der Dokumentstamm bleibt %%path%%.',
+    'messageDocumentRootBlocked' => 'Der Webserver kann diese Ordner auf dem Weg nicht durchlaufen und die Dateien daher nicht ausliefern: %%paths%%. Erlauben Sie es mit chmod o+x auf diesen Ordnern.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listet die konfigurierten Anwendungen und ihren Status auf.',

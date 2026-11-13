@@ -10,6 +10,13 @@ class Modules_Runway_Access
     const PERMISSION = 'manage_runway_apps';
 
     /**
+     * Plesk's own permission "Hosting settings management" of a subscription: the document root is
+     * one of the hosting settings (docs/DESIGN.md section 6). pm_Client::hasPermission() only knows
+     * the permissions of the extension; Plesk's own ones are checked with hasCorePermission().
+     */
+    const HOSTING_PERMISSION = 'manage_phosting';
+
+    /**
      * @return bool
      */
     public static function isAdmin()
@@ -46,6 +53,34 @@ class Modules_Runway_Access
             return (bool)$client->hasPermission(self::PERMISSION, $domain);
         } catch (Exception $e) {
             Modules_Runway_Log::debug('Permission check failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Whether the current user may change the document root of the domain through Runway:
+     * administrators always; customers and resellers (who go through the same checks as for
+     * canManage()) only with Runway's permission and Plesk's own permission to manage the hosting
+     * settings of that domain, so that Runway, which changes the setting with administrator rights
+     * (pm_ApiCli), never lets anybody do what Plesk would not let them do. Plesk versions without
+     * pm_Client::hasCorePermission() leave the document root to administrators.
+     *
+     * @param pm_Domain $domain
+     * @return bool
+     */
+    public static function canChangeDocumentRoot(pm_Domain $domain)
+    {
+        $client = pm_Session::getClient();
+        if ($client->isAdmin()) {
+            return true;
+        }
+        if (!self::canManage($domain) || !method_exists($client, 'hasCorePermission')) {
+            return false;
+        }
+        try {
+            return (bool)$client->hasCorePermission(self::HOSTING_PERMISSION, $domain);
+        } catch (Exception $e) {
+            Modules_Runway_Log::debug('Hosting permission check failed: ' . $e->getMessage());
             return false;
         }
     }

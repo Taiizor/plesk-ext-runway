@@ -51,12 +51,35 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   `api/app` config field `healthMatch`, helper state `health_match`, `plesk ext runway --status`
   shows it on the *Health* line.
 - The domain page warns, without blocking the save, while the application root is a document root
-  of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one, and names the
-  domain's document root at the static paths; `api/app` adds `domain.documentRoot`,
+  of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one; `api/app` adds
+  `domain.documentRoot`,
   `documentRoots`, `appRootDocumentRoot` and `defaultAppRoot`. The stored application root also
   counts when a symbolic link puts it into a document root (`app-inspect` and `app-page` take
   `document_roots` and answer `document_root`, resolved as the system user).
   `plesk ext runway --status` prints the same warning.
+- The domain's document root on the Runway page (*Advanced*, right above the static paths, for
+  every runtime, hidden for workers): the folder the web server serves the static paths from (and
+  in path mode the rest of the site), so the application root can stay outside it, e.g. the
+  application root `apps/example.com`, the document root `apps/example.com/wwwroot` and the
+  static path `/media`. It is Plesk's setting, never stored by Runway: the form shows Plesk's
+  current value and a change goes through `plesk bin site --update <domain> -www-root` (Plesk's own
+  checks; Plesk creates a missing folder and regenerates the web server configuration). Runway
+  validates the path first (relative, no `.`/`..` segment or segment starting with `-`, at most 255
+  characters, inside the home directory with symbolic links resolved by the helper as the system
+  user: new helper command `docroot-check`) and afterwards lets the web server pass the directories
+  on the way (`o+x` where needed, as the system user: `docroot-access`). Customers need Plesk's
+  *Hosting settings management* permission in addition to Runway's; without it the field is
+  read-only. The form suggests the usual folder of the runtime (`wwwroot`, `dist`, `public`, ...)
+  when it exists (inspection field `public_dirs`) and warns in path mode and when the application
+  root lies in the chosen document root. `api/app` adds `documentRootAllowed` and
+  `documentRootSuggestions`, `api/app/save` accepts `documentRoot` (changed before the settings are
+  saved; a request with only `documentRoot` does not restart the application). The page sends the
+  document root only when the field was changed (a change made in Plesk meanwhile is never undone)
+  and, when nothing else changed, only it: no build, no restart. A full path inside the home
+  directory is taken relative to it; folders on the way that the web server cannot pass are named
+  in the save message,
+  `plesk ext runway --status` prints a *Document root* line. Removing an application never changes
+  the document root. README section *Static files and the document root*.
 
 ### Changed
 

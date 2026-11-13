@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'The expected response content must be at most %%max%% characters long and must not contain line breaks or control characters.',
     'errorHealthMatchJson' => 'The expected response content starts with { but is not a valid JSON object.',
     'errorHealthMatchPath' => 'The expected response content needs a health check path: enter one, or clear the content.',
+    'errorDocumentRoot' => 'The document root must be a folder inside the subscription (letters, digits and . _ - @ + /, at most %%max%% characters), without "." or ".." segments and without a folder name that starts with "-".',
+    'errorDocumentRootOutside' => '%%path%% leads outside the subscription through a symbolic link and cannot be the document root.',
+    'errorDocumentRootNotDir' => '%%path%% exists but is not a folder.',
+    'errorDocumentRootDenied' => 'Changing the document root needs the permission to manage the hosting settings of this domain in Plesk.',
+    'errorDocumentRootChange' => 'Plesk did not change the document root: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memory limit (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'The settings were saved. The new version starts next to the running one and takes over when it is ready; follow it in the "Build & deploy" log.',
     'messageSwitchStarted' => 'The new version starts next to the running one and takes over when it is ready. Follow it in the "Build & deploy" log.',
     'messageAction_restartPlain' => 'The application is restarting in place.',
+    'messageDocumentRootChanged' => 'The document root is now %%path%%.',
+    'messageDocumentRootUnchanged' => 'The document root stays %%path%%.',
+    'messageDocumentRootBlocked' => 'The web server cannot pass these folders on the way, so it cannot serve the files: %%paths%%. Allow it with chmod o+x on them.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'List the configured applications and their state.',

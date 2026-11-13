@@ -8,6 +8,10 @@
 #
 # The permission is granted for the checks and restored to its previous value at the end. The
 # application of DOMAIN is only read and restarted (app/control restart), never reconfigured.
+# The document root (Plesk's setting) needs Plesk's own "Hosting settings management" permission
+# (manage_phosting) as well: checked without it and, granted for the check, with it; both the
+# permission and the document root are restored (cleanup restores the document root through
+# Plesk's CLI whenever the run stops in between).
 # Environment: CONTAINER (runway-plesk), PANEL (http://localhost:18880), CUSTOMER (cust1),
 # DOMAIN (gotest.local), SITE_ID (1), PYTHON.
 set -u
@@ -17,6 +21,7 @@ CUSTOMER=${CUSTOMER:-cust1}
 DOMAIN=${DOMAIN:-gotest.local}
 SITE_ID=${SITE_ID:-1}
 PERMISSION=ext_permission_runway_manage_runway_apps
+HOSTING_PERMISSION=manage_phosting
 PY=${PYTHON:-}
 if [ -z "$PY" ]; then
     for candidate in python3 python; do
@@ -45,9 +50,22 @@ check() {
     if [ "$(echo "$3" | jexpr "$2")" = "True" ]; then ok "$1"; else bad "$1: $(echo "$3" | head -c 300)"; fi
 }
 permission() { dock exec "$CONTAINER" plesk bin subscription_settings --update "$DOMAIN" -$PERMISSION "$1" >/dev/null; }
+hosting() { dock exec "$CONTAINER" plesk bin subscription_settings --update "$DOMAIN" -$HOSTING_PERMISSION "$1" >/dev/null; }
+# docroot_info DOMAIN: the document root that Plesk stores for a domain (absolute path).
+docroot_info() { dock exec "$CONTAINER" plesk bin site --info "$1" 2>/dev/null | sed -n 's/^--WWW-Root--: *//p' | tr -d '\r'; }
 
 BEFORE=$(dock exec "$CONTAINER" plesk bin subscription_settings --info "$DOMAIN" | awk -v p="$PERMISSION" '$1 == p {print $2}' | tr -d '\r')
+HOSTING_BEFORE=$(dock exec "$CONTAINER" plesk bin subscription_settings --info "$DOMAIN" | awk -v p="$HOSTING_PERMISSION" '$1 == p {print $2}' | tr -d '\r')
+# The document root before the customer changed it: set before the change, cleared after a verified restore.
+DR_BEFORE=""
+DR_HOME=""
 cleanup() {
+    if [ -n "$DR_BEFORE" ]; then
+        dock exec "$CONTAINER" plesk bin site --update "$DOMAIN" -www-root "/$DR_BEFORE" >/dev/null 2>&1 \
+            || echo "cleanup: the document root of $DOMAIN could not be restored to $DR_BEFORE"
+    fi
+    [ -n "$DR_HOME" ] && dock exec "$CONTAINER" rm -rf "$DR_HOME/apps/$DOMAIN/runway-customer-docroot"
+    [ -n "$HOSTING_BEFORE" ] && hosting "$HOSTING_BEFORE"
     [ -n "$BEFORE" ] && permission "$BEFORE"
     rm -rf "$WORK"
 }
@@ -110,6 +128,41 @@ check "a customer cannot turn zero-downtime deployments on (field error)" "d['st
 check "customer cannot change admin-only limits" \
     "d['status'] == 'success' and d['data']['limits'] == $(echo "$APP" | jexpr "json.dumps(d['data']['limits'])")" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"memoryMb\": 1, \"cpuPercent\": 1, \"tasks\": 1}")"
+
+echo "== document root (Plesk's permission \"Hosting settings management\")"
+hosting false
+APP=$(get "app?site_id=$SITE_ID")
+DR_CURRENT=$(echo "$APP" | jexpr "d['data']['domain']['documentRoot']")
+DR_HOME=$(echo "$APP" | jexpr "d['data']['domain']['home']")
+# Restored by cleanup from here on: the refused attempts below must not leave a changed document
+# root behind either, should a regression let one through (writing the same value is harmless).
+DR_BEFORE=$DR_CURRENT
+check "app: without the hosting settings permission the document root is read-only" \
+    "d['status'] == 'success' and d['data']['documentRootAllowed'] is False and d['data']['domain']['documentRoot'] == 'httpdocs'" "$APP"
+check "app/save: a customer without the hosting settings permission cannot change the document root (field error)" \
+    "d['status'] == 'error' and list(d['errors']) == ['documentRoot'] and 'hosting settings' in d['errors']['documentRoot'][0]" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"apps/$DOMAIN/runway-customer-docroot\"}")"
+check "app/save: the unchanged document root is not a change (accepted without the permission)" \
+    "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_CURRENT' and d['data']['documentRootChanged'] is False" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_CURRENT\"}")"
+check "app/save with a document root for an unknown domain is refused" "d['status'] == 'error'" \
+    "$(post app/save "{\"site_id\": 999999, \"documentRoot\": \"httpdocs\"}")"
+[ "$(docroot_info "$DOMAIN")" = "$DR_HOME/$DR_CURRENT" ] && ok "the document root is unchanged" || bad "document root: $(docroot_info "$DOMAIN")"
+hosting true
+check "app: with the hosting settings permission the document root is editable" "d['data']['documentRootAllowed'] is True" "$(get "app?site_id=$SITE_ID")"
+out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"apps/$DOMAIN/runway-customer-docroot\"}")
+check "app/save: with the permission the customer changes the document root (the application is left alone)" \
+    "d['status'] == 'success' and d['data']['documentRoot'] == 'apps/$DOMAIN/runway-customer-docroot' and d['data']['documentRootChanged'] is True and d['data']['job'] is None" "$out"
+[ "$(docroot_info "$DOMAIN")" = "$DR_HOME/apps/$DOMAIN/runway-customer-docroot" ] && ok "Plesk stores the customer's document root" || bad "document root: $(docroot_info "$DOMAIN")"
+out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_BEFORE\"}")
+if [ "$(echo "$out" | jexpr "d['status'] == 'success'")" = "True" ] && [ "$(docroot_info "$DOMAIN")" = "$DR_HOME/$DR_BEFORE" ]; then
+    ok "document root restored by the customer ($DR_BEFORE)"
+    DR_BEFORE=""
+else
+    bad "restoring the document root: $out"
+fi
+dock exec "$CONTAINER" rm -rf "$DR_HOME/apps/$DOMAIN/runway-customer-docroot"
+hosting "${HOSTING_BEFORE:-false}"
 
 echo "== permission revoked"
 permission false

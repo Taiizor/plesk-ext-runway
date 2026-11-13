@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Conținutul așteptat al răspunsului poate avea cel mult %%max%% de caractere și nu poate conține sfârșituri de linie sau caractere de control.',
     'errorHealthMatchJson' => 'Conținutul așteptat al răspunsului începe cu { dar nu este un obiect JSON valid.',
     'errorHealthMatchPath' => 'Conținutul așteptat al răspunsului necesită o cale de verificare a stării: introduceți una sau goliți conținutul.',
+    'errorDocumentRoot' => 'Rădăcina documentelor trebuie să fie un folder din interiorul abonamentului (litere, cifre și . _ - @ + /, cel mult %%max%% caractere), fără segmente „.” sau „..” și fără nume de folder care încep cu „-”.',
+    'errorDocumentRootOutside' => '%%path%% duce în afara abonamentului printr-o legătură simbolică și nu poate fi rădăcina documentelor.',
+    'errorDocumentRootNotDir' => '%%path%% există, dar nu este un folder.',
+    'errorDocumentRootDenied' => 'Modificarea rădăcinii documentelor necesită permisiunea de a gestiona setările de găzduire ale acestui domeniu în Plesk.',
+    'errorDocumentRootChange' => 'Plesk nu a modificat rădăcina documentelor: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limita de memorie (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Setările au fost salvate. Noua versiune pornește alături de cea care rulează și preia traficul când este pregătită; urmăriți-o în jurnalul „Compilare și implementare”.',
     'messageSwitchStarted' => 'Noua versiune pornește alături de cea care rulează și preia traficul când este pregătită. Urmăriți-o în jurnalul „Compilare și implementare”.',
     'messageAction_restartPlain' => 'Aplicația repornește pe loc.',
+    'messageDocumentRootChanged' => 'Rădăcina documentelor este acum %%path%%.',
+    'messageDocumentRootUnchanged' => 'Rădăcina documentelor rămâne %%path%%.',
+    'messageDocumentRootBlocked' => 'Serverul web nu poate traversa aceste foldere de pe traseu, așa că nu poate servi fișierele: %%paths%%. Permiteți-i acest lucru cu chmod o+x pe ele.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Listează aplicațiile configurate și starea lor.',

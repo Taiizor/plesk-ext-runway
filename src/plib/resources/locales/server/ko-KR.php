@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => '예상 응답 내용은 최대 %%max%%자여야 하며 줄 바꿈이나 제어 문자를 포함할 수 없습니다.',
     'errorHealthMatchJson' => '예상 응답 내용이 {로 시작하지만 유효한 JSON 객체가 아닙니다.',
     'errorHealthMatchPath' => '예상 응답 내용에는 헬스 체크 경로가 필요합니다. 경로를 입력하거나 내용을 지우십시오.',
+    'errorDocumentRoot' => '문서 루트는 구독 내부의 폴더여야 하며(문자, 숫자 및 . _ - @ + /, 최대 %%max%%자), "." 또는 ".." 세그먼트와 "-"로 시작하는 폴더 이름을 포함할 수 없습니다.',
+    'errorDocumentRootOutside' => '%%path%%은(는) 심볼릭 링크를 통해 구독 외부로 연결되므로 문서 루트가 될 수 없습니다.',
+    'errorDocumentRootNotDir' => '%%path%%이(가) 존재하지만 폴더가 아닙니다.',
+    'errorDocumentRootDenied' => '문서 루트를 변경하려면 Plesk에서 이 도메인의 호스팅 설정을 관리할 권한이 필요합니다.',
+    'errorDocumentRootChange' => 'Plesk가 문서 루트를 변경하지 않았습니다: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => '메모리 제한(MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => '설정이 저장되었습니다. 새 버전이 실행 중인 버전과 나란히 시작되고 준비되면 트래픽을 넘겨받습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
     'messageSwitchStarted' => '새 버전이 실행 중인 버전과 나란히 시작되며 준비되면 트래픽을 넘겨받습니다. "빌드 및 배포" 로그에서 진행 상황을 확인하십시오.',
     'messageAction_restartPlain' => '애플리케이션을 제자리에서 재시작하는 중입니다.',
+    'messageDocumentRootChanged' => '이제 문서 루트는 %%path%%입니다.',
+    'messageDocumentRootUnchanged' => '문서 루트는 %%path%%(으)로 유지됩니다.',
+    'messageDocumentRootBlocked' => '웹 서버가 경로상의 다음 폴더를 통과할 수 없어 파일을 제공할 수 없습니다: %%paths%%. 이 폴더에 chmod o+x를 실행하여 허용하십시오.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '구성된 애플리케이션과 그 상태를 나열합니다.',

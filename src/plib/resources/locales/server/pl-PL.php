@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Oczekiwana treść odpowiedzi może mieć maksymalnie %%max%% znaków i nie może zawierać znaków nowego wiersza ani znaków sterujących.',
     'errorHealthMatchJson' => 'Oczekiwana treść odpowiedzi zaczyna się od {, ale nie jest prawidłowym obiektem JSON.',
     'errorHealthMatchPath' => 'Oczekiwana treść odpowiedzi wymaga ścieżki kontroli stanu: wprowadź ją lub wyczyść treść.',
+    'errorDocumentRoot' => 'Katalog główny dokumentów musi być folderem wewnątrz subskrypcji (litery, cyfry oraz . _ - @ + /, maks. %%max%% znaków), bez segmentów „.” ani „..” i bez nazw folderów zaczynających się od „-”.',
+    'errorDocumentRootOutside' => 'Ścieżka %%path%% prowadzi poza subskrypcję przez dowiązanie symboliczne i nie może być katalogiem głównym dokumentów.',
+    'errorDocumentRootNotDir' => 'Ścieżka %%path%% istnieje, ale nie jest folderem.',
+    'errorDocumentRootDenied' => 'Zmiana katalogu głównego dokumentów wymaga uprawnienia do zarządzania ustawieniami hostingu tej domeny w Plesk.',
+    'errorDocumentRootChange' => 'Plesk nie zmienił katalogu głównego dokumentów: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit pamięci (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Ustawienia zostały zapisane. Nowa wersja uruchamia się obok działającej i przejmie ruch, gdy będzie gotowa; śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
     'messageSwitchStarted' => 'Nowa wersja uruchamia się obok działającej i przejmie ruch, gdy będzie gotowa. Śledź postęp w dzienniku „Kompilacja i wdrożenie”.',
     'messageAction_restartPlain' => 'Aplikacja jest ponownie uruchamiana w miejscu.',
+    'messageDocumentRootChanged' => 'Katalog główny dokumentów to teraz %%path%%.',
+    'messageDocumentRootUnchanged' => 'Katalog główny dokumentów pozostaje bez zmian: %%path%%.',
+    'messageDocumentRootBlocked' => 'Serwer WWW nie może przejść przez te foldery na ścieżce, więc nie może obsłużyć plików: %%paths%%. Zezwól na to poleceniem chmod o+x wykonanym na tych folderach.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Wyświetla skonfigurowane aplikacje i ich stan.',

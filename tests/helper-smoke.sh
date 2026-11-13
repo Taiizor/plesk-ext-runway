@@ -591,6 +591,49 @@ inspect_root() { # inspect_root APP_ROOT DOCUMENT_ROOTS_JSON: document_root of a
     && ok "app-page names the document root as well" || bad "app-page document_root"
 rm -rf "$HOME_DIR/apps/smoke-docroot" "$HOME_DIR/apps/smoke-link" "$HOME_DIR/apps/smoke-current"
 
+echo "== candidate document roots of the inspection (public_dirs: real directories only, order per runtime)"
+# Real directories public and wwwroot; "dist" is a link (never counts), "web" a file.
+runuser -u "$USER_NAME" -- bash -c "mkdir -p '$HOME_DIR/apps/smoke-pub/'{public,wwwroot} && ln -sfn public '$HOME_DIR/apps/smoke-pub/dist' && touch '$HOME_DIR/apps/smoke-pub/web'"
+PD=$(call app-inspect "{\"sysuser\": \"$USER_NAME\", \"app_root\": \"apps/smoke-pub\"}" | jexpr "d['public_dirs']")
+[ "$(echo "$PD" | python3 -c "import ast,sys; d = ast.literal_eval(sys.stdin.read()); print((d['dotnet'], d['bun'], d['php'], d['ruby'], d['python'], d['go'], d['binary']))")" \
+    = "(['wwwroot'], ['public'], ['public'], ['public'], ['public'], ['public', 'wwwroot'], ['public', 'wwwroot'])" ] \
+    && ok "public_dirs: wwwroot (.NET), public (Bun: dist is a link), public (PHP: web is a file), public (Ruby, Python), public, wwwroot (others)" \
+    || bad "public_dirs: $PD"
+[ "$(call app-inspect "{\"sysuser\": \"$USER_NAME\", \"app_root\": \"apps/smoke-pub-missing\"}" | jexpr "d['exists'] is False and all(v == [] for v in d['public_dirs'].values()) and len(d['public_dirs']) == 9")" = "True" ] \
+    && ok "public_dirs of a missing application root: empty for every runtime" || bad "public_dirs of a missing application root"
+[ "$(call app-page "{\"domain_id\": $ID, \"sysuser\": \"$USER_NAME\", \"app_root\": \"apps/smoke-pub\", \"runtime\": \"dotnet\"}" | jexpr "d['inspect']['public_dirs']['dotnet']")" = "['wwwroot']" ] \
+    && ok "app-page reports public_dirs as well" || bad "app-page public_dirs"
+
+echo "== document root checks (docroot-check, docroot-access)"
+runuser -u "$USER_NAME" -- bash -c "umask 027; mkdir -p '$HOME_DIR/apps/smoke-pub/wwwroot/media' && ln -sfn /etc '$HOME_DIR/apps/smoke-out' && ln -sfn smoke-pub/wwwroot '$HOME_DIR/apps/smoke-in' && ln -sfn .. '$HOME_DIR/apps/smoke-up' && echo x > '$HOME_DIR/apps/smoke-pub/file.txt'"
+dr() { call docroot-check "{\"sysuser\": \"$USER_NAME\", \"document_root\": \"$1\"}"; }
+[ "$(dr apps/smoke-pub/wwwroot | jexpr "(d['ok'], d['exists'], d['real'])")" = "(True, True, 'apps/smoke-pub/wwwroot')" ] && ok "docroot-check: an existing directory" || bad "docroot-check existing: $(dr apps/smoke-pub/wwwroot)"
+[ "$(dr apps/smoke-pub/new/www | jexpr "(d['ok'], d['exists'])")" = "(True, False)" ] && ok "docroot-check: a missing directory is fine (Plesk creates it)" || bad "docroot-check missing: $(dr apps/smoke-pub/new/www)"
+[ "$(dr apps/smoke-in | jexpr "(d['ok'], d['real'])")" = "(True, 'apps/smoke-pub/wwwroot')" ] && ok "docroot-check: a link inside the home directory" || bad "docroot-check link inside: $(dr apps/smoke-in)"
+[ "$(dr apps/smoke-out | jexpr "(d['ok'], d.get('code'))")" = "(False, 'docroot_outside')" ] && ok "docroot-check: a link that leads outside the home directory is refused" || bad "docroot-check link outside: $(dr apps/smoke-out)"
+[ "$(dr apps/smoke-out/new | jexpr "(d['ok'], d.get('code'))")" = "(False, 'docroot_outside')" ] && ok "docroot-check: a missing directory below a link outside is refused" || bad "docroot-check below a link outside: $(dr apps/smoke-out/new)"
+[ "$(dr apps/smoke-up | jexpr "(d['ok'], d.get('code'))")" = "(False, 'docroot_outside')" ] && ok "docroot-check: a link to the home directory itself is refused" || bad "docroot-check home itself: $(dr apps/smoke-up)"
+[ "$(dr apps/smoke-pub/file.txt | jexpr "(d['ok'], d.get('code'))")" = "(False, 'docroot_not_dir')" ] && ok "docroot-check: a file is not a document root" || bad "docroot-check file: $(dr apps/smoke-pub/file.txt)"
+for bad_root in "../etc" "apps/-x" "apps/./x" "apps//x" "apps/a b"; do
+    [ "$(dr "$bad_root" | jexpr "d['ok']")" = "False" ] && ok "docroot-check refuses \"$bad_root\"" || bad "docroot-check accepted \"$bad_root\""
+done
+# docroot-access: o+x for the directories the web server group cannot pass (Runway's 0750 psacln
+# directories), nothing else; Plesk's own directories (group psaserv) stay as they are.
+# Directly below the home directory, so that the mode of apps (which depends on how the container
+# was prepared) plays no part.
+runuser -u "$USER_NAME" -- bash -c "umask 027; mkdir -p '$HOME_DIR/smoke-acc/app/wwwroot'"
+out=$(call docroot-access "{\"sysuser\": \"$USER_NAME\", \"document_root\": \"smoke-acc/app/wwwroot\"}")
+modes="$(stat -c %a "$HOME_DIR/smoke-acc") $(stat -c %a "$HOME_DIR/smoke-acc/app") $(stat -c %a "$HOME_DIR/smoke-acc/app/wwwroot")"
+[ "$modes" = "751 751 751" ] \
+    && [ "$(echo "$out" | jexpr "d['blocked'] == [] and d['changed'] == ['smoke-acc', 'smoke-acc/app', 'smoke-acc/app/wwwroot']")" = "True" ] \
+    && ok "docroot-access: o+x on the directories the web server cannot pass ($modes)" || bad "docroot-access: modes $modes, $out"
+chgrp psaserv "$HOME_DIR/smoke-acc/app/wwwroot" && chmod 750 "$HOME_DIR/smoke-acc/app/wwwroot"
+[ "$(call docroot-access "{\"sysuser\": \"$USER_NAME\", \"document_root\": \"smoke-acc/app/wwwroot\"}" | jexpr "d['changed']")" = "[]" ] \
+    && [ "$(stat -c %a "$HOME_DIR/smoke-acc/app/wwwroot")" = "750" ] && ok "docroot-access: a directory of the group psaserv (Plesk's) stays 0750" || bad "docroot-access psaserv: $(stat -c '%a %G' "$HOME_DIR/smoke-acc/app/wwwroot")"
+[ "$(call docroot-access "{\"sysuser\": \"$USER_NAME\", \"document_root\": \"apps/smoke-out\"}" | jexpr "(d['ok'], d.get('code'))")" = "(False, 'docroot_outside')" ] \
+    && [ "$(stat -c %a /etc)" = "755" ] && ok "docroot-access: never follows a link outside the home directory" || bad "docroot-access through a link outside"
+rm -rf "$HOME_DIR/apps/smoke-pub" "$HOME_DIR/smoke-acc" "$HOME_DIR/apps/smoke-out" "$HOME_DIR/apps/smoke-in" "$HOME_DIR/apps/smoke-up"
+
 echo "== adapter metadata (docs/DESIGN.md section 5.1)"
 [ "$(call runtimes '{}' | jexpr "sorted(r['key'] for r in d['runtimes']) == sorted(['go','rust','bun','java','dotnet','python','ruby','php','binary']) and all(set(['key','label','toolchain','version_re','hint','docs_url','default_listen','supports_build','install_help','detected_only']) <= set(r) for r in d['runtimes'])")" = "True" ] && ok "all runtimes with full metadata" || bad "runtime metadata"
 [ "$(call runtimes '{}' | jexpr "dict((r['key'], r['toolchain']) for r in d['runtimes']) == {'go':'managed','rust':'managed','bun':'managed','java':'managed','dotnet':'managed','python':'managed','ruby':'detected','php':'detected','binary':'none'}")" = "True" ] && ok "toolchain kinds" || bad "toolchain kinds"

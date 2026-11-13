@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'El contingut esperat de la resposta ha de tenir com a màxim %%max%% caràcters i no pot contenir salts de línia ni caràcters de control.',
     'errorHealthMatchJson' => 'El contingut esperat de la resposta comença amb { però no és un objecte JSON vàlid.',
     'errorHealthMatchPath' => 'El contingut esperat de la resposta necessita un camí de comprovació d\'estat: introduïu-ne un o esborreu el contingut.',
+    'errorDocumentRoot' => 'L\'arrel de documents ha de ser una carpeta dins de la subscripció (lletres, dígits i . _ - @ + /, com a màxim %%max%% caràcters), sense segments "." ni ".." i sense cap nom de carpeta que comenci per "-".',
+    'errorDocumentRootOutside' => '%%path%% porta fora de la subscripció a través d\'un enllaç simbòlic i no pot ser l\'arrel de documents.',
+    'errorDocumentRootNotDir' => '%%path%% existeix, però no és una carpeta.',
+    'errorDocumentRootDenied' => 'Per canviar l\'arrel de documents cal el permís per gestionar la configuració d\'allotjament d\'aquest domini a Plesk.',
+    'errorDocumentRootChange' => 'Plesk no ha canviat l\'arrel de documents: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límit de memòria (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'S\'ha desat la configuració. La versió nova s\'inicia al costat de la que s\'està executant i pren el relleu quan està a punt; seguiu-la al registre "Compilació i desplegament".',
     'messageSwitchStarted' => 'La versió nova s\'inicia al costat de la que s\'està executant i pren el relleu quan està a punt. Seguiu-la al registre "Compilació i desplegament".',
     'messageAction_restartPlain' => 'L\'aplicació s\'està reiniciant in situ.',
+    'messageDocumentRootChanged' => 'L\'arrel de documents ara és %%path%%.',
+    'messageDocumentRootUnchanged' => 'L\'arrel de documents continua sent %%path%%.',
+    'messageDocumentRootBlocked' => 'El servidor web no pot travessar aquestes carpetes del camí, així que no pot servir els fitxers: %%paths%%. Permeteu-ho amb chmod o+x en aquestes carpetes.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Llista les aplicacions configurades i el seu estat.',

@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Kandungan respons yang dijangka mestilah tidak melebihi %%max%% aksara dan tidak boleh mengandungi pemisah baris atau aksara kawalan.',
     'errorHealthMatchJson' => 'Kandungan respons yang dijangka bermula dengan { tetapi bukan objek JSON yang sah.',
     'errorHealthMatchPath' => 'Kandungan respons yang dijangka memerlukan laluan semakan kesihatan: masukkan satu laluan, atau kosongkan kandungan.',
+    'errorDocumentRoot' => 'Akar dokumen mestilah folder di dalam langganan (huruf, digit dan . _ - @ + /, maksimum %%max%% aksara), tanpa segmen "." atau ".." dan tanpa nama folder yang bermula dengan "-".',
+    'errorDocumentRootOutside' => '%%path%% menghala ke luar langganan melalui pautan simbolik dan tidak boleh menjadi akar dokumen.',
+    'errorDocumentRootNotDir' => '%%path%% wujud tetapi bukan folder.',
+    'errorDocumentRootDenied' => 'Mengubah akar dokumen memerlukan kebenaran untuk mengurus tetapan pengehosan domain ini dalam Plesk.',
+    'errorDocumentRootChange' => 'Plesk tidak mengubah akar dokumen: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Had memori (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Tetapan telah disimpan. Versi baharu dimulakan di sebelah versi yang sedang berjalan dan mengambil alih apabila ia sedia; pantau kemajuannya dalam log "Bina & sebar".',
     'messageSwitchStarted' => 'Versi baharu dimulakan di sebelah versi yang sedang berjalan dan mengambil alih apabila ia sedia. Pantau kemajuannya dalam log "Bina & sebar".',
     'messageAction_restartPlain' => 'Aplikasi sedang dimulakan semula di tempat.',
+    'messageDocumentRootChanged' => 'Akar dokumen kini %%path%%.',
+    'messageDocumentRootUnchanged' => 'Akar dokumen kekal %%path%%.',
+    'messageDocumentRootBlocked' => 'Pelayan web tidak dapat melalui folder berikut di sepanjang laluan, jadi ia tidak dapat melayan fail: %%paths%%. Benarkannya dengan chmod o+x pada folder tersebut.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Menyenaraikan aplikasi yang dikonfigurasi dan keadaannya.',

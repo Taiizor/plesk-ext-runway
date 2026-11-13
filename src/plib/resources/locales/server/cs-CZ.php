@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Očekávaný obsah odpovědi smí mít nejvýše %%max%% znaků a nesmí obsahovat zalomení řádků ani řídicí znaky.',
     'errorHealthMatchJson' => 'Očekávaný obsah odpovědi začíná znakem {, ale není platným objektem JSON.',
     'errorHealthMatchPath' => 'Očekávaný obsah odpovědi vyžaduje cestu kontroly stavu: zadejte ji, nebo obsah vymažte.',
+    'errorDocumentRoot' => 'Kořenový adresář dokumentů musí být složka uvnitř předplatného (písmena, číslice a . _ - @ + /, nejvýše %%max%% znaků) bez segmentů „.“ a „..“ a bez názvu složky začínajícího znakem „-“.',
+    'errorDocumentRootOutside' => 'Cesta %%path%% vede přes symbolický odkaz mimo předplatné a nemůže být kořenovým adresářem dokumentů.',
+    'errorDocumentRootNotDir' => 'Cesta %%path%% existuje, ale není to složka.',
+    'errorDocumentRootDenied' => 'Ke změně kořenového adresáře dokumentů je potřeba oprávnění spravovat v panelu Plesk nastavení hostingu této domény.',
+    'errorDocumentRootChange' => 'Plesk kořenový adresář dokumentů nezměnil: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit paměti (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Nastavení bylo uloženo. Nová verze se spustí vedle běžící verze a převezme provoz, jakmile bude připravena; průběh sledujte v protokolu „Sestavení a nasazení“.',
     'messageSwitchStarted' => 'Nová verze se spouští vedle běžící verze a převezme provoz, jakmile bude připravena. Průběh sledujte v protokolu „Sestavení a nasazení“.',
     'messageAction_restartPlain' => 'Aplikace se restartuje na místě.',
+    'messageDocumentRootChanged' => 'Kořenový adresář dokumentů je nyní %%path%%.',
+    'messageDocumentRootUnchanged' => 'Kořenový adresář dokumentů zůstává %%path%%.',
+    'messageDocumentRootBlocked' => 'Webový server nemůže projít těmito složkami na cestě, a proto nemůže soubory obsluhovat: %%paths%%. Povolte to příkazem chmod o+x na těchto složkách.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Vypíše nakonfigurované aplikace a jejich stav.',

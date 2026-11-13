@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'يجب ألا يتجاوز طول محتوى الاستجابة المتوقع %%max%% حرفًا، ويجب ألا يحتوي على فواصل أسطر أو أحرف تحكم.',
     'errorHealthMatchJson' => 'يبدأ محتوى الاستجابة المتوقع بالرمز { لكنه ليس كائن JSON صالحًا.',
     'errorHealthMatchPath' => 'يحتاج محتوى الاستجابة المتوقع إلى مسار لفحص السلامة: أدخل مسارًا أو امسح المحتوى.',
+    'errorDocumentRoot' => 'يجب أن يكون جذر المستندات مجلدًا داخل الاشتراك (أحرف وأرقام و . _ - @ + /، %%max%% حرف كحد أقصى)، بدون مقاطع "." أو ".." وبدون اسم مجلد يبدأ بـ "-".',
+    'errorDocumentRootOutside' => 'يؤدي %%path%% إلى خارج الاشتراك عبر ارتباط رمزي ولا يمكن أن يكون جذر المستندات.',
+    'errorDocumentRootNotDir' => '%%path%% موجود لكنه ليس مجلدًا.',
+    'errorDocumentRootDenied' => 'يتطلب تغيير جذر المستندات إذن إدارة إعدادات الاستضافة لهذا النطاق في Plesk.',
+    'errorDocumentRootChange' => 'لم يغيّر Plesk جذر المستندات: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'حد الذاكرة (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'تم حفظ الإعدادات. يبدأ الإصدار الجديد بجانب الإصدار الجاري ويتولى استقبال حركة المرور عندما يصبح جاهزًا؛ تابع ذلك في سجل "البناء والنشر".',
     'messageSwitchStarted' => 'يبدأ الإصدار الجديد بجانب الإصدار الجاري ويتولى استقبال حركة المرور عندما يصبح جاهزًا. تابع ذلك في سجل "البناء والنشر".',
     'messageAction_restartPlain' => 'جارٍ إعادة تشغيل التطبيق في مكانه.',
+    'messageDocumentRootChanged' => 'أصبح جذر المستندات الآن %%path%%.',
+    'messageDocumentRootUnchanged' => 'يبقى جذر المستندات %%path%%.',
+    'messageDocumentRootBlocked' => 'لا يستطيع خادم الويب المرور عبر هذه المجلدات الموجودة في الطريق، لذا لا يمكنه خدمة الملفات: %%paths%%. اسمح له بذلك باستخدام chmod o+x عليها.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'يسرد التطبيقات المكوّنة وحالتها.',

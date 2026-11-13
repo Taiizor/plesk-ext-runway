@@ -255,6 +255,17 @@ class Modules_Runway_Cli
         if ($config['staticPaths']) {
             $facts[] = ['Static paths', implode(' ', $config['staticPaths'])];
         }
+        // Plesk's setting (the web server serves the static paths from it), relative to the home directory.
+        $documentRoot = Modules_Runway_App::relativeDocumentRoot($domain);
+        if ($documentRoot === null) {
+            // Outside the home directory, or not readable (a domain without hosting): never fatal here.
+            try {
+                $documentRoot = (string)$domain->getDocumentRoot();
+            } catch (Exception $e) {
+                $documentRoot = 'unknown';
+            }
+        }
+        $facts[] = ['Document root', $documentRoot !== '' ? $documentRoot : 'unknown'];
         if (!empty($service['main_pid'])) {
             $facts[] = ['PID', (string)(int)$service['main_pid']];
         }

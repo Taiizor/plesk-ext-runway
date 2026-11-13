@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => '预期响应内容最多 %%max%% 个字符，且不能包含换行符或控制字符。',
     'errorHealthMatchJson' => '预期响应内容以 { 开头，但不是有效的 JSON 对象。',
     'errorHealthMatchPath' => '预期响应内容需要健康检查路径：请输入一个路径，或清空该内容。',
+    'errorDocumentRoot' => '文档根目录必须是订阅内的文件夹（字母、数字以及 . _ - @ + /，最多 %%max%% 个字符），且不能包含“.”或“..”路径段，也不能包含以“-”开头的文件夹名称。',
+    'errorDocumentRootOutside' => '%%path%% 通过符号链接指向订阅之外，不能作为文档根目录。',
+    'errorDocumentRootNotDir' => '%%path%% 已存在，但不是文件夹。',
+    'errorDocumentRootDenied' => '更改文档根目录需要在 Plesk 中管理此域名主机设置的权限。',
+    'errorDocumentRootChange' => 'Plesk 未更改文档根目录：%%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => '内存限制（MiB）',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => '设置已保存。新版本将与当前运行的版本并行启动，就绪后接管流量；请在“构建与部署”日志中查看进度。',
     'messageSwitchStarted' => '新版本正在与当前运行的版本并行启动，就绪后将接管流量。请在“构建与部署”日志中查看进度。',
     'messageAction_restartPlain' => '应用程序正在原地重新启动。',
+    'messageDocumentRootChanged' => '文档根目录现在为 %%path%%。',
+    'messageDocumentRootUnchanged' => '文档根目录仍为 %%path%%。',
+    'messageDocumentRootBlocked' => 'Web 服务器无法穿过路径上的这些文件夹，因此无法提供文件：%%paths%%。请对这些文件夹执行 chmod o+x 以允许访问。',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => '列出已配置的应用程序及其状态。',

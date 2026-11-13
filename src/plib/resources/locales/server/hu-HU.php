@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'A várt választartalom legfeljebb %%max%% karakter hosszú lehet, és nem tartalmazhat sortörést vagy vezérlőkaraktert.',
     'errorHealthMatchJson' => 'A várt választartalom { karakterrel kezdődik, de nem érvényes JSON-objektum.',
     'errorHealthMatchPath' => 'A várt választartalomhoz állapot-ellenőrzési útvonal szükséges: adjon meg egyet, vagy törölje a tartalmat.',
+    'errorDocumentRoot' => 'A dokumentumgyökérnek az előfizetésen belüli mappának kell lennie (betűk, számjegyek és . _ - @ + /, legfeljebb %%max%% karakter), „.” vagy „..” szegmensek nélkül, és egyik mappa neve sem kezdődhet „-” karakterrel.',
+    'errorDocumentRootOutside' => 'A(z) %%path%% szimbolikus linken keresztül az előfizetésen kívülre vezet, ezért nem lehet dokumentumgyökér.',
+    'errorDocumentRootNotDir' => 'A(z) %%path%% létezik, de nem mappa.',
+    'errorDocumentRootDenied' => 'A dokumentumgyökér módosításához a Pleskben a domain tárhelybeállításainak kezelésére vonatkozó jogosultság szükséges.',
+    'errorDocumentRootChange' => 'A Plesk nem módosította a dokumentumgyökeret: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memóriakorlát (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'A beállítások mentve. Az új verzió a futó mellett indul el, és amint készen áll, átveszi a forgalmat; az „Összeállítás és üzembe helyezés” naplóban követheti.',
     'messageSwitchStarted' => 'Az új verzió a futó mellett indul el, és amint készen áll, átveszi a forgalmat. Az „Összeállítás és üzembe helyezés” naplóban követheti.',
     'messageAction_restartPlain' => 'Az alkalmazás helyben újraindul.',
+    'messageDocumentRootChanged' => 'A dokumentumgyökér mostantól: %%path%%.',
+    'messageDocumentRootUnchanged' => 'A dokumentumgyökér változatlan marad: %%path%%.',
+    'messageDocumentRootBlocked' => 'A webkiszolgáló nem tud áthaladni az útvonalon lévő alábbi mappákon, ezért nem tudja kiszolgálni a fájlokat: %%paths%%. Engedélyezze ezt a chmod o+x paranccsal ezeken a mappákon.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'A beállított alkalmazások és állapotuk listázása.',

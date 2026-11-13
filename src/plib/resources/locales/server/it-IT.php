@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Il contenuto previsto della risposta deve avere al massimo %%max%% caratteri e non deve contenere interruzioni di riga o caratteri di controllo.',
     'errorHealthMatchJson' => 'Il contenuto previsto della risposta inizia con { ma non è un oggetto JSON valido.',
     'errorHealthMatchPath' => 'Il contenuto previsto della risposta richiede un percorso dell\'health check: inseriscine uno oppure cancella il contenuto.',
+    'errorDocumentRoot' => 'La root del documento deve essere una cartella all\'interno dell\'abbonamento (lettere, cifre e . _ - @ + /, al massimo %%max%% caratteri), senza segmenti "." o ".." e senza nomi di cartella che iniziano con "-".',
+    'errorDocumentRootOutside' => '%%path%% porta fuori dall\'abbonamento tramite un link simbolico e non può essere la root del documento.',
+    'errorDocumentRootNotDir' => '%%path%% esiste ma non è una cartella.',
+    'errorDocumentRootDenied' => 'Per modificare la root del documento serve l\'autorizzazione a gestire le impostazioni di hosting di questo dominio in Plesk.',
+    'errorDocumentRootChange' => 'Plesk non ha modificato la root del documento: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite di memoria (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Le impostazioni sono state salvate. La nuova versione si avvia accanto a quella in esecuzione e subentra quando è pronta; segui l\'avanzamento nel log "Build e implementazione".',
     'messageSwitchStarted' => 'La nuova versione si avvia accanto a quella in esecuzione e subentra quando è pronta. Segui l\'avanzamento nel log "Build e implementazione".',
     'messageAction_restartPlain' => 'L\'applicazione è in fase di riavvio sul posto.',
+    'messageDocumentRootChanged' => 'La root del documento ora è %%path%%.',
+    'messageDocumentRootUnchanged' => 'La root del documento resta %%path%%.',
+    'messageDocumentRootBlocked' => 'Il server web non può attraversare queste cartelle lungo il percorso, quindi non può servire i file: %%paths%%. Consentilo eseguendo chmod o+x su di esse.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Elenca le applicazioni configurate e il loro stato.',

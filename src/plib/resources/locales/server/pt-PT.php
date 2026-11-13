@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'O conteúdo esperado da resposta deve ter no máximo %%max%% caracteres e não pode conter quebras de linha nem caracteres de controlo.',
     'errorHealthMatchJson' => 'O conteúdo esperado da resposta começa com { mas não é um objeto JSON válido.',
     'errorHealthMatchPath' => 'O conteúdo esperado da resposta requer um caminho de verificação de estado: introduza um ou limpe o conteúdo.',
+    'errorDocumentRoot' => 'A raiz do documento deve ser uma pasta dentro da subscrição (letras, dígitos e . _ - @ + /, no máximo %%max%% caracteres), sem segmentos "." ou ".." e sem nomes de pasta que comecem por "-".',
+    'errorDocumentRootOutside' => '%%path%% sai da subscrição através de uma ligação simbólica e não pode ser a raiz do documento.',
+    'errorDocumentRootNotDir' => '%%path%% existe, mas não é uma pasta.',
+    'errorDocumentRootDenied' => 'Para alterar a raiz do documento é necessária a permissão para gerir as definições de alojamento deste domínio no Plesk.',
+    'errorDocumentRootChange' => 'O Plesk não alterou a raiz do documento: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'As definições foram guardadas. A nova versão é iniciada ao lado da que está em execução e assume o tráfego quando estiver pronta; acompanhe-a no registo "Compilação e implementação".',
     'messageSwitchStarted' => 'A nova versão está a ser iniciada ao lado da que está em execução e assume o tráfego quando estiver pronta. Acompanhe-a no registo "Compilação e implementação".',
     'messageAction_restartPlain' => 'A aplicação está a reiniciar no local.',
+    'messageDocumentRootChanged' => 'A raiz do documento é agora %%path%%.',
+    'messageDocumentRootUnchanged' => 'A raiz do documento continua a ser %%path%%.',
+    'messageDocumentRootBlocked' => 'O servidor web não consegue atravessar estas pastas no caminho, pelo que não pode servir os ficheiros: %%paths%%. Permita-o com chmod o+x nessas pastas.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Lista as aplicações configuradas e o respetivo estado.',

@@ -26,6 +26,12 @@
 # creates the helper's test-only switch /etc/runway/allow-insecure-fetch while it runs.
 # RUNWAY_SMOKE_SUB=0 skips everything that needs the subdomain.
 #
+# Document roots (Plesk's setting, api/app/save documentRoot): validation errors on DOMAIN, then a
+# folder inside the application root as the document root of DOMAIN (with RUNWAY_SMOKE_DEPLOY=1
+# together with the static path /media, served by nginx from there) and of the subdomain (path
+# mode: its static path /api/static); both are restored through the API, and cleanup restores
+# them through Plesk's CLI whenever a run stops before that.
+#
 # Environment: CONTAINER (runway-plesk), PANEL (http://localhost:18880), SITE_ID (1),
 # DOMAIN (gotest.local), APP_ROOT (apps/gotest.local), GO_VERSION (1.27.4), SUB (runway-smoke),
 # FETCH_PORT (18765), PYTHON.
@@ -63,6 +69,12 @@ POWER_USER_RESTORE=""
 # SITE_ID (cleanup restores the health check path HP_BEFORE, without a watch or a content).
 HM_RESTORE=""
 HP_BEFORE=""
+# The document roots (Plesk's setting) before the document root checks changed them: set before the
+# first change, cleared only after a verified restore, so that cleanup restores them through
+# Plesk's CLI whenever a run stops in between (SP_BEFORE: the static paths of SITE_ID, JSON).
+DR_MAIN_BEFORE=""
+DR_SUB_BEFORE=""
+SP_BEFORE=""
 
 # Git Bash on Windows: no path conversion for docker arguments (but keep it for curl's
 # cookie jar path, which is a POSIX path there).
@@ -120,6 +132,15 @@ wait_conf_gone() {
         sleep 2
     done
     return 1
+}
+# docroot_info DOMAIN: the document root that Plesk stores for a domain (absolute path).
+docroot_info() { dock exec "$CONTAINER" plesk bin site --info "$1" 2>/dev/null | sed -n 's/^--WWW-Root--: *//p' | tr -d '\r'; }
+# https_get DOMAIN PATH [CURL OPTIONS...]: a request through nginx inside the container (Host = DOMAIN).
+https_get() {
+    local host=$1 path=$2 ip
+    shift 2
+    ip=$(dock exec "$CONTAINER" hostname -I | awk '{print $1}')
+    dock exec "$CONTAINER" curl -s -k "$@" --resolve "$host:443:$ip" "https://$host$path"
 }
 # A request loop inside the container through nginx (HTTPS to the container's address, Host =
 # the domain), counting every answer that is not 2xx: loop_start DOMAIN, loop_stop NAME.
@@ -179,6 +200,18 @@ loop_stop() {
     [ "${n_bad:-1}" = "0" ] && [ "${n_ok:-0}" -gt 20 ] && ok "$1: $n_ok requests through nginx, none failed" || bad "$1: ${result:-no result}"
 }
 cleanup() {
+    # Never leave a changed document root behind (restored through Plesk's CLI, which also
+    # regenerates the web server configuration).
+    if [ -n "$DR_MAIN_BEFORE" ]; then
+        dock exec "$CONTAINER" plesk bin site --update "$DOMAIN" -www-root "/$DR_MAIN_BEFORE" >/dev/null 2>&1 \
+            || echo "cleanup: the document root of $DOMAIN could not be restored to $DR_MAIN_BEFORE"
+        if [ -n "$SP_BEFORE" ]; then post app/save "{\"site_id\": $SITE_ID, \"staticPaths\": $SP_BEFORE}" >/dev/null; fi
+    fi
+    if [ -n "$DR_SUB_BEFORE" ]; then
+        dock exec "$CONTAINER" plesk bin site --update "$SUB_DOMAIN" -www-root "/$DR_SUB_BEFORE" >/dev/null 2>&1 \
+            || echo "cleanup: the document root of $SUB_DOMAIN could not be restored to $DR_SUB_BEFORE"
+    fi
+    dock exec "$CONTAINER" sh -c "rm -rf '/var/www/vhosts/$DOMAIN/$APP_ROOT/runway-smoke-docroot' '/var/www/vhosts/$DOMAIN/runway-smoke-out' '/var/www/vhosts/$DOMAIN/runway-smoke-file'" >/dev/null 2>&1
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
     if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
     if [ -n "$ZD_BEFORE" ]; then post settings "$ZD_BEFORE" >/dev/null; fi
@@ -486,6 +519,130 @@ else
     skip "app/fetch validation: $DOMAIN has no application (run with RUNWAY_SMOKE_DEPLOY=1)"
 fi
 
+echo "== document root of $DOMAIN (Plesk's setting: api/app domain.documentRoot, api/app/save documentRoot)"
+APP=$(get "app?site_id=$SITE_ID")
+HOME_DIR=$(echo "$APP" | jexpr "d['data']['domain']['home']")
+SYSUSER=$(echo "$APP" | jexpr "d['data']['domain']['sysuser']")
+DR_CURRENT=$(echo "$APP" | jexpr "d['data']['domain']['documentRoot']")
+# Restored by cleanup from here on: also the refused attempts below must not leave a changed
+# document root behind, should a regression let one through (writing the same value is harmless).
+DR_MAIN_BEFORE=$DR_CURRENT
+check "app: an administrator may change the document root; suggestions for every runtime" \
+    "d['data']['documentRootAllowed'] is True and sorted(d['data']['documentRootSuggestions']) == $KEYS and all(isinstance(v, list) for v in d['data']['documentRootSuggestions'].values())" "$APP"
+[ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_CURRENT" ] && ok "api/app reports Plesk's document root of $DOMAIN ($DR_CURRENT)" \
+    || bad "document root: Plesk $(docroot_info "$DOMAIN"), api/app $DR_CURRENT"
+dock exec "$CONTAINER" runuser -u "$SYSUSER" -- sh -c "ln -sfn /etc '$HOME_DIR/runway-smoke-out' && touch '$HOME_DIR/runway-smoke-file'"
+# dr_refused NAME JSON-VALUE [TEXT]: app/save with only documentRoot is a field error (TEXT in the message).
+dr_refused() {
+    check "app/save: documentRoot $1 is refused (field error)" \
+        "d['status'] == 'error' and list(d['errors']) == ['documentRoot'] and '${3:-}' in d['errors']['documentRoot'][0]" \
+        "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": $2}")"
+}
+dr_refused "with a .. segment" '"apps/../httpdocs"'
+dr_refused "with a segment that starts with -" '"apps/-x"' '"-"'
+dr_refused "behind a symbolic link that leads outside the home directory" '"runway-smoke-out"' 'outside'
+dr_refused "below a symbolic link that leads outside the home directory" '"runway-smoke-out/new"' 'outside'
+dr_refused "that is a file" '"runway-smoke-file"' 'not a folder'
+dr_refused "with a control character" '"http\u0001docs"'
+dr_refused "with a line feed inside" '"apps/runway\nsmoke"'
+dr_refused "with a backslash" '"apps\\x"'
+dr_refused "of 256 characters" "\"$("$PY" -c "print('a' * 256)")\"" '255'
+dr_refused "that is not text" '5'
+check "app/save: an invalid document root and an invalid application root are reported together" \
+    "d['status'] == 'error' and set(d['errors']) == set(['appRoot', 'documentRoot'])" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"appRoot\": \"../etc\", \"documentRoot\": \"-x\"}")"
+[ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_CURRENT" ] && ok "refused document roots change nothing" || bad "document root after refused values: $(docroot_info "$DOMAIN")"
+check "app/save: the unchanged document root (with slashes) is accepted and leaves the application alone" \
+    "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_CURRENT' and d['data']['documentRootChanged'] is False and d['data']['job'] is None and d['data']['build'] is False" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"/$DR_CURRENT/\"}")"
+check "app/save: surrounding blanks and line breaks are trimmed (the unchanged value with a line feed)" \
+    "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_CURRENT' and d['data']['documentRootChanged'] is False" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \" $DR_CURRENT\\n\"}")"
+check "app/save: a full path inside the home directory counts relative to it (unchanged)" \
+    "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_CURRENT' and d['data']['documentRootChanged'] is False" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$HOME_DIR/$DR_CURRENT\"}")"
+# A path that passes Runway's checks but that Plesk refuses (a folder below a file): a field error,
+# and the configuration sent along is not saved.
+if [ "$CONFIGURED" = "True" ]; then
+    HP_DR=$(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['healthPath']")
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"runway-smoke-file/sub\", \"healthPath\": \"/runway-smoke-dr\"}")
+    check "app/save: a document root that Plesk refuses is a field error with Plesk's message" \
+        "d['status'] == 'error' and list(d['errors']) == ['documentRoot'] and 'Plesk' in d['errors']['documentRoot'][0]" "$out"
+    [ "$(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['healthPath']")" = "$HP_DR" ] && [ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_CURRENT" ] \
+        && ok "Plesk refusing the document root saves nothing else" || bad "after Plesk refused: healthPath $(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['healthPath']"), document root $(docroot_info "$DOMAIN")"
+else
+    skip "Plesk refusing a document root together with a setting: $DOMAIN has no application (run with RUNWAY_SMOKE_DEPLOY=1)"
+fi
+dock exec "$CONTAINER" rm -f "$HOME_DIR/runway-smoke-out" "$HOME_DIR/runway-smoke-file"
+# A folder inside the application root that does not exist yet: Plesk creates it.
+DR_TARGET=$APP_ROOT/runway-smoke-docroot
+dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET"
+RUNNING=False
+if [ "$CONFIGURED" = "True" ]; then
+    for _ in $(seq 1 15); do
+        RUNNING=$(get "app/status?site_id=$SITE_ID" | jexpr "d['data'].get('listener') == 'ok' and d['data']['service']['active_state'] == 'active'")
+        [ "$RUNNING" = "True" ] && break
+        sleep 2
+    done
+fi
+if [ "$RUNNING" = "True" ]; then
+    # Document root and static path in one save: the document root changes first, then the
+    # configuration is applied (the application restarts).
+    SP_BEFORE=$(get "app?site_id=$SITE_ID" | jexpr "json.dumps(d['data']['config']['staticPaths'])")
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_TARGET\", \"staticPaths\": [\"/media\"]}")
+    check "app/save: document root $DR_TARGET and the static path /media in one save" \
+        "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_TARGET' and d['data']['documentRootChanged'] is True and d['data']['config']['staticPaths'] == ['/media'] and '$DR_TARGET' in d['data']['message']" "$out"
+    wait_deploy "$SITE_ID" >/dev/null
+else
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_TARGET\"}")
+    check "app/save: only the document root (the application is left alone)" \
+        "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_TARGET' and d['data']['documentRootChanged'] is True and d['data']['job'] is None and d['data']['build'] is False" "$out"
+fi
+[ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_TARGET" ] && ok "Plesk stores the new document root of $DOMAIN" || bad "Plesk's document root of $DOMAIN: $(docroot_info "$DOMAIN")"
+[ "$(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1)" = "$SYSUSER:psaserv 750" ] && ok "Plesk created the missing folder ($SYSUSER:psaserv 0750)" \
+    || bad "the new document root folder: $(dock exec "$CONTAINER" stat -c '%U:%G %a' "$HOME_DIR/$DR_TARGET" 2>&1)"
+check "app: domain.documentRoot follows Plesk" "d['data']['domain']['documentRoot'] == '$DR_TARGET' and [r['path'] for r in d['data']['documentRoots'] if r['own']] == ['$DR_TARGET']" "$(get "app?site_id=$SITE_ID")"
+if [ "$CONFIGURED" = "True" ]; then
+    cli --status "$DOMAIN" | grep -q "^Document root: *$DR_TARGET\$" && ok "CLI --status shows the document root" || bad "CLI --status Document root: $(cli --status "$DOMAIN" | grep -i 'document root')"
+else
+    skip "CLI --status document root: $DOMAIN has no application (run with RUNWAY_SMOKE_DEPLOY=1)"
+fi
+if [ "$RUNNING" = "True" ]; then
+    NGINX_CONF=/var/www/vhosts/system/$DOMAIN/conf/nginx.conf
+    wait_conf -qF "root \"$HOME_DIR/$DR_TARGET\";" "$NGINX_CONF" >/dev/null
+    dock exec "$CONTAINER" grep -qF "root \"$HOME_DIR/$DR_TARGET\";" "$NGINX_CONF" && dock exec "$CONTAINER" grep -q '# Runway: reverse proxy of the site' "$NGINX_CONF" \
+        && ok "nginx: the new root and the Runway snippet after Plesk regenerated the configuration" || bad "nginx configuration: $(dock exec "$CONTAINER" grep -n 'root "\|Runway' "$NGINX_CONF")"
+    # The exclusion of /media comes with the regeneration after app-apply (task manager, delayed):
+    # wait for it, then give the answer a few seconds as well.
+    wait_conf -qF '|(media)(/|$))' "$NGINX_CONF" >/dev/null
+    dock exec "$CONTAINER" runuser -u "$SYSUSER" -- sh -c "umask 022; mkdir -p '$HOME_DIR/$DR_TARGET/media' && echo runway-smoke-static > '$HOME_DIR/$DR_TARGET/media/smoke.txt'"
+    body=""
+    for _ in $(seq 1 5); do
+        body=$(https_get "$DOMAIN" /media/smoke.txt)
+        [ "$body" = "runway-smoke-static" ] && break
+        sleep 2
+    done
+    [ "$body" = "runway-smoke-static" ] && ok "nginx serves the static path /media from $DR_TARGET/media" || bad "/media/smoke.txt answered: $(echo "$body" | head -c 200)"
+    https_get "$DOMAIN" /runway-smoke-page | grep -q 'Hello from Go' && ok "every other path still reaches the application" || bad "/runway-smoke-page: $(https_get "$DOMAIN" /runway-smoke-page | head -c 200)"
+else
+    skip "static path from the new document root: the application of $DOMAIN is not running (run with RUNWAY_SMOKE_DEPLOY=1)"
+fi
+if [ -n "$SP_BEFORE" ]; then
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_MAIN_BEFORE\", \"staticPaths\": $SP_BEFORE}")
+    wait_deploy "$SITE_ID" >/dev/null
+else
+    out=$(post app/save "{\"site_id\": $SITE_ID, \"documentRoot\": \"$DR_MAIN_BEFORE\"}")
+fi
+if [ "$(echo "$out" | jexpr "d['status'] == 'success' and d['data']['documentRoot'] == '$DR_MAIN_BEFORE'")" = "True" ] \
+        && [ "$(docroot_info "$DOMAIN")" = "$HOME_DIR/$DR_MAIN_BEFORE" ]; then
+    ok "document root of $DOMAIN restored ($DR_MAIN_BEFORE)"
+    DR_MAIN_BEFORE=""
+    SP_BEFORE=""
+else
+    bad "restoring the document root of $DOMAIN: $out"
+fi
+dock exec "$CONTAINER" rm -rf "$HOME_DIR/$DR_TARGET"
+
 echo "== CLI (plesk ext runway)"
 out=$(cli --help)
 echo "$out" | grep -q -- '--install-toolchain' && ! echo "$out" | grep -q '\[\[cli' && ok "CLI --help lists the commands with descriptions" || bad "CLI --help: $out"
@@ -705,6 +862,52 @@ if [ -n "$SUB_ID" ]; then
         else
             bad "app/fetch: $out"
         fi
+    fi
+
+    echo "== document root of the subdomain $SUB_DOMAIN (inside its application root)"
+    SUB_DR=$(get "app?site_id=$SUB_ID" | jexpr "d['data']['domain']['documentRoot']")
+    SUB_TARGET=apps/$SUB_DOMAIN/public
+    SUB_RUNNING=False
+    for _ in $(seq 1 15); do
+        SUB_RUNNING=$(get "app/status?site_id=$SUB_ID" | jexpr "d['data'].get('listener') == 'ok'")
+        [ "$SUB_RUNNING" = "True" ] && break
+        sleep 2
+    done
+    DR_SUB_BEFORE=$SUB_DR
+    out=$(post app/save "{\"site_id\": $SUB_ID, \"documentRoot\": \"$SUB_TARGET\"}")
+    check "app/save: the subdomain's document root moves into its application root (only the document root: no restart)" \
+        "d['status'] == 'success' and d['data']['documentRoot'] == '$SUB_TARGET' and d['data']['documentRootChanged'] is True and d['data']['job'] is None and d['data']['build'] is False" "$out"
+    [ "$(docroot_info "$SUB_DOMAIN")" = "$SUB_HOME/$SUB_TARGET" ] && ok "Plesk stores the new document root of $SUB_DOMAIN" || bad "Plesk's document root of $SUB_DOMAIN: $(docroot_info "$SUB_DOMAIN")"
+    # Runway created the application root as the system user (0750, group psacln): the web server
+    # passes it only with the search permission for others that docroot-access added.
+    [ "$(dock exec "$CONTAINER" stat -c %a "$SUB_HOME/apps/$SUB_DOMAIN")" = "751" ] && ok "the application root became searchable for the web server (0751)" \
+        || bad "mode of the application root: $(dock exec "$CONTAINER" stat -c '%a %U:%G' "$SUB_HOME/apps/$SUB_DOMAIN")"
+    if [ "$SUB_RUNNING" = "True" ]; then
+        # Path mode /api with the static path /api/static: /api/static/... comes from the document
+        # root, the rest of /api from the application, everything outside /api from the document root.
+        dock exec "$CONTAINER" runuser -u "$SUB_USER" -- sh -c "umask 022; mkdir -p '$SUB_HOME/$SUB_TARGET/api/static' && echo runway-smoke-sub > '$SUB_HOME/$SUB_TARGET/api/static/smoke.txt'"
+        wait_conf -qF "root \"$SUB_HOME/$SUB_TARGET\";" "$CONF/nginx.conf" >/dev/null
+        dock exec "$CONTAINER" grep -qF 'location ~ ^/api(?!/(static)(/|$))(/|$) {' "$CONF/nginx.conf" \
+            && ok "nginx: the Runway snippet of $SUB_DOMAIN is still there" || bad "nginx configuration of $SUB_DOMAIN: $(dock exec "$CONTAINER" grep -n 'root "\|Runway' "$CONF/nginx.conf")"
+        body=$(https_get "$SUB_DOMAIN" /api/static/smoke.txt)
+        [ "$body" = "runway-smoke-sub" ] && ok "nginx serves the static path /api/static from the new document root" || bad "/api/static/smoke.txt answered: $(echo "$body" | head -c 200)"
+        code=$(https_get "$SUB_DOMAIN" /api/x -o /dev/null -w '%{http_code}')
+        [ "$code" = "200" ] && ok "/api/x still reaches the application" || bad "/api/x answered HTTP $code"
+        # A marker file outside /api proves that the rest of the site comes from the new root (the
+        # old root has a default page too, so an HTTP 200 alone would prove nothing).
+        dock exec "$CONTAINER" runuser -u "$SUB_USER" -- sh -c "umask 022; echo runway-smoke-root > '$SUB_HOME/$SUB_TARGET/runway-smoke-root.txt'"
+        body=$(https_get "$SUB_DOMAIN" /runway-smoke-root.txt)
+        [ "$body" = "runway-smoke-root" ] && ok "path mode: the rest of the site comes from the new document root" || bad "/runway-smoke-root.txt answered: $(echo "$body" | head -c 200)"
+    else
+        skip "static path from the new document root of $SUB_DOMAIN: its application is not running"
+    fi
+    out=$(post app/save "{\"site_id\": $SUB_ID, \"documentRoot\": \"$DR_SUB_BEFORE\"}")
+    if [ "$(echo "$out" | jexpr "d['status'] == 'success' and d['data']['documentRootChanged'] is True")" = "True" ] \
+            && [ "$(docroot_info "$SUB_DOMAIN")" = "$SUB_HOME/$DR_SUB_BEFORE" ]; then
+        ok "document root of $SUB_DOMAIN restored ($DR_SUB_BEFORE)"
+        DR_SUB_BEFORE=""
+    else
+        bad "restoring the document root of $SUB_DOMAIN: $out"
     fi
 
     echo "== worker (listen none)"

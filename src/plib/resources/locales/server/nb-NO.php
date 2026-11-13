@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Det forventede responsinnholdet kan være på høyst %%max%% tegn og kan ikke inneholde linjeskift eller kontrolltegn.',
     'errorHealthMatchJson' => 'Det forventede responsinnholdet starter med {, men er ikke et gyldig JSON-objekt.',
     'errorHealthMatchPath' => 'Det forventede responsinnholdet krever en bane for helsesjekk: angi en, eller tøm innholdet.',
+    'errorDocumentRoot' => 'Dokumentroten må være en mappe inne i abonnementet (bokstaver, sifre og . _ - @ + /, maks. %%max%% tegn), uten segmentene "." eller ".." og uten mappenavn som begynner med "-".',
+    'errorDocumentRootOutside' => '%%path%% fører ut av abonnementet via en symbolsk lenke og kan ikke være dokumentroten.',
+    'errorDocumentRootNotDir' => '%%path%% finnes, men er ikke en mappe.',
+    'errorDocumentRootDenied' => 'Endring av dokumentroten krever tillatelse til å administrere webhotellinnstillingene for dette domenet i Plesk.',
+    'errorDocumentRootChange' => 'Plesk endret ikke dokumentroten: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnegrense (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Innstillingene ble lagret. Den nye versjonen starter ved siden av den som kjører, og tar over når den er klar; følg med i loggen "Bygg og utrulling".',
     'messageSwitchStarted' => 'Den nye versjonen starter ved siden av den som kjører, og tar over når den er klar. Følg med i loggen "Bygg og utrulling".',
     'messageAction_restartPlain' => 'Applikasjonen starter på nytt på stedet.',
+    'messageDocumentRootChanged' => 'Dokumentroten er nå %%path%%.',
+    'messageDocumentRootUnchanged' => 'Dokumentroten forblir %%path%%.',
+    'messageDocumentRootBlocked' => 'Webserveren kan ikke passere disse mappene på veien, så den kan ikke levere filene: %%paths%%. Tillat det med chmod o+x på dem.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Viser de konfigurerte applikasjonene og tilstanden deres.',

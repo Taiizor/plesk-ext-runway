@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Nội dung phản hồi mong đợi phải dài tối đa %%max%% ký tự và không được chứa ký tự xuống dòng hoặc ký tự điều khiển.',
     'errorHealthMatchJson' => 'Nội dung phản hồi mong đợi bắt đầu bằng { nhưng không phải là đối tượng JSON hợp lệ.',
     'errorHealthMatchPath' => 'Nội dung phản hồi mong đợi cần có đường dẫn kiểm tra tình trạng: hãy nhập một đường dẫn hoặc xóa nội dung.',
+    'errorDocumentRoot' => 'Thư mục gốc tài liệu phải là một thư mục bên trong thuê bao (chữ cái, chữ số và . _ - @ + /, tối đa %%max%% ký tự), không chứa phân đoạn "." hoặc ".." và không có tên thư mục nào bắt đầu bằng "-".',
+    'errorDocumentRootOutside' => '%%path%% dẫn ra ngoài thuê bao qua một liên kết tượng trưng nên không thể làm thư mục gốc tài liệu.',
+    'errorDocumentRootNotDir' => '%%path%% đã tồn tại nhưng không phải là thư mục.',
+    'errorDocumentRootDenied' => 'Để thay đổi thư mục gốc tài liệu, cần có quyền quản lý cài đặt lưu trữ của tên miền này trong Plesk.',
+    'errorDocumentRootChange' => 'Plesk đã không thay đổi thư mục gốc tài liệu: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Giới hạn bộ nhớ (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Đã lưu cài đặt. Phiên bản mới khởi động bên cạnh phiên bản đang chạy và sẽ tiếp quản khi sẵn sàng; hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
     'messageSwitchStarted' => 'Phiên bản mới đang khởi động bên cạnh phiên bản đang chạy và sẽ tiếp quản khi sẵn sàng. Hãy theo dõi tiến độ trong nhật ký "Biên dịch & triển khai".',
     'messageAction_restartPlain' => 'Ứng dụng đang khởi động lại tại chỗ.',
+    'messageDocumentRootChanged' => 'Thư mục gốc tài liệu hiện là %%path%%.',
+    'messageDocumentRootUnchanged' => 'Thư mục gốc tài liệu vẫn là %%path%%.',
+    'messageDocumentRootBlocked' => 'Máy chủ web không thể đi qua các thư mục này trên đường dẫn nên không thể phục vụ các tệp: %%paths%%. Hãy cho phép bằng chmod o+x trên các thư mục đó.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liệt kê các ứng dụng đã cấu hình và trạng thái của chúng.',

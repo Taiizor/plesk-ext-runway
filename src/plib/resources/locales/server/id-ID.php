@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Konten respons yang diharapkan maksimal %%max%% karakter dan tidak boleh mengandung karakter ganti baris atau karakter kontrol.',
     'errorHealthMatchJson' => 'Konten respons yang diharapkan diawali dengan { tetapi bukan objek JSON yang valid.',
     'errorHealthMatchPath' => 'Konten respons yang diharapkan memerlukan jalur pemeriksaan kesehatan: masukkan jalurnya, atau kosongkan kontennya.',
+    'errorDocumentRoot' => 'Root dokumen harus berupa folder di dalam langganan (huruf, angka, dan . _ - @ + /, maks. %%max%% karakter), tanpa segmen "." atau ".." dan tanpa nama folder yang diawali "-".',
+    'errorDocumentRootOutside' => '%%path%% mengarah ke luar langganan melalui tautan simbolik dan tidak dapat menjadi root dokumen.',
+    'errorDocumentRootNotDir' => '%%path%% ada, tetapi bukan folder.',
+    'errorDocumentRootDenied' => 'Mengubah root dokumen memerlukan izin untuk mengelola pengaturan hosting domain ini di Plesk.',
+    'errorDocumentRootChange' => 'Plesk tidak mengubah root dokumen: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Batas memori (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Pengaturan telah disimpan. Versi baru dimulai di samping versi yang sedang berjalan dan mengambil alih setelah siap; pantau di log "Build & deploy".',
     'messageSwitchStarted' => 'Versi baru dimulai di samping versi yang sedang berjalan dan mengambil alih setelah siap. Pantau di log "Build & deploy".',
     'messageAction_restartPlain' => 'Aplikasi sedang dimulai ulang di tempat.',
+    'messageDocumentRootChanged' => 'Root dokumen sekarang %%path%%.',
+    'messageDocumentRootUnchanged' => 'Root dokumen tetap %%path%%.',
+    'messageDocumentRootBlocked' => 'Server web tidak dapat melewati folder-folder berikut di sepanjang jalur, sehingga tidak dapat melayani file: %%paths%%. Izinkan dengan menjalankan chmod o+x pada folder tersebut.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Menampilkan daftar aplikasi yang dikonfigurasi beserta statusnya.',

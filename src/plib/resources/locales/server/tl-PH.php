@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Ang inaasahang content ng response ay dapat hanggang %%max%% character lamang at hindi dapat maglaman ng mga line break o control character.',
     'errorHealthMatchJson' => 'Nagsisimula sa { ang inaasahang content ng response pero hindi ito wastong JSON object.',
     'errorHealthMatchPath' => 'Kailangan ng inaasahang content ng response ng health check path: maglagay ng isa, o i-clear ang content.',
+    'errorDocumentRoot' => 'Ang document root ay dapat isang folder sa loob ng subscription (mga letra, numero at . _ - @ + /, hanggang %%max%% character), na walang "." o ".." na segment at walang pangalan ng folder na nagsisimula sa "-".',
+    'errorDocumentRootOutside' => 'Lumalabas ang %%path%% sa subscription sa pamamagitan ng isang symbolic link at hindi ito maaaring maging document root.',
+    'errorDocumentRootNotDir' => 'Umiiral ang %%path%% ngunit hindi ito isang folder.',
+    'errorDocumentRootDenied' => 'Kailangan ang pahintulot na pamahalaan ang mga hosting setting ng domain na ito sa Plesk upang mapalitan ang document root.',
+    'errorDocumentRootChange' => 'Hindi pinalitan ng Plesk ang document root: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Na-save ang mga setting. Magsisimula ang bagong bersyon katabi ng tumatakbong bersyon at papalit ito kapag handa na; subaybayan ito sa log na "Build at deploy".',
     'messageSwitchStarted' => 'Nagsisimula ang bagong bersyon katabi ng tumatakbong bersyon at papalit ito kapag handa na. Subaybayan ito sa log na "Build at deploy".',
     'messageAction_restartPlain' => 'Nire-restart ang application sa puwesto.',
+    'messageDocumentRootChanged' => 'Ang document root ay %%path%% na ngayon.',
+    'messageDocumentRootUnchanged' => 'Nananatiling %%path%% ang document root.',
+    'messageDocumentRootBlocked' => 'Hindi makadaan ang web server sa mga folder na ito sa daan, kaya hindi nito maisisilbi ang mga file: %%paths%%. Payagan ito gamit ang chmod o+x sa mga ito.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Ilista ang mga naka-configure na application at ang status ng mga ito.',

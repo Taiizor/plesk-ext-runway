@@ -25,7 +25,8 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
 [Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
-[Listen modes](#listen-modes) · [Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
+[Listen modes](#listen-modes) · [Static files and the document root](#static-files-and-the-document-root) ·
+[Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
 [When an application fails](#when-an-application-fails) ·
 [Deploying with Git](#deploying-with-git) · [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
@@ -61,8 +62,9 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - Environment variables, stored root-only on the server and never passed on a command line.
 - Listen on a TCP port, on a Unix socket, or run a background worker without a proxy.
 - Proxy the whole domain or only a path prefix (for example `/api`), let the web server serve
-  static folders, and check a health path (optionally also the content of its answer, for example
-  `{"status":"ok"}`).
+  static folders, choose the domain's document root (for example the application's `wwwroot`, a
+  Plesk setting that Runway changes through Plesk), and check a health path (optionally also the
+  content of its answer, for example `{"status":"ok"}`).
 - Start, stop, restart, build and redeploy; live status (state, PID, the application's memory
   apart from the kernel's file cache, restarts, listener check), application journal and build
   log. **Stop persists**: a stopped application stays stopped across reboots, deployments and
@@ -184,6 +186,9 @@ setting. The trust model of the updater is described in [SECURITY.md](SECURITY.m
    inside a document root works, but its sources, binaries and settings files with secrets
    (`appsettings.json`, `.env`) can then be downloaded; the domain page and
    `plesk ext runway --status` warn about it, also when a symbolic link puts the directory there.
+   Static files of the application (an ASP.NET `wwwroot`, a Bun `dist`, Laravel's `public`) can
+   still be served by the web server: make that folder the domain's document root on the Runway
+   page (see [Static files and the document root](#static-files-and-the-document-root)).
 3. Open the domain's **Runway** page, choose runtime and version, check the build and start
    commands (Runway suggests them from the project files), enable the application and save.
    Runway builds it, starts the service and points the domain at it.
@@ -273,6 +278,61 @@ root**, not from the application directory: `/assets/app.css` is `assets/app.css
 root, so the files must be there. Large files (videos, images, downloads) served this way do not
 use the application's memory (see [Memory](#memory)). Let's Encrypt
 (`/.well-known/acme-challenge/`) and the Plesk web statistics are never proxied.
+
+## Static files and the document root
+
+The web server serves static paths from the domain's **document root**, a Plesk hosting setting
+(`httpdocs` for a new subscription, the folder of a subdomain). To keep the application's files
+and its static files apart, point the document root at the folder that holds only the static
+files: *Advanced > Document root* on the domain's Runway page, right above the static paths. For
+example, with the application directory `apps/example.com`, the document root
+`apps/example.com/wwwroot` and the static path `/media`, the web server serves
+`apps/example.com/wwwroot/media/...` itself and passes every other request to the application;
+the sources and settings files in `apps/example.com` stay out of reach. The form suggests the
+usual folder of the runtime when it exists in the application directory (`wwwroot` for .NET,
+`dist` or `public` for Bun, `public` or `web` for PHP, `public` for Ruby and Python, else `public`,
+`dist` or `wwwroot`). The folder's content must mirror the URL: the static path `/static` serves
+`<document root>/static/...`, so a folder that a framework serves under its own name (Django's
+`staticfiles` behind `/static/`, a Go `static` folder behind `/static/`) needs a parent folder as
+the document root, for example `public` with `STATIC_ROOT` set to `public/static`.
+
+- It is the same setting as in Plesk (*Websites & Domains > Hosting & DNS > Hosting*): Runway
+  never stores it, shows what Plesk has, and changes it through Plesk (`plesk bin site --update
+  <domain> -www-root`), which checks the path itself and regenerates the web server
+  configuration. A change made in Plesk shows up on the Runway page.
+- The path is relative to the subscription's home directory: letters, digits and `. _ - @ + /`,
+  no `.` or `..` segment, no folder name that starts with `-`, at most 255 characters, and inside
+  the subscription also when symbolic links are followed. A missing folder is created by Plesk
+  (with its missing parents, owned by the system user and the web server group `psaserv`, mode
+  0750, and with Plesk's default `index.html`).
+- The web server reads the files as a member of the group `psaserv`. When Runway changes the
+  document root, it gives the directories on the way that the web server could not pass the
+  search permission for others (`o+x`, never the read permission; Runway creates application
+  directories with mode 0750). The files themselves must be readable too: builds create files
+  that only the subscription can read (umask 027), so a build that writes into the document root
+  ends with, for example, `chmod -R o+rX wwwroot` (the form names the command).
+- The `o+x` stays when the document root moves elsewhere later or the application is removed.
+  It only lets the web server pass these directories, never list them, but a file in the
+  application directory that is readable for others (mode 0644, as FTP and the File Manager create
+  files) can then be read by every member of `psaserv` that knows its name. Keep settings files such
+  as `appsettings.json` or `.env` at mode 0640 or 0600, or remove the permission with
+  `chmod o-x <folder>` once the document root is elsewhere.
+- Runway adjusts these permissions only when the document root is changed on the Runway page. After
+  a change in Plesk's own hosting settings, a folder that Runway created on the way (mode 0750) stops
+  the web server (403 for the static paths): run `chmod o+x` on it, or change the document root on
+  the Runway page instead.
+- In **path mode** the document root also serves the rest of the site, everything outside the
+  mount path. Workers have no static paths: the field is hidden for them.
+- Administrators can always change it. Customers (and resellers, through the same checks) need,
+  besides **Runway applications management**, Plesk's own permission **Hosting settings
+  management** (`manage_phosting`) of the subscription; without it the field is read-only.
+- The page sends the document root only when you changed the field, so a change made in Plesk
+  meanwhile is never undone by saving other settings. When only the document root changed, the
+  save changes it and leaves the application alone (no build, no restart). Otherwise the save
+  changes the document root first and then applies the application settings (which restarts the
+  application, as every save does); when Plesk refuses the path, nothing else is saved, and when
+  applying the settings fails afterwards, the error says that the document root was changed. Removing the application never changes the document root: it is a setting of the
+  domain, so set it back yourself (for example to `httpdocs`) when the folder goes away.
 
 ## Zero-downtime deployments
 
@@ -455,7 +515,7 @@ Runway extends the Plesk CLI (`pm_Hook_ApiCli`, administrators only):
 
 ```sh
 plesk ext runway --list                              # applications and their state
-plesk ext runway --status example.com
+plesk ext runway --status example.com                # also shows the document root
 plesk ext runway --start example.com                 # --stop keeps it stopped
 plesk ext runway --restart example.com               # zero-downtime: waits for the switch; -plain restarts in place
 plesk ext runway --deploy example.com                # build + restart (a stopped app is only built)
@@ -480,6 +540,7 @@ plesk ext runway --update                            # update Runway to it (see 
 | Listen | `tcp`, `unix`, `none` | per runtime (`tcp` for most) |
 | Proxy mode | `web` (whole domain), `path` (one prefix), `worker` (= listen `none`) | `web` |
 | Mount path | URL prefix for `path` mode, for example `/api` | |
+| Document root | Plesk's document root of the domain (not stored by Runway): the folder the web server serves the static paths from (and in `path` mode the rest of the site), relative to the home directory; see [Static files and the document root](#static-files-and-the-document-root) | `httpdocs` (Plesk) |
 | Static paths | up to 20 URL prefixes the web server serves from the document root (the files must be there) | |
 | Health check path | `GET` with a 2 s timeout, shown as healthy/unhealthy: healthy is a 2xx or 3xx answer (that also contains the expected response content, when one is set) | |
 | Expected response content | optional, needs a health check path. A JSON object such as `{"status":"ok"}`: the answer must be JSON that contains these keys with equal values (spacing, key order and further keys do not matter; nested objects are compared the same way, everything else exactly and with its JSON type: `"1"` is not `1`, `true` is not `1`). Any other text such as `Healthy`: it must appear in the answer (case-sensitive). The first 64 KiB of the answer are read. The status card, the health watch and zero-downtime deployments use it (a new version whose answer does not match never gets traffic) | |
@@ -576,6 +637,10 @@ browser ── Plesk panel (React UI) ── JSON API (PHP, psaadm)
   changed by the administrator and survive the customer removing and re-creating the
   application. Revoking the permission removes access to the page; disable existing
   applications yourself if they must stop.
+- The document root is changed through Plesk's own command line with Plesk's checks, and for
+  customers only with Plesk's **Hosting settings management** permission as well; the helper
+  first resolves the symbolic links of the path as the system user, so it cannot lead outside
+  the subscription.
 
 See [SECURITY.md](SECURITY.md) for the threat model and how to report a vulnerability.
 

@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'תוכן התגובה הצפוי יכול להכיל לכל היותר %%max%% תווים ואינו יכול להכיל מעברי שורה או תווי בקרה.',
     'errorHealthMatchJson' => 'תוכן התגובה הצפוי מתחיל ב-{ אך אינו אובייקט JSON חוקי.',
     'errorHealthMatchPath' => 'תוכן התגובה הצפוי דורש נתיב בדיקת תקינות: הזן נתיב או נקה את התוכן.',
+    'errorDocumentRoot' => 'שורש המסמכים חייב להיות תיקייה בתוך המנוי (אותיות, ספרות והתווים . _ - @ + /, לכל היותר %%max%% תווים), ללא מקטעי "." או ".." וללא שם תיקייה שמתחיל בתו "-".',
+    'errorDocumentRootOutside' => '%%path%% מוביל אל מחוץ למנוי דרך קישור סימבולי ואינו יכול להיות שורש המסמכים.',
+    'errorDocumentRootNotDir' => '%%path%% קיים, אך אינו תיקייה.',
+    'errorDocumentRootDenied' => 'כדי לשנות את שורש המסמכים נדרשת הרשאה לנהל ב-Plesk את הגדרות האחסון של הדומיין הזה.',
+    'errorDocumentRootChange' => 'Plesk לא שינה את שורש המסמכים: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'ההגדרות נשמרו. הגרסה החדשה מופעלת לצד הגרסה הפועלת ומקבלת את התעבורה כשהיא מוכנה; ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
     'messageSwitchStarted' => 'הגרסה החדשה מופעלת לצד הגרסה הפועלת ומקבלת את התעבורה כשהיא מוכנה. ניתן לעקוב אחריה ביומן "בנייה ופריסה".',
     'messageAction_restartPlain' => 'היישום מופעל מחדש במקום.',
+    'messageDocumentRootChanged' => 'שורש המסמכים הוא כעת %%path%%.',
+    'messageDocumentRootUnchanged' => 'שורש המסמכים נשאר %%path%%.',
+    'messageDocumentRootBlocked' => 'שרת הווב אינו יכול לעבור דרך התיקיות האלה שבדרך, ולכן אינו יכול להגיש את הקבצים: %%paths%%. אפשר זאת באמצעות chmod o+x עליהן.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'מציג את היישומים המוגדרים ואת מצבם.',

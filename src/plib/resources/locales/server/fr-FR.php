@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Le contenu attendu de la réponse doit comporter au maximum %%max%% caractères et ne doit pas contenir de sauts de ligne ni de caractères de contrôle.',
     'errorHealthMatchJson' => 'Le contenu attendu de la réponse commence par { mais n\'est pas un objet JSON valide.',
     'errorHealthMatchPath' => 'Le contenu attendu de la réponse nécessite un chemin de vérification d\'état : saisissez-en un ou videz le contenu.',
+    'errorDocumentRoot' => 'La racine du document doit être un dossier à l\'intérieur de l\'abonnement (lettres, chiffres et . _ - @ + /, %%max%% caractères au maximum), sans segment "." ni ".." et sans nom de dossier commençant par "-".',
+    'errorDocumentRootOutside' => '%%path%% mène en dehors de l\'abonnement par un lien symbolique et ne peut pas être la racine du document.',
+    'errorDocumentRootNotDir' => '%%path%% existe mais n\'est pas un dossier.',
+    'errorDocumentRootDenied' => 'La modification de la racine du document nécessite l\'autorisation de gérer les paramètres d\'hébergement de ce domaine dans Plesk.',
+    'errorDocumentRootChange' => 'Plesk n\'a pas modifié la racine du document : %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de mémoire (Mio)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Les paramètres ont été enregistrés. La nouvelle version démarre à côté de celle en cours d\'exécution et prend le relais dès qu\'elle est prête ; suivez-la dans le journal « Compilation et déploiement ».',
     'messageSwitchStarted' => 'La nouvelle version démarre à côté de celle en cours d\'exécution et prend le relais dès qu\'elle est prête. Suivez-la dans le journal « Compilation et déploiement ».',
     'messageAction_restartPlain' => 'L\'application redémarre sur place.',
+    'messageDocumentRootChanged' => 'La racine du document est désormais %%path%%.',
+    'messageDocumentRootUnchanged' => 'La racine du document reste %%path%%.',
+    'messageDocumentRootBlocked' => 'Le serveur Web ne peut pas traverser ces dossiers sur le chemin et ne peut donc pas servir les fichiers : %%paths%%. Autorisez-le avec chmod o+x sur ces dossiers.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Liste les applications configurées et leur état.',

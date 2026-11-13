@@ -69,6 +69,11 @@ return [
     'errorHealthMatch' => 'Beklenen yanıt içeriği en fazla %%max%% karakter olmalı ve satır sonu ya da kontrol karakteri içermemelidir.',
     'errorHealthMatchJson' => 'Beklenen yanıt içeriği { ile başlıyor ancak geçerli bir JSON nesnesi değil.',
     'errorHealthMatchPath' => 'Beklenen yanıt içeriği bir sağlık kontrolü yolu gerektirir: bir yol girin ya da içeriği silin.',
+    'errorDocumentRoot' => 'Belge kökü abonelik içinde bir klasör olmalıdır (harfler, rakamlar ve . _ - @ + /, en fazla %%max%% karakter); "." veya ".." bölümleri ve "-" ile başlayan klasör adları içeremez.',
+    'errorDocumentRootOutside' => '%%path%% sembolik bir bağlantı üzerinden aboneliğin dışına çıkıyor; belge kökü olamaz.',
+    'errorDocumentRootNotDir' => '%%path%% mevcut, ancak bir klasör değil.',
+    'errorDocumentRootDenied' => 'Belge kökünü değiştirmek için Plesk\'te bu alan adının barındırma ayarlarını yönetme izni gerekir.',
+    'errorDocumentRootChange' => 'Plesk belge kökünü değiştirmedi: %%details%%',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Bellek sınırı (MiB)',
@@ -94,6 +99,9 @@ return [
     'messageSavedSwitching' => 'Ayarlar kaydedildi. Yeni sürüm çalışan sürümün yanında başlar ve hazır olduğunda trafiği devralır; "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
     'messageSwitchStarted' => 'Yeni sürüm çalışan sürümün yanında başlıyor ve hazır olduğunda trafiği devralacak. "Derleme ve dağıtım" günlüğünden takip edebilirsiniz.',
     'messageAction_restartPlain' => 'Uygulama yerinde yeniden başlatılıyor.',
+    'messageDocumentRootChanged' => 'Belge kökü artık %%path%%.',
+    'messageDocumentRootUnchanged' => 'Belge kökü %%path%% olarak kalıyor.',
+    'messageDocumentRootBlocked' => 'Web sunucusu yol üzerindeki şu klasörlerden geçemediği için dosyaları sunamaz: %%paths%%. Bu klasörlere chmod o+x uygulayarak izin verin.',
 
     // Command line: descriptions shown by "plesk ext runway --help"
     'cli.commands.list' => 'Yapılandırılmış uygulamaları ve durumlarını listeler.',

@@ -174,7 +174,15 @@ Rules for every adapter:
 - `mode`: `web` (whole domain proxied), `path` (only `mount_path` prefix proxied, e.g. `/api`;
   nginx: `location ~ ^/api(/|$)`; Apache: `ProxyPass /api ...`), `worker` (= listen none).
 - `static_paths`: up to 20 URL prefixes (`^/[A-Za-z0-9._~-]+(/[A-Za-z0-9._~-]+)*$`) excluded from
-  the proxy regex so nginx/Apache serve them from the document root (SPA assets).
+  the proxy regex so nginx/Apache serve them from the document root (SPA assets). The prefixes are
+  all Runway writes into the web server configuration: Plesk's own locations then serve them from
+  the domain's **document root**, a Plesk hosting setting that Runway never stores. The settings
+  form shows it next to the static paths and can change it through Plesk (`documentRoot` of
+  `api/app/save`, §6), so that e.g. the application root `apps/example.com`, the document root
+  `apps/example.com/wwwroot` and the static path `/media` serve `apps/example.com/wwwroot/media/...`
+  from the web server and everything else from the application, while the application root stays
+  outside the document root. In `path` mode the document root also serves everything outside the
+  mount path. The WebConfig snippets are unchanged by it.
 - `health_path`: optional path; `app-status` performs one GET (2 s timeout, Host = domain) and
   reports `healthy|unhealthy|unknown`. Automatic restarts only with the opt-in health watch (§7).
   `health_match` (optional, needs `health_path`): the expected response content; a 2xx/3xx answer
@@ -204,14 +212,79 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/update` | GET | admin | built-in updater, no network: `{installed: "X.Y.Z-R", latest: {version, release, full, tag, htmlUrl, publishedAt} \| null, available, checkedAt, error, updateSource, lastFailedVersion, job: {admin job status}, updateCheck, updateAuto}` (helper `update-status` plus the two settings) |
 | `api/update/check` | POST | admin | forced check (helper `update-check {force: true}`; within 60 s of the previous check the cache answers) → `api/update` shape plus `checked`; a failed check is `error`, not an API error; HTTP 404 of GitHub (nothing published) is `latest: null` |
 | `api/update/install` | POST | admin | `{version: "X.Y.Z-R"}` (the version the administrator saw; field error `version` when malformed) → helper `update-install` → `{job, version, message}`; refused unless it is the cached available update, newer than the installed one, and no admin job runs |
-| `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active,documentRoot}, documentRoots:[{domain, path, own}], appRootDocumentRoot, defaultAppRoot, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}`. `documentRoots`: the document roots (`pm_Domain::getDocumentRoot()`) of the domains with hosting in the same webspace (same home directory and system user, from `pm_Domain::getDomainsByClient()`), relative to the home directory, `own` marking the domain's own (also `domain.documentRoot`; null when unknown). The web server serves every file there whenever it does not pass a request to an application (application disabled or removed, worker mode, paths outside the mount path, static paths; a stopped or failed application answers 502), so the settings form warns, without blocking the save, while the typed application root is one of them or lies below one (compared as text), or while it is the stored root and `appRootDocumentRoot` names an entry: the document root the stored root lies in with symbolic links resolved (helper `app-page` `document_root`, §7; null otherwise); `defaultAppRoot` (`apps/<domain>`) is its suggestion. `plesk ext runway --status` warns the same way (`app-inspect` when the text comparison finds nothing) |
-| `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, healthMatch 200 characters, static paths 1000 in total. A save is an explicit start (helper `resume`) |
+| `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active,documentRoot}, documentRoots:[{domain, path, own}], appRootDocumentRoot, defaultAppRoot, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}`. `documentRoots`: the document roots (`pm_Domain::getDocumentRoot()`) of the domains with hosting in the same webspace (same home directory and system user, from `pm_Domain::getDomainsByClient()`), relative to the home directory, `own` marking the domain's own (also `domain.documentRoot`; null when unknown). The web server serves every file there whenever it does not pass a request to an application (application disabled or removed, worker mode, paths outside the mount path, static paths; a stopped or failed application answers 502), so the settings form warns, without blocking the save, while the typed application root is one of them or lies below one (compared as text), or while it is the stored root and `appRootDocumentRoot` names an entry: the document root the stored root lies in with symbolic links resolved (helper `app-page` `document_root`, §7; null otherwise); `defaultAppRoot` (`apps/<domain>`) is its suggestion. `plesk ext runway --status` warns the same way (`app-inspect` when the text comparison finds nothing). `documentRootAllowed`: whether this user may change `domain.documentRoot` (see Document root below); `documentRootSuggestions`: `{<runtime>: [path, ...]}`, the candidate folders of the inspected (stored or default) application root that exist as real directories (helper `public_dirs`, §7), as paths relative to the home directory (`apps/example.com/wwwroot`) |
+| `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, healthMatch 200 characters, static paths 1000 in total. A save is an explicit start (helper `resume`). Optional `documentRoot` (string; see Document root below); the answer always carries `documentRoot` (the new value, else the current one) and `documentRootChanged` |
 | `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy, plain?: bool}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again. Zero-downtime: `restart` of a running switchable application answers with the switch job; `plain: true` restarts in place (§12.10) |
 | `api/app/status` | GET | domain | helper `app-status` |
 | `api/app/logs` | GET | domain | `?kind=app\|deploy&lines=N` → `{log, kind}` |
 | `api/app/remove` | POST | domain | → `{message}` |
 | `api/app/sample` | POST | domain | `{runtime, listen, force?}` (message: one file / %%count%% files) → writes the sample app into the app root (helper `app-sample`, as the user), points the config at it (runtime, listen, toolchain chosen by the helper, default commands), applies it like `api/app/save` and answers like `api/app` plus `{written, build, buildError, message}`. A non-empty app root without `force` → field error `force`; `listen: unix` without a toolchain that supports sockets (PHP without FrankenPHP) → field error `listen` |
 | `api/app/fetch` | POST | domain | `{url (https:// only; http:// only with the helper's test flag), sha256?, extract?: bool, filename?, build?: bool}` → starts a deploy job in `fetch` mode (download as the user into the app root, verify, chmod +x / extract, optional build, restart unless stopped) → `{job, message}`; needs a configured app (the UI disables the button until the settings are saved) |
+
+Document root (`documentRoot` of `api/app/save`; Plesk is the source of truth, Runway never stores it):
+
+- Format: relative to the home directory without a leading slash, like `appRoot` and the paths of
+  `documentRoots` (`httpdocs`, `apps/example.com/wwwroot`; `App::relativeDocumentRoot()`). The value
+  is trimmed of surrounding whitespace (line breaks included, as `appRoot`) and slashes, so the path
+  Runway checks is the path Plesk gets; a line break or control character inside is refused (the
+  patterns use `$` with the `D` modifier). One equal to the current document root is not a
+  change: never refused (also without the permission) and nothing is changed.
+- Validation of a change (`App::isValidDocumentRoot()`, before anything changes): non-empty, at most
+  255 characters, `RE_APP_ROOT` segments (letters, digits, `. _ @ + -`: no blank, backslash or
+  control character, no empty segment), no `.` or `..` segment, no segment that starts with `-`;
+  field errors `errorInvalidValue` (not a string), `errorDocumentRoot`, `errorDocumentRootDenied`
+  (no permission), then helper `docroot-check` as the system user (§7): `errorDocumentRootOutside`
+  (with symbolic links resolved it leads outside the home directory, or to the home directory
+  itself), `errorDocumentRootNotDir` (it exists and is not a directory), `errorDocumentRootChange`
+  (any other helper error). A missing directory is allowed: Plesk creates it.
+- Permission (`Access::canChangeDocumentRoot()`): administrators always; customers and resellers
+  (the checks of `canManage()`: access to the domain and `manage_runway_apps`) also need Plesk's own
+  permission *Hosting settings management*, `pm_Client::hasCorePermission('manage_phosting',
+  $domain)` (`pm_Client::hasPermission()` answers only for the extension's own permissions: it says
+  `false` for every Plesk permission). Plesk versions without `hasCorePermission()` leave the
+  setting to administrators. A domain of another subscription is refused by `domainFromRequest` as
+  before. Plesk's XML API accepts a change of `www_root` from a customer without `manage_phosting`
+  (verified with the e2e customer through `agent.php`), so Runway's check is the stricter one.
+- Order: the configuration (`App::update()`, in memory) and the document root are validated
+  together; any error answers all of them and changes nothing. Then `App::changeDocumentRoot()`:
+  `pm_ApiCli::call('site', ['--update', <domain name>, '-www-root', '/<path>'], RESULT_FULL)` (an
+  argument array, no shell; the path starts with `/`, so Plesk never reads it as an option). Plesk
+  refusing it (exit code ≠ 0) is the field error `errorDocumentRootChange` with Plesk's message
+  (without the generic "An error occurred during ...:" prefixes) and the configuration is not
+  saved. Then helper `docroot-access` (§7; a failure is only logged; directories it could not open
+  up, `blocked`, are named in the save message with `messageDocumentRootBlocked`), then the
+  configuration is applied as before (`applyAndDeploy()`, an explicit start that restarts the
+  application). A body with `documentRoot` and no configuration field (only `site_id` besides)
+  leaves the application alone: no `app-apply`, no restart, `job: null`, message
+  `messageDocumentRootChanged` / `messageDocumentRootUnchanged`; the form sends exactly that when
+  only the document root changed (§8). Otherwise the save message gets `messageDocumentRootChanged`
+  appended. A failure of the configuration after a changed document root leaves the document root
+  changed, and the error message ends with `messageDocumentRootChanged` so the user knows.
+- A value that starts with the home directory (`/var/www/vhosts/example.com/apps/x`, pasted from a
+  shell) is taken relative to it (`apps/x`); any other leading `/` is dropped as well.
+- `pm_Domain` keeps the document root it read for the rest of the request (verified: after `site
+  --update` in the same request `getDocumentRoot()` still answers the old value), so the save answer
+  reports the path it set; `api/app` reads it fresh.
+- Removing the application (`api/app/remove`, Reconcile, uninstall) never touches the document root:
+  it is the domain's setting that the user chose.
+
+Plesk mechanism (verified on Plesk 18.0.82 with the e2e subscription and the scratch subdomain):
+`plesk bin site --update <name> -www-root /<path>` changes the document root of a subscription's
+main domain and of a subdomain (`subscription --update` and `subdomain --update -domain` do the
+same; `site` is Plesk's utility for every kind of site, so it is used for all of them; additional
+domains are not verified: the test license allows no further domain). Plesk checks the path itself: `..` and `/` ("service directory"), blanks
+("symbols that cannot be used") and a symbolic link leading outside the webspace are refused, a
+link inside it is stored as the link's path; a leading `-` in a segment and a path without the
+leading `/` are accepted by Plesk (Runway refuses the first). A missing directory is created with
+its missing parents as `<sysuser>:psaserv` 0750, and Plesk puts its default `index.html` into a
+document root it creates; an existing directory keeps its owner, mode and content. Plesk
+regenerates the nginx and Apache configuration of the domain within the call (about 4 s): the
+`root`/`DocumentRoot` follow, the Runway snippet stays and static paths are served from the new
+root. The web server (nginx and Apache are members of `psaserv`) cannot pass a directory of mode
+0750 and group `psacln`, which is what `call_as_user` creates (umask 027): an application root
+that Runway created, with the document root inside it, answered 403 until the search permission
+for others was added (`docroot-access`). Builds also create files with umask 027 (0640): files a
+build writes into the document root need e.g. `chmod -R o+rX` at the end of the build command.
 
 Config fields (JSON, camelCase on the API, snake_case toward the helper):
 `enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, healthMatch (string, default "" = off; trimmed like PHP's trim(), at most 200 characters, no control characters (C0, DEL, C1): field error errorHealthMatch; text that starts with "{" must be a JSON object: errorHealthMatchJson; needs healthPath: errorHealthMatchPath; a non-string: errorInvalidValue), healthWatch (bool, needs healthPath: field error errorHealthWatchPath), healthWatchInterval (10-3600, default 30), healthWatchFailures (1-20, default 3), buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10). Workers (listen `none`) keep a stored `healthMatch`, but the payload sends `health_match: ""` for them and whenever `healthPath` is empty.
@@ -230,7 +303,7 @@ their code.
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
 | `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, health_match, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
-| `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
+| `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, public_dirs, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
@@ -241,6 +314,8 @@ their code.
 | `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
 | `update-install` | `{version: "X.Y.Z-R"}` | `{job: "admin", version}`; refuses a malformed version, one that is not newer than the installed one, one that is not the cached available update, and a running admin job |
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
+| `docroot-check` | `{sysuser, document_root}` | `{exists, real, document_root}`: as the system user, the document root (relative, `v_document_root`: the rules of an application root, at most 255 characters, no segment that starts with `-`) must stay strictly inside the home directory once `os.path.realpath` resolved the links (code `docroot_outside`) and, when it exists (`lexists`), be a directory (code `docroot_not_dir`); `real` is the resolved path relative to the home directory. A missing path is fine. Changes nothing |
+| `docroot-access` | `{sysuser, document_root}` | `{changed, blocked, document_root}`: run by the panel after Plesk changed the document root. As the system user, every directory of the resolved path below the home directory, the document root included, that the web server group cannot pass (neither group `psaserv` with `g+x` nor `o+x`) gets `o+x` (`fchmod` through an `O_NOFOLLOW` descriptor, never the read bit); directories of other owners and unopenable ones are reported in `blocked`, never changed |
 | `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
 | `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
 | `_health [now]` (internal) | — | run by `runway-health.service` every 10 s (`runway-health.timer`): the health watch below; `now` checks every watched application at once, without the interval and the start grace (tests, by hand) |
@@ -352,6 +427,17 @@ then works as follows; without it the code path is the 1.0 one (status line only
   checks use, which `plesk ext runway --status` shows on its *Health* line (so a worker that kept a
   path and a content in the panel shows neither). Unit and environment files never depend on
   it (an application without it renders the files of 1.0.0).
+
+Candidate document roots (`app-inspect`, `app-page`, `app-sample`'s inspection): `public_dirs` is
+`{<runtime>: [name, ...]}` with an entry for every runtime: the names of `Runtime.public_dirs` that
+are real directories directly inside the application root (`os.lstat`, so a symbolic link never
+counts; one `lstat` per distinct name, no recursion, as the system user), in the runtime's order:
+dotnet `wwwroot`; bun `dist`, `public`; php `public`, `web`; ruby `public`; python `public`; go,
+rust, java, binary `public`, `dist`, `wwwroot`. Only folders whose content mirrors the URL count: a
+static path `/static/x` is `<document root>/static/x`, so a folder that frameworks serve under a
+prefix of its own name (`static`, Django's `staticfiles`) would answer 404 as a document root and is
+never suggested. Empty lists for a missing application root. The panel turns them into
+`documentRootSuggestions` (§6).
 
 Document roots (`app-inspect`, `app-page`): `document_roots` lists the document roots of the
 webspace relative to the home directory (the panel's `documentRoots`, §6; invalid entries are
@@ -465,10 +551,31 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   app root is a document root of the webspace or lies below one (`documentRoots`, as text), or is
   the stored root that `appRootDocumentRoot` places in one (symbolic links resolved), a warning
   under the field names the domain, a settings file of the runtime (`appsettings.json` for .NET,
-  else `.env`) and suggests `defaultAppRoot` (saving stays possible); the static paths hint has
-  an example (`/assets/app.css` is `assets/app.css` in the document root) and names the domain's
-  document root. Paths and file names reach the texts as `isolate()`d placeholders, never inside a
+  else `.env`) and suggests `defaultAppRoot` (saving stays possible); the domain's own entry is
+  taken from the *Document root* field as typed. The static paths hint has an example
+  (`/assets/app.css` is `assets/app.css` in the document root) and refers to the *Document root*
+  field. Paths and file names reach the texts as `isolate()`d placeholders, never inside a
   translation, so that they keep their direction in Arabic and Hebrew.
+- Document root: the text field *Document root* in "Advanced", right above *Static paths*, hidden
+  for workers (code input, `dir="ltr"`, placeholder `httpdocs`), filled with `domain.documentRoot`.
+  Hint: the web server serves the static paths (and in path mode the rest of the site) from this
+  folder; it is the domain's document root in Plesk, the same setting as in its hosting settings;
+  example with `isolate()`d paths (application root `apps/example.com`, document root
+  `apps/example.com/wwwroot`, static path `/media`, folder `apps/example.com/wwwroot/media`).
+  Without `documentRootAllowed` the field is disabled with the note *Only users who may manage the
+  hosting settings of this domain in Plesk can change it* and the save body omits it; otherwise the
+  body sends it (trimmed) only when the field differs from the value the form was opened with and
+  the mode is not worker, so a change made in Plesk meanwhile is never undone by saving other
+  settings. When the application is configured and the document root is the only change (the save
+  bodies of the opened and the current values are equal apart from it), the body is just
+  `{documentRoot}`: no build, no restart (§6). The typed value replaces the domain's root in the
+  application root's `appRootInDocroot` warning only while it would be sent. Live notes under the
+  field: in path mode the warning that the document root also serves the rest of the site outside
+  the mount path; for a document root inside the application root of a runtime with builds, the
+  build command hint
+  `chmod -R o+rX <folder inside the application root>`; and *Suggestion: <path>* with the button
+  *Use it* (fills the field) for the first entry of `documentRootSuggestions[<runtime>]` while the
+  typed application root is the inspected one and the suggestion differs from the field.
 - **Panel integration** (`hooks/CustomButtons.php`): the navigation entry "Runway" (`nav.png`, the
   white mark: every view draws its navigation on a dark sidebar) in four places, one per view:
   `PLACE_ADMIN_NAVIGATION` (Service Provider view, section Server Management),
@@ -530,14 +637,22 @@ latest release when it is newer; waits like `--install-toolchain` and tolerates 
 fail while the upgrade replaces the files). `<domain>` is a name or a domain id. Exit codes: 0 success, 1 failure, 2 usage
 error (unknown command, domain or runtime). Admin context.
 
+`--status` of a configured application prints a *Document root* line after *Static paths*: Plesk's
+document root relative to the home directory (`App::relativeDocumentRoot()`, the absolute path when
+it lies outside). The CLI changes no application setting besides `--enable`/`--disable`, so it has
+no option to change the document root (Plesk's own `plesk bin site --update <domain> -www-root`
+does).
+
 ## 10. Testing and release
 
 - Local: `plesk/plesk` container (`scripts/plesk-dev.sh`), `tests/helper-smoke.sh` (root helper,
   fake domain id 999 with the reconcile pause flag), `tests/api-smoke.sh` (login link → cookies →
   API calls; also the navigation entry of the Service Provider and the Power User view, no Runway
   tab on a subscription's page and the icon of a domain row, read from the JSON of the panel
-  pages), `tests/customer-smoke.sh`
-  (customer `cust1` with and without the permission, including the customer panel's navigation),
+  pages; document roots of the domain and the scratch subdomain changed through the API, checked
+  in Plesk and through nginx, and restored, also by the cleanup trap), `tests/customer-smoke.sh`
+  (customer `cust1` with and without the permission, including the customer panel's navigation,
+  and the document root without and with Plesk's `manage_phosting`),
   `tests/runtime-e2e.sh` (sample app per runtime and listen mode through the API and nginx, path
   mode, static paths, triggers, worker, suspension, CLI, WebSockets through nginx and Apache,
   optional Laravel Octane), browser check of each page. helper-smoke's self-update section runs

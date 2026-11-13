@@ -965,6 +965,71 @@ def v_document_roots(value, home):
     return roots
 
 
+def v_document_root(value, home):
+    """The document root a domain should get (docroot-check, docroot-access), relative to the home
+    directory: the rules of an application root, at most 255 characters, and no segment may start
+    with "-" (the panel passes the path to Plesk's command line). Returns (relative, absolute)."""
+    rel, absolute = v_app_root(value, home)
+    if len(rel) > 255 or any(part.startswith("-") for part in rel.split("/")):
+        raise HelperError("Invalid document root")
+    return rel, absolute
+
+
+def _relative_to(path, root):
+    return path[len(root.rstrip("/")) + 1:]
+
+
+def _user_check_document_root(path, home):
+    """Runs as the customer, before the panel changes a document root: the path (inside the home
+    directory as text) must stay inside it once the customer's symbolic links are resolved
+    (os.path.realpath; the home directory itself is not a document root), and an existing path
+    must be a directory. A missing directory is fine: Plesk creates it, with its parents, as
+    <user>:psaserv 0750 (docs/DESIGN.md section 7). Returns {exists, real}."""
+    real_home = os.path.realpath(home)
+    real = os.path.realpath(path)
+    if not real.startswith(real_home.rstrip("/") + "/"):
+        raise HelperError("The document root leads outside the home directory", code="docroot_outside")
+    exists = os.path.lexists(path)
+    if exists and not os.path.isdir(path):
+        raise HelperError("The document root exists but is not a directory", code="docroot_not_dir")
+    return {"exists": exists, "real": _relative_to(real, real_home)}
+
+
+def _user_open_document_root(path, home, web_gid):
+    """Runs as the customer, after Plesk changed the document root: every directory below the home
+    directory down to the document root (its real path) that the web server group cannot pass (no
+    group web server with g+x, no o+x) gets the search permission for others (o+x, never read), so
+    that the web server reaches the document root through application roots that Runway created
+    (0750, group psacln). Plesk's own directories (group psaserv) stay as they are; directories of
+    other owners are reported, never changed; nothing is followed (O_NOFOLLOW on the real path).
+    Returns {changed, blocked} (relative paths)."""
+    real_home = os.path.realpath(home).rstrip("/")
+    real = os.path.realpath(path)
+    if not real.startswith(real_home + "/"):
+        raise HelperError("The document root leads outside the home directory", code="docroot_outside")
+    changed, blocked = [], []
+    current = real_home
+    for part in _relative_to(real, real_home).split("/"):
+        current = current + "/" + part
+        try:
+            fd = os.open(current, _DIR_FLAGS)
+        except OSError:
+            blocked.append(_relative_to(current, real_home))
+            break
+        try:
+            st = os.fstat(fd)
+            if (st.st_gid == web_gid and st.st_mode & stat.S_IXGRP) or st.st_mode & stat.S_IXOTH:
+                continue
+            if st.st_uid != os.getuid():
+                blocked.append(_relative_to(current, real_home))
+                continue
+            os.fchmod(fd, stat.S_IMODE(st.st_mode) | stat.S_IXOTH)
+            changed.append(_relative_to(current, real_home))
+        finally:
+            os.close(fd)
+    return {"changed": changed, "blocked": blocked}
+
+
 def _user_document_root(app_root, roots):
     """Runs as the customer: the document root (the relative path of an entry of `roots`) that
     the application root lies in once symbolic links are resolved, or None. The panel compares the
@@ -983,19 +1048,34 @@ def _user_document_root(app_root, roots):
     return None
 
 
+def _user_public_dirs(app_root):
+    """Runs as the customer: per runtime, the candidate document roots of Runtime.public_dirs that
+    are real directories directly inside the application root (lstat: a symbolic link never counts),
+    in the runtime's order. One lstat per distinct name, no recursion."""
+    found = {}
+    for name in set(name for rt in RUNTIMES.values() for name in rt.public_dirs):
+        try:
+            found[name] = stat.S_ISDIR(os.lstat(os.path.join(app_root, name)).st_mode)
+        except (OSError, ValueError):
+            found[name] = False
+    return dict((key, [name for name in rt.public_dirs if found.get(name)]) for key, rt in RUNTIMES.items())
+
+
 def _user_inspect_app_root(app_root, document_roots=()):
     """Runs as the customer: generic facts plus the detection result of every runtime adapter,
-    and the document root (of `document_roots`, see v_document_roots) the application root lies
-    in with symbolic links resolved."""
+    the document root (of `document_roots`, see v_document_roots) the application root lies in
+    with symbolic links resolved, and the candidate document roots inside it (public_dirs)."""
     info = {"exists": os.path.isdir(app_root), "entries": [],
             "triggers": {"deploy": False, "restart": False},
-            "document_root": _user_document_root(app_root, document_roots) if document_roots else None}
+            "document_root": _user_document_root(app_root, document_roots) if document_roots else None,
+            "public_dirs": dict((key, []) for key in RUNTIME_KEYS)}
     for key in RUNTIME_KEYS:
         info[key] = None
     if not info["exists"]:
         return info
     if not os.access(app_root, os.R_OK | os.X_OK):
         raise HelperError("The application root %s cannot be read by the system user" % app_root)
+    info["public_dirs"] = _user_public_dirs(app_root)
     names, count, more = _scan_names(app_root, LIST_KEEP_ROOT)
     entries = sorted(name.encode("utf-8", "surrogateescape").decode("utf-8", "replace") for name in names)
     info["entry_count"] = count
@@ -2442,6 +2522,12 @@ class Runtime(object):
     unix_toolchain_re = ""
     # The default commands differ per toolchain (app-page then adds variants per installed toolchain).
     defaults_per_toolchain = False
+    # Directories directly inside an application root that usually hold the files a web server can
+    # serve itself, in the order the settings form suggests them as the document root (the
+    # inspection reports the existing ones: public_dirs, docs/DESIGN.md section 7). Only folders whose
+    # content mirrors the URL: a static path /static/x is <document root>/static/x, so a folder that
+    # applications serve under a prefix of its own name (static, staticfiles) is no document root.
+    public_dirs = ("public", "dist", "wwwroot")
 
     def meta(self):
         # hint_key / install_help_key: locale keys of the panel for the English hint/install_help
@@ -2691,6 +2777,7 @@ class BunRuntime(Runtime):
             "'latest' is a channel that can be updated later.")
     docs_url = "https://bun.sh/docs"
     root = BASE_DIR + "/bun"
+    public_dirs = ("dist", "public")
 
     def target(self):
         if machine_arch() == "aarch64":
@@ -3055,6 +3142,7 @@ class DotnetRuntime(Runtime):
             "/opt/runway/dotnet; a global.json in the project selects a specific SDK.")
     docs_url = "https://learn.microsoft.com/dotnet/core/"
     root = BASE_DIR + "/dotnet"
+    public_dirs = ("wwwroot",)
     meta_url = "https://builds.dotnet.microsoft.com/dotnet/release-metadata/"
     shared_files = ("dotnet", "dnx", "LICENSE.txt", "ThirdPartyNotices.txt")
 
@@ -3288,6 +3376,7 @@ class PythonRuntime(Runtime):
             "Apps use a .venv in the application root.")
     docs_url = "https://docs.astral.sh/uv/"
     root = BASE_DIR + "/python"
+    public_dirs = ("public",)
     uv_dir = BASE_DIR + "/uv"
     uv = uv_dir + "/uv"
 
@@ -3510,6 +3599,7 @@ class RubyRuntime(Runtime):
                     "extension (plesk bin extension --install ruby) or the distribution packages (apt-get install "
                     "ruby-full ruby-dev / dnf install ruby ruby-devel). Native gems also need the build dependencies.")
     docs_url = "https://www.ruby-lang.org/en/documentation/"
+    public_dirs = ("public",)
     # The defaults of the system Ruby depend on whether Bundler is available (see system_bundle()).
     defaults_per_toolchain = True
     _installed = None
@@ -3674,6 +3764,7 @@ class PhpRuntime(Runtime):
                     "FrankenPHP versions can be installed here.")
     docs_url = "https://frankenphp.dev/docs/"
     unix_toolchain_re = r"^frankenphp-"
+    public_dirs = ("public", "web")
     defaults_per_toolchain = True
     fp_root = BASE_DIR + "/frankenphp"
     _plesk = None
@@ -6484,6 +6575,33 @@ def cmd_app_inspect(payload):
     return result
 
 
+def cmd_docroot_check(payload):
+    """Checks a document root before the panel asks Plesk to use it: as the system user, it must
+    stay inside the home directory with symbolic links resolved and, when it exists, be a directory
+    (codes docroot_outside, docroot_not_dir). Changes nothing."""
+    payload = payload or {}
+    pw = v_sysuser(payload.get("sysuser"))
+    rel, absolute = v_document_root(payload.get("document_root"), pw.pw_dir)
+    result = call_as_user(pw, _user_check_document_root, absolute, pw.pw_dir)
+    result["document_root"] = rel
+    return result
+
+
+def cmd_docroot_access(payload):
+    """After the panel changed a document root through Plesk: lets the web server group pass the
+    directories from the home directory down to it (o+x where needed, as the system user)."""
+    payload = payload or {}
+    pw = v_sysuser(payload.get("sysuser"))
+    rel, absolute = v_document_root(payload.get("document_root"), pw.pw_dir)
+    try:
+        web_gid = grp.getgrnam(WEB_GROUP).gr_gid
+    except KeyError:
+        web_gid = -1
+    result = call_as_user(pw, _user_open_document_root, absolute, pw.pw_dir, web_gid)
+    result["document_root"] = rel
+    return result
+
+
 def cmd_apps_list(payload):
     """Every application with the state of its live unit. converge: true (the panel's scheduled
     Reconcile only) also repairs zero-downtime slots and pointers (docs/DESIGN.md section 12.8)."""
@@ -8308,6 +8426,8 @@ COMMANDS = {
     "app-status": cmd_app_status,
     "app-logs": cmd_app_logs,
     "app-inspect": cmd_app_inspect,
+    "docroot-check": cmd_docroot_check,
+    "docroot-access": cmd_docroot_access,
     "apps-list": cmd_apps_list,
     "reapply-all": cmd_reapply_all,
     "web-reconfigure": cmd_web_reconfigure,
