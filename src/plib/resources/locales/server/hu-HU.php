@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Ezen a kiszolgálón csak a rendszergazda kapcsolhatja be a leállás nélküli üzembe helyezést.',
     'errorReadyTimeout' => 'A készenléti időkorlát csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
     'errorDrainSeconds' => 'A kiürítési idő csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
+    'errorHealthWatchPath' => 'Az állapotfigyeléshez állapot-ellenőrzési útvonal szükséges: adjon meg egyet, vagy kapcsolja ki a figyelést.',
+    'errorHealthWatchInterval' => 'Az ellenőrzési időköz csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
+    'errorHealthWatchFailures' => 'A sikertelen ellenőrzések száma csak %%min%% és %%max%% közötti egész szám lehet.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memóriakorlát (MiB)',

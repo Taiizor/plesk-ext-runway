@@ -123,6 +123,14 @@ func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "smoke %s", os.Getenv("SMOKE"))
 	})
+	// Health check path of the health watch tests: 503 while the file "unhealthy" exists.
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat("unhealthy"); err == nil {
+			http.Error(w, "unhealthy", http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprint(w, "ok")
+	})
 	// A file served from the application root: its page cache is charged to the service.
 	http.HandleFunc("/blob", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "blob.bin")
@@ -251,6 +259,91 @@ apply_limits '{"tasks": 512}' && ! grep -q 'MemoryPressureWatch' /etc/systemd/sy
     && ok "a task limit alone keeps the unit without MemoryPressureWatch" || bad "task limit: $(grep MemoryPressureWatch /etc/systemd/system/runway-app-$ID.service)"
 apply_limits '{}' && ! grep -q 'MemoryPressureWatch' /etc/systemd/system/runway-app-$ID.service \
     && ok "without limits the unit has no MemoryPressureWatch line" || bad "unit without limits: $(grep MemoryPressureWatch /etc/systemd/system/runway-app-$ID.service)"
+
+echo "== health watch (docs/DESIGN.md section 7, health watch)"
+watch_apply() { # watch_apply EXTRA_FIELDS: the sample (same variables) with these fields, not restarted
+    call app-apply "{$(base), \"env\": {\"SMOKE\": \"a \\\"b\\\" \$HOME %h\"}, \"restart\": false$1}" | field "['ok']"
+}
+hw() { call app-status "{\"domain_id\": $ID}" | jexpr "$1"; }
+main_pid() { systemctl show -p MainPID --value runway-app-$ID; }
+wait_new_pid() { # wait_new_pid OLD: a new process answers
+    local pid
+    for _ in $(seq 1 40); do
+        pid=$(main_pid)
+        if [ "$pid" != "0" ] && [ "$pid" != "$1" ] && [ "$(curl -s "http://127.0.0.1:$PORT/")" = 'smoke a "b" $HOME %h' ]; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+rm -f "$APP/unhealthy"
+[ "$(watch_apply ', "health_watch": true')" = "True" ] && [ "$(hw "d['health_watch']")" = "None" ] \
+    && [ ! -e /etc/systemd/system/runway-health.timer ] \
+    && ok "without a health check path the watch stays off (no timer)" || bad "watch without a path: $(hw "d['health_watch']")"
+[ "$(watch_apply ', "health_path": "/health", "health_watch": true, "health_interval": 10, "health_failures": 2')" = "True" ] \
+    && [ "$(systemctl is-enabled runway-health.timer)" = "enabled" ] && [ "$(systemctl is-active runway-health.timer)" = "active" ] \
+    && [ "$(hw "(d['health_watch']['interval'], d['health_watch']['failures_limit'])")" = "(10, 2)" ] \
+    && ok "watch on: runway-health.timer enabled and active, interval 10 s, 2 failures" \
+    || bad "watch on: timer $(systemctl is-enabled runway-health.timer) $(systemctl is-active runway-health.timer), $(hw "d['health_watch']")"
+pid0=$(main_pid)
+"$H" _health now >/dev/null
+[ "$(main_pid)" = "$pid0" ] && [ "$(hw "(d['health_watch']['result'], d['health_watch']['failures'])")" = "('healthy', 0)" ] \
+    && ok "a healthy application is left alone" || bad "healthy: $(hw "d['health_watch']")"
+runuser -u "$USER_NAME" -- touch "$APP/unhealthy"
+"$H" _health now >/dev/null
+[ "$(main_pid)" = "$pid0" ] && [ "$(hw "(d['health_watch']['result'], d['health_watch']['failures'], d['health_watch']['code'])")" = "('unhealthy', 1, 'http')" ] \
+    && ok "first failed check (HTTP 503): counted, no restart" || bad "first failure: $(hw "d['health_watch']")"
+"$H" _health now >/dev/null
+if wait_new_pid "$pid0"; then
+    [ "$(hw "(d['health_watch']['restarts_last_hour'], d['health_watch']['restart_params'].get('code'), bool(d['health_watch']['restarted_iso']), d['health_watch']['failures'])")" = "(1, 503, True, 0)" ] \
+        && ok "second failed check in a row: restarted in place, reason HTTP 503 on the status" || bad "restart status: $(hw "d['health_watch']")"
+else
+    bad "no restart after 2 failed checks: $(hw "d['health_watch']")"
+fi
+[ "$(call app-logs "{\"domain_id\": $ID, \"lines\": 100}" | jexpr "'health watch: restarting the application after 2 failed health checks' in d['log']")" = "True" ] \
+    && ok "the application log notes the restart" || bad "application log: $(call app-logs "{\"domain_id\": $ID, \"lines\": 20}" | jexpr "d['log']")"
+# A new instance gets HEALTH_WATCH_GRACE (60 s) before its first check; "_health now" skips it.
+# After 9 s the interval (10 s, minus 2 s of timer slack) is over, so only the grace holds it back.
+pid1=$(main_pid)
+sleep 9
+"$H" _health >/dev/null
+[ "$(main_pid)" = "$pid1" ] && [ "$(hw "d['health_watch']['failures']")" = "0" ] \
+    && ok "no check within 60 seconds after a start" || bad "start grace: $(hw "d['health_watch']")"
+# At most 3 restarts per hour: with 1 failure per restart the third one is the last.
+[ "$(watch_apply ', "health_path": "/health", "health_watch": true, "health_interval": 10, "health_failures": 1')" = "True" ] || bad "apply 1 failure"
+for _ in $(seq 1 30); do
+    "$H" _health now >/dev/null
+    [ "$(hw "d['health_watch']['paused']")" = "True" ] && break
+    sleep 1
+done
+pid2=$(main_pid)
+sleep 1
+"$H" _health now >/dev/null
+[ "$(hw "(d['health_watch']['restarts_last_hour'], d['health_watch']['paused'])")" = "(3, True)" ] && [ "$(main_pid)" = "$pid2" ] \
+    && ok "after 3 restarts within an hour: paused, no further restart" || bad "restart limit: $(hw "d['health_watch']")"
+[ "$(call app-logs "{\"domain_id\": $ID, \"lines\": 100}" | jexpr "'but no restart' in d['log']")" = "True" ] \
+    && ok "the application log notes the pause" || bad "pause not in the application log"
+rm -f "$APP/unhealthy"
+for _ in $(seq 1 20); do
+    "$H" _health now >/dev/null
+    [ "$(hw "(d['health_watch']['result'], d['health_watch']['paused'])")" = "('healthy', False)" ] && break
+    sleep 0.5
+done
+[ "$(hw "(d['health_watch']['result'], d['health_watch']['paused'], d['health_watch']['failures'])")" = "('healthy', False, 0)" ] \
+    && ok "healthy again: failures and pause reset" || bad "healthy again: $(hw "d['health_watch']")"
+# A stopped application stays stopped.
+call app-action "{\"domain_id\": $ID, \"action\": \"stop\"}" >/dev/null
+runuser -u "$USER_NAME" -- touch "$APP/unhealthy"
+"$H" _health now >/dev/null
+[ "$(systemctl is-active runway-app-$ID)" != "active" ] && ok "a stopped application is not restarted by the watch" || bad "the watch started a stopped application"
+rm -f "$APP/unhealthy"
+call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" >/dev/null
+wait_new_pid 0 || bad "start after the watch tests"
+[ "$(watch_apply ', "health_path": "/health", "health_watch": false')" = "True" ] && [ ! -e /etc/systemd/system/runway-health.timer ] \
+    && [ ! -e /etc/systemd/system/runway-health.service ] && [ ! -e /var/lib/runway/health/$ID.json ] && [ "$(hw "d['health_watch']")" = "None" ] \
+    && ok "watch off: timer, service and watch state removed" || bad "watch off: $(ls /etc/systemd/system/runway-health.* /var/lib/runway/health/ 2>&1)"
+watch_apply '' >/dev/null
 
 echo "== trigger files"
 pid1=$(systemctl show -p MainPID --value runway-app-$ID)

@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Solo el administrador puede activar los despliegues sin interrupción en este servidor.',
     'errorReadyTimeout' => 'El plazo de disponibilidad debe ser un número entero de segundos entre %%min%% y %%max%%.',
     'errorDrainSeconds' => 'El periodo de vaciado debe ser un número entero de segundos entre %%min%% y %%max%%.',
+    'errorHealthWatchPath' => 'La supervisión de estado necesita una ruta de la comprobación de estado: introduzca una o desactive la supervisión.',
+    'errorHealthWatchInterval' => 'El intervalo de comprobación debe ser un número entero de segundos entre %%min%% y %%max%%.',
+    'errorHealthWatchFailures' => 'El número de comprobaciones fallidas debe ser un número entero entre %%min%% y %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límite de memoria (MiB)',

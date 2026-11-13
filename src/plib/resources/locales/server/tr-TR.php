@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Bu sunucuda kesintisiz dağıtımları yalnızca yönetici açabilir.',
     'errorReadyTimeout' => 'Hazır olma zaman aşımı %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
     'errorDrainSeconds' => 'Boşaltma süresi %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
+    'errorHealthWatchPath' => 'Sağlık izleme bir sağlık kontrolü yolu gerektirir: bir yol girin ya da izlemeyi kapatın.',
+    'errorHealthWatchInterval' => 'Kontrol aralığı %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
+    'errorHealthWatchFailures' => 'Başarısız kontrol sayısı %%min%% ile %%max%% arasında bir tam sayı olmalıdır.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Bellek sınırı (MiB)',

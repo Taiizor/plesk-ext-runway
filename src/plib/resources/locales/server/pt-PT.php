@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Neste servidor, só o administrador pode ativar as implementações sem interrupção.',
     'errorReadyTimeout' => 'O tempo limite de prontidão deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
     'errorDrainSeconds' => 'O período de drenagem deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
+    'errorHealthWatchPath' => 'A monitorização de estado requer um caminho de verificação de estado: introduza um ou desative a monitorização.',
+    'errorHealthWatchInterval' => 'O intervalo de verificação deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
+    'errorHealthWatchFailures' => 'O número de verificações falhadas deve ser um número inteiro entre %%min%% e %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',

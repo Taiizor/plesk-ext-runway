@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'רק מנהל המערכת יכול להפעיל פריסות ללא השבתה בשרת זה.',
     'errorReadyTimeout' => 'הזמן הקצוב למוכנות חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
     'errorDrainSeconds' => 'זמן הריקון חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
+    'errorHealthWatchPath' => 'ניטור התקינות דורש נתיב בדיקת תקינות: הזן נתיב או השבת את הניטור.',
+    'errorHealthWatchInterval' => 'המרווח בין הבדיקות חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
+    'errorHealthWatchFailures' => 'מספר הבדיקות הכושלות חייב להיות מספר שלם בין %%min%% ל-%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',

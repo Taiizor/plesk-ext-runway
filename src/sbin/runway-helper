@@ -86,6 +86,9 @@ UNIT_ADMIN_JOB = "runway-job-admin.service"
 UNIT_SLOT = "runway-app-%d-%s.service"
 UNIT_CONVERGE = "runway-converge.service"
 SLOTS = ("a", "b")
+# Health watch: installed while an application has it on (sync_health_units).
+UNIT_HEALTH = "runway-health.service"
+UNIT_HEALTH_TIMER = "runway-health.timer"
 
 # Unix socket mode: /run/runway/<id>/app.sock, directory owned by the system user with the
 # web server group (nginx and Apache are members of psaserv, hosting customers are not).
@@ -168,6 +171,19 @@ MAX_STATIC_PATHS = 20
 FETCH_MAX_BYTES = 500 * 1024 * 1024
 FETCH_TIMEOUT = 1800
 HEALTH_TIMEOUT = 2.0
+# Health watch (docs/DESIGN.md section 7, health watch): runway-health.timer runs "_health" every
+# HEALTH_WATCH_TICK seconds while an application has it on; each application is checked every
+# health_interval seconds once its instance has run HEALTH_WATCH_GRACE seconds, and restarted in
+# place after health_failures failed checks in a row, at most HEALTH_WATCH_MAX_RESTARTS times per
+# HEALTH_WATCH_WINDOW seconds (a wrong health path must not restart it for ever).
+HEALTH_WATCH_DIR = STATE_DIR + "/health"
+HEALTH_WATCH_TIMEOUT = 5.0
+HEALTH_WATCH_TICK = 10
+HEALTH_WATCH_GRACE = 60
+HEALTH_WATCH_MAX_RESTARTS = 3
+HEALTH_WATCH_WINDOW = 3600
+HEALTH_WATCH_INTERVAL_DEFAULT = 30
+HEALTH_WATCH_FAILURES_DEFAULT = 3
 # Root-owned switch for tests only: allows http:// and non-public addresses in fetch mode.
 FETCH_INSECURE_FLAG = CONF_DIR + "/allow-insecure-fetch"
 # Root-only test flag: while it exists (and is younger than RECONCILE_PAUSE_MAX seconds) the
@@ -514,6 +530,7 @@ def validate_app(payload):
     pmin = v_int(port_range[0], 1024, 65535, "port range start")
     pmax = v_int(port_range[1], pmin, 65535, "port range end")
     app_root, app_dir = v_app_root(payload.get("app_root"), pw.pw_dir)
+    health_path = v_health_path(payload.get("health_path")) if listen != "none" else ""
     state = {
         "version": 1,
         "domain_id": v_domain_id(payload.get("domain_id")),
@@ -554,7 +571,14 @@ def validate_app(payload):
         "mode": mode,
         "mount_path": v_url_prefix(payload.get("mount_path"), "mount path") if mode == "path" else "",
         "static_paths": v_static_paths(payload.get("static_paths")),
-        "health_path": v_health_path(payload.get("health_path")) if listen != "none" else "",
+        "health_path": health_path,
+        # Health watch (opt-in): restarts the application when its health path keeps failing;
+        # nothing to watch without a health path (workers have none).
+        "health_watch": bool(payload.get("health_watch")) and bool(health_path),
+        "health_interval": v_int(_or_default(payload.get("health_interval"), HEALTH_WATCH_INTERVAL_DEFAULT), 10, 3600,
+                                 "health check interval"),
+        "health_failures": v_int(_or_default(payload.get("health_failures"), HEALTH_WATCH_FAILURES_DEFAULT), 1, 20,
+                                 "failed health checks"),
         # Zero-downtime deployments (docs/DESIGN.md section 12): workers have nothing to switch.
         "zero_downtime": bool(payload.get("zero_downtime")) and listen != "none",
         "ready_timeout": v_int(_or_default(payload.get("ready_timeout"), ZD_READY_DEFAULT), 5, 900, "readiness timeout"),
@@ -5036,6 +5060,8 @@ def app_status(domain_id, state=None):
         status["health_detail"] = "" if state.get("health_path") else "No health check path configured"
         status["health_code"] = "" if state.get("health_path") else "no_path"
         status["health_params"] = {}
+        # Health watch: null while it is off.
+        status["health_watch"] = health_watch_status(domain_id, state)
         # Zero-downtime deployments (docs/DESIGN.md section 12.10).
         status["zero_downtime"] = bool(state.get("zero_downtime"))
         status["switchable"] = zd_switchable(state)
@@ -5109,10 +5135,11 @@ def app_status(domain_id, state=None):
     return status
 
 
-def health_check(state, listener, pw=None):
-    """One HTTP GET of the health path (2 s, Host = domain): (healthy | unhealthy | unknown, detail,
-    code, params). Only talks to an endpoint held by the application's own user (listener "ok");
-    a unix socket is opened without following a symbolic link (unix_connect)."""
+def health_check(state, listener, pw=None, timeout=HEALTH_TIMEOUT):
+    """One HTTP GET of the health path (timeout: 2 s for the status, 5 s for the health watch;
+    Host = domain): (healthy | unhealthy | unknown, detail, code, params). Only talks to an
+    endpoint held by the application's own user (listener "ok"); a unix socket is opened without
+    following a symbolic link (unix_connect)."""
     if listener != "ok":
         return "unknown", "The application is not listening", "not_listening", {}
     try:
@@ -5121,17 +5148,17 @@ def health_check(state, listener, pw=None):
         host = state["domain"].encode("ascii", "replace").decode("ascii")
     request = ("GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: runway-health/%s\r\nAccept: */*\r\n"
                "Connection: close\r\n\r\n" % (state["health_path"], host, VERSION)).encode("ascii", "replace")
-    deadline = time.time() + HEALTH_TIMEOUT
+    deadline = time.time() + timeout
     data = b""
     sock = None
     try:
         if state.get("listen") == "unix":
             if pw is None:
                 pw = pwd.getpwnam(str(state.get("sysuser")))
-            sock = unix_connect(endpoint_socket(state), pw.pw_uid, HEALTH_TIMEOUT)
+            sock = unix_connect(endpoint_socket(state), pw.pw_uid, timeout)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(HEALTH_TIMEOUT)
+            sock.settimeout(timeout)
             sock.connect(("127.0.0.1", int(state["port"])))
         sock.sendall(request)
         while b"\r\n" not in data and len(data) < 4096:
@@ -5157,11 +5184,241 @@ def health_check(state, listener, pw=None):
             "http", {"code": code, "path": state["health_path"]})
 
 
+# ---------------------------------------------------------------------------
+# Health watch (opt-in per application, docs/DESIGN.md section 7)
+# ---------------------------------------------------------------------------
+
+def epoch_iso(value):
+    """Epoch seconds -> '2026-11-13T07:00:00+00:00', None for anything else."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+        return None
+    return datetime.datetime.fromtimestamp(value, datetime.timezone.utc).replace(microsecond=0).isoformat()
+
+
+def health_watch_path(domain_id):
+    return os.path.join(HEALTH_WATCH_DIR, "%d.json" % domain_id)
+
+
+def read_health_watch(domain_id):
+    data = read_json(health_watch_path(domain_id))
+    return data if isinstance(data, dict) else {}
+
+
+def _recent_restarts(watch, now):
+    return [t for t in watch.get("restarts") or []
+            if isinstance(t, (int, float)) and not isinstance(t, bool) and 0 <= now - t < HEALTH_WATCH_WINDOW]
+
+
+def health_watch_status(domain_id, state):
+    """The "health_watch" object of app-status (null without the watch)."""
+    if not isinstance(state, dict) or not state.get("health_watch"):
+        return None
+    watch = read_health_watch(domain_id)
+    now = time.time()
+
+    def number(key, default):
+        value = state.get(key)
+        return value if isinstance(value, int) and not isinstance(value, bool) else default
+
+    return {
+        "interval": number("health_interval", HEALTH_WATCH_INTERVAL_DEFAULT),
+        "failures_limit": number("health_failures", HEALTH_WATCH_FAILURES_DEFAULT),
+        "failures": int(watch.get("failures") or 0),
+        "checked_iso": epoch_iso(watch.get("checked_epoch")),
+        "result": watch.get("result") if watch.get("result") in ("healthy", "unhealthy", "skipped") else None,
+        "detail": str(watch.get("detail") or "")[:300],
+        "code": str(watch.get("code") or "")[:40],
+        "params": watch.get("params") if isinstance(watch.get("params"), dict) else {},
+        "restarts_last_hour": len(_recent_restarts(watch, now)),
+        "max_restarts": HEALTH_WATCH_MAX_RESTARTS,
+        "restarted_iso": epoch_iso(watch.get("restarted_epoch")),
+        "restart_detail": str(watch.get("restart_detail") or "")[:300],
+        "restart_code": str(watch.get("restart_code") or "")[:40],
+        "restart_params": watch.get("restart_params") if isinstance(watch.get("restart_params"), dict) else {},
+        "paused": bool(watch.get("paused")),
+    }
+
+
+def sync_health_units():
+    """Installs and starts runway-health.timer while an application has the health watch on, and
+    removes it (with its service) when none has: servers without it run nothing."""
+    service_path = os.path.join(UNIT_DIR, UNIT_HEALTH)
+    timer_path = os.path.join(UNIT_DIR, UNIT_HEALTH_TIMER)
+    states = list(iter_app_states())
+    for raw in states:
+        # The failures and restarts of a watch that was turned off are forgotten.
+        if not raw.get("health_watch") and isinstance(raw.get("domain_id"), int) and not isinstance(raw.get("domain_id"), bool):
+            remove_quietly(health_watch_path(raw["domain_id"]))
+    if not any(raw.get("health_watch") for raw in states):
+        if os.path.exists(timer_path) or os.path.exists(service_path):
+            systemctl("disable", "--now", UNIT_HEALTH_TIMER)
+            remove_quietly(timer_path)
+            remove_quietly(service_path)
+            systemctl("daemon-reload")
+            systemctl("reset-failed", UNIT_HEALTH, UNIT_HEALTH_TIMER)
+        return False
+    service = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]",
+        "Description=Runway: health watch (restarts an application whose health check keeps failing)",
+        "",
+        "[Service]",
+        "Type=oneshot",
+        "ExecStart=%s _health" % HELPER_COPY,
+        "TimeoutStartSec=600",
+        "",
+    ])
+    timer = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]",
+        "Description=Runway: health watch every %d seconds" % HEALTH_WATCH_TICK,
+        "",
+        "[Timer]",
+        "OnActiveSec=%d" % HEALTH_WATCH_TICK,
+        "OnUnitActiveSec=%d" % HEALTH_WATCH_TICK,
+        "AccuracySec=1",
+        "",
+        "[Install]",
+        "WantedBy=timers.target",
+        "",
+    ])
+    changed = write_unit_file(service_path, service)
+    changed = write_unit_file(timer_path, timer) or changed
+    if changed:
+        systemctl("daemon-reload")
+    if changed or not unit_enabled(UNIT_HEALTH_TIMER) or not unit_is_active(UNIT_HEALTH_TIMER):
+        systemctl("enable", "--now", UNIT_HEALTH_TIMER)
+    return True
+
+
+def internal_health(now_mode=False):
+    """runway-health.service (every HEALTH_WATCH_TICK seconds): the health watch of every application
+    that has it on. now_mode ("_health now", tests and by hand): every one of them at once, without
+    the interval and the start grace. Prints what it did (the journal of runway-health.service)."""
+    ensure_dir(HEALTH_WATCH_DIR, 0o700)
+    watched = set()
+    for raw in list(iter_app_states()):
+        domain_id = raw.get("domain_id")
+        if not isinstance(domain_id, int) or isinstance(domain_id, bool) or not raw.get("health_watch"):
+            continue
+        watched.add(domain_id)
+        try:
+            line = health_watch_app(domain_id, now_mode)
+        except Exception as exc:  # noqa: BLE001 - one application must not stop the others
+            line = "#%d: %s" % (domain_id, exc)
+        if line:
+            print(line, flush=True)
+    for name in _listdir(HEALTH_WATCH_DIR):
+        match = re.match(r"^(\d+)\.json$", name)
+        if match and int(match.group(1)) not in watched:
+            remove_quietly(os.path.join(HEALTH_WATCH_DIR, name))
+
+
+def health_watch_app(domain_id, now_mode=False):
+    """One application of the health watch when its check is due; never while a deployment, a
+    save or a switch holds its deploy lock (they restart it themselves). Returns a log line."""
+    watch = read_health_watch(domain_id)
+    state, _pw = load_app_state(domain_id)
+    if not state["health_watch"]:
+        return None
+    if not now_mode and time.time() - float(watch.get("checked_epoch") or 0) < state["health_interval"] - 2:
+        return None
+    lock = FileLock("deploy-%d" % domain_id)
+    if unit_is_active(UNIT_DEPLOY % domain_id) or not lock.acquire(blocking=False):
+        return None
+    try:
+        state, pw = load_app_state(domain_id)
+        return _health_watch_locked(state, pw, watch, now_mode)
+    finally:
+        lock.release()
+
+
+def _health_watch_locked(state, pw, watch, now_mode):
+    domain_id = state["domain_id"]
+    now = time.time()
+    path = health_watch_path(domain_id)
+    slots = zd_has_slots(state)
+    unit = app_unit(domain_id, state["slot"]) if slots else UNIT_APP % domain_id
+    view = live_view(state) if slots else state
+    if not state["health_watch"] or not state["enabled"] or state["suspended"] or state["stopped"] or state["tampered"]:
+        if watch.get("failures"):
+            watch["failures"] = 0
+            write_json(path, watch)
+        return None
+    info = unit_show([unit], ["ActiveState", "SubState", "ActiveEnterTimestampMonotonic"]).get(unit, {})
+    if info.get("ActiveState") != "active" or info.get("SubState") != "running":
+        # Not running: systemd restarts a crashed application itself (Restart=always), and a
+        # starting one is not judged yet.
+        if watch.get("failures"):
+            watch["failures"] = 0
+            write_json(path, watch)
+        return None
+    entered = info.get("ActiveEnterTimestampMonotonic") or ""
+    entered = int(entered) if entered.isdigit() else 0
+    instance = "%s@%d" % (unit, entered)
+    if watch.get("instance") != instance:
+        # Another instance (restarted by anybody): its failures start from zero.
+        watch.update({"instance": instance, "failures": 0})
+    if not now_mode and entered and time.monotonic() - entered / 1e6 < HEALTH_WATCH_GRACE:
+        write_json(path, watch)
+        return None
+    listener, ldetail, lcode, lparams = listener_info(view, pw)
+    if listener in ("foreign", "tampered"):
+        # Another user holds the endpoint: a restart would not help (the status reports it).
+        watch.update({"checked_epoch": now, "result": "skipped", "detail": ldetail, "code": lcode, "params": lparams})
+        write_json(path, watch)
+        return None
+    result, detail, code, params = health_check(view, listener, pw, HEALTH_WATCH_TIMEOUT)
+    healthy = result == "healthy"
+    watch.update({"checked_epoch": now, "result": "healthy" if healthy else "unhealthy",
+                  "detail": detail, "code": code, "params": params})
+    if healthy:
+        watch.update({"failures": 0, "paused": False})
+        write_json(path, watch)
+        return None
+    watch["failures"] = int(watch.get("failures") or 0) + 1
+    if watch["failures"] < state["health_failures"]:
+        write_json(path, watch)
+        return "#%d: health check failed (%d of %d in a row): %s" % (domain_id, watch["failures"], state["health_failures"], detail)
+    restarts = _recent_restarts(watch, now)
+    watch["restarts"] = restarts
+    if len(restarts) >= HEALTH_WATCH_MAX_RESTARTS:
+        if not watch.get("paused"):
+            journal_note(domain_id, "health watch: %d failed health checks in a row (last: %s), but no restart: it "
+                                    "restarted the application %d times within the last hour and restarts it again once "
+                                    "the oldest of them is an hour ago." % (watch["failures"], detail, len(restarts)))
+        watch["paused"] = True
+        write_json(path, watch)
+        return "#%d: not restarted (%d restarts within the last hour): %s" % (domain_id, len(restarts), detail)
+    message = "health watch: restarting the application after %d failed health checks in a row (last: %s)." % (
+        watch["failures"], detail)
+    journal_note(domain_id, message)
+    if slots:
+        zd_plain_restart(state, pw)
+    else:
+        prepare_start(state, pw)
+        systemctl("enable", unit, check=True)
+        systemctl("reset-failed", unit)
+        systemctl("restart", "--no-block", unit, check=True)
+    restarts.append(now)
+    watch.update({"restarts": restarts, "restarted_epoch": now, "restart_detail": detail, "restart_code": code,
+                  "restart_params": params, "failures": 0, "paused": False, "instance": None})
+    write_json(path, watch)
+    return "#%d: %s" % (domain_id, message)
+
+
 FLAG_KEYS = ("stopped", "tampered", "tampered_at", "tampered_detail")
 CLEARED_FLAGS = {"stopped": False, "tampered": False, "tampered_at": "", "tampered_detail": ""}
 
 
 def cmd_app_apply(payload):
+    result = _app_apply(payload)
+    # The health watch timer exists while an application has the watch on.
+    sync_health_units()
+    return result
+
+
+def _app_apply(payload):
     payload = dict(payload or {})
     if "env" not in payload:
         # The panel omits "env" when it did not load/edit it: keep the stored secrets.
@@ -5368,8 +5625,10 @@ def remove_app(domain_id):
     remove_include(domain_id)
     for path in job_paths("deploy-%d" % domain_id):
         remove_quietly(path)
+    remove_quietly(health_watch_path(domain_id))
     systemctl("daemon-reload")
     systemctl("reset-failed", *units)
+    sync_health_units()
 
 
 def cmd_app_action(payload):
@@ -6174,6 +6433,7 @@ def cmd_reapply_all(_payload):
                         errors.append("#%s: removed root-privileged Exec lines from the old unit file%s"
                                       % (domain_id, "" if unit == UNIT_APP % domain_id else " " + unit))
     systemctl("daemon-reload")
+    sync_health_units()
     return {"count": count, "errors": errors}
 
 
@@ -6199,6 +6459,8 @@ def cmd_uninstall(payload):
     if os.path.exists(os.path.join(UNIT_DIR, UNIT_CONVERGE)):
         remove_converge_unit()
         systemctl("daemon-reload")
+    # No application is left: the health watch timer goes too.
+    sync_health_units()
     for name in _listdir(TMPFILES_DIR):
         if name == "runway.conf" or re.match(r"^runway-\d+\.conf$", name):
             remove_quietly(os.path.join(TMPFILES_DIR, name))
@@ -7859,6 +8121,9 @@ def main(argv):
         return 0
     if command == "_converge" and len(argv) == 2:
         internal_converge()
+        return 0
+    if command == "_health" and (len(argv) == 2 or (len(argv) == 3 and argv[2] == "now")):
+        internal_health(len(argv) == 3)
         return 0
 
     handler = COMMANDS.get(command)

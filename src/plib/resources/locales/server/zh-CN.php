@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => '在此服务器上，只有管理员可以开启零停机部署。',
     'errorReadyTimeout' => '就绪超时必须是 %%min%% 到 %%max%% 之间的整数秒。',
     'errorDrainSeconds' => '排空时间必须是 %%min%% 到 %%max%% 之间的整数秒。',
+    'errorHealthWatchPath' => '健康监控需要健康检查路径：请输入一个路径，或关闭健康监控。',
+    'errorHealthWatchInterval' => '检查间隔必须是 %%min%% 到 %%max%% 之间的整数秒。',
+    'errorHealthWatchFailures' => '检查失败次数必须是 %%min%% 到 %%max%% 之间的整数。',
 
     // Field names used in error messages
     'fieldMemoryMb' => '内存限制（MiB）',

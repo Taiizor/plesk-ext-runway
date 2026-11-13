@@ -280,6 +280,9 @@ class Modules_Runway_Cli
             }
             $facts[] = ['Health', (string)$health . ($config['healthPath'] !== '' ? ' (' . $config['healthPath'] . ')' : '')];
         }
+        foreach (self::healthWatchFacts($status) as $fact) {
+            $facts[] = $fact;
+        }
         if (isset($status['deploy']) && is_array($status['deploy'])) {
             $deploy = $status['deploy'];
             $state = isset($deploy['state']) ? (string)$deploy['state'] : 'none';
@@ -341,6 +344,32 @@ class Modules_Runway_Cli
         $limit = (isset($status['ready_timeout']) ? (int)$status['ready_timeout'] : 60)
             + (isset($status['drain_seconds']) ? (int)$status['drain_seconds'] : 10) + 300;
         return $this->waitForJob($job, $limit);
+    }
+
+    /**
+     * Health watch facts of --status (docs/DESIGN.md section 7): the setting, the failed checks in
+     * a row, the last restart and a pause after too many restarts.
+     *
+     * @param array $status app-status of the helper
+     * @return array[] [label, value] pairs
+     */
+    private static function healthWatchFacts(array $status)
+    {
+        $watch = isset($status['health_watch']) && is_array($status['health_watch']) ? $status['health_watch'] : null;
+        if ($watch === null) {
+            return array_key_exists('health_watch', $status) ? [['Health watch', 'off']] : [];
+        }
+        $facts = [['Health watch', 'every ' . (int)$watch['interval'] . ' s, restart after ' . (int)$watch['failures_limit']
+            . ' failed checks in a row' . (!empty($watch['failures']) ? '; ' . (int)$watch['failures'] . ' failed so far' : '')]];
+        if (!empty($watch['restarted_iso'])) {
+            $facts[] = ['Last watch restart', (string)$watch['restarted_iso']
+                . (!empty($watch['restart_detail']) ? ' (' . $watch['restart_detail'] . ')' : '')];
+        }
+        if (!empty($watch['paused'])) {
+            $facts[] = ['Warning', 'the health watch restarted the application ' . (int)$watch['restarts_last_hour']
+                . ' times within the last hour and restarts it again once the oldest of them is an hour ago'];
+        }
+        return $facts;
     }
 
     /**

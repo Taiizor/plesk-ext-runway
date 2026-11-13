@@ -9,7 +9,8 @@ import {
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
-const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
+const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'healthWatch', 'healthWatchInterval',
+    'healthWatchFailures', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
     'zeroDowntime', 'readyTimeout', 'drainSeconds'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
 // Fields the default commands depend on.
@@ -74,6 +75,10 @@ export const formValues = data => {
         mountPath: text(config.mountPath),
         staticPaths: Array.isArray(config.staticPaths) ? config.staticPaths.join('\n') : text(config.staticPaths),
         healthPath: text(config.healthPath),
+        // Health watch: defaults 30 s and 3 failed checks in a row.
+        healthWatch: Boolean(config.healthWatch),
+        healthWatchInterval: text(config.healthWatchInterval || 30),
+        healthWatchFailures: text(config.healthWatchFailures || 3),
         buildCmd: text(config.buildCmd),
         startCmd: text(config.startCmd),
         autoDeploy: config.autoDeploy !== false,
@@ -116,6 +121,14 @@ const requestBody = (values, data, isAdmin, supportsBuild) => {
         body.zeroDowntime = Boolean(values.zeroDowntime);
         if (values.zeroDowntime) {
             ['readyTimeout', 'drainSeconds'].forEach(key => {
+                const raw = String(values[key]).trim();
+                body[key] = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+            });
+        }
+        // Health watch: the interval and the failures only while it is on.
+        body.healthWatch = Boolean(values.healthWatch);
+        if (values.healthWatch) {
+            ['healthWatchInterval', 'healthWatchFailures'].forEach(key => {
                 const raw = String(values[key]).trim();
                 body[key] = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
             });
@@ -201,7 +214,8 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const visible = ['enabled', 'runtime', 'appRoot', 'mode', 'startCmd', 'env', 'autoDeploy']
         .concat(supportsBuild ? ['buildCmd'] : [])
         .concat(kind !== 'none' ? ['toolchain'] : [])
-        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'zeroDowntime'])
+        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'healthWatch', 'zeroDowntime'])
+        .concat(!worker && values.healthWatch ? ['healthWatchInterval', 'healthWatchFailures'] : [])
         .concat(!worker && values.zeroDowntime ? ['readyTimeout', 'drainSeconds'] : [])
         .concat(values.mode === 'path' ? ['mountPath'] : [])
         .concat(isAdmin ? LIMITS : []);
@@ -468,6 +482,31 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                             label={<Translate content="Domain.form.healthPath" />}
                             description={<Translate content="Domain.form.healthPathHint" />}
                             placeholder="/healthz"
+                            inputProps={pathInput}
+                        />
+                    )}
+                    {!worker && (
+                        <FormFieldCheckbox
+                            name="healthWatch"
+                            label={<Translate content="Domain.form.healthWatch" />}
+                            description={<Translate content="Domain.form.healthWatchHint" />}
+                        />
+                    )}
+                    {!worker && values.healthWatch && (
+                        <FormFieldText
+                            name="healthWatchInterval"
+                            label={<Translate content="Domain.form.healthWatchInterval" />}
+                            description={<Translate content="Domain.form.healthWatchIntervalHint" />}
+                            size="md"
+                            inputProps={pathInput}
+                        />
+                    )}
+                    {!worker && values.healthWatch && (
+                        <FormFieldText
+                            name="healthWatchFailures"
+                            label={<Translate content="Domain.form.healthWatchFailures" />}
+                            description={<Translate content="Domain.form.healthWatchFailuresHint" />}
+                            size="md"
                             inputProps={pathInput}
                         />
                     )}

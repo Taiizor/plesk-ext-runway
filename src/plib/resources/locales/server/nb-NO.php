@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'På denne serveren kan bare administratoren slå på utrulling uten nedetid.',
     'errorReadyTimeout' => 'Tidsavbruddet for klarhet må være et helt antall sekunder mellom %%min%% og %%max%%.',
     'errorDrainSeconds' => 'Tømmeperioden må være et helt antall sekunder mellom %%min%% og %%max%%.',
+    'errorHealthWatchPath' => 'Helseovervåkingen krever en bane for helsesjekk: angi en, eller slå av overvåkingen.',
+    'errorHealthWatchInterval' => 'Sjekkintervallet må være et helt antall sekunder mellom %%min%% og %%max%%.',
+    'errorHealthWatchFailures' => 'Antallet mislykkede sjekker må være et heltall mellom %%min%% og %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnegrense (MiB)',

@@ -26,6 +26,7 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
 [Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
 [Listen modes](#listen-modes) · [Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
+[When an application fails](#when-an-application-fails) ·
 [Deploying with Git](#deploying-with-git) · [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
 [License](#license)
@@ -70,6 +71,8 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - Trigger files for Git and CI deployments.
 - Optional **zero-downtime deployments**: the new version starts next to the running one and
   takes over when it is ready; a version that does not become ready never gets traffic.
+- Optional **health watch**: requests the health check path regularly and restarts an application
+  that hangs without crashing (a crashed one is restarted by systemd anyway).
 
 **Languages**: the interface follows the panel language, in all 32 languages of Plesk. English and
 Turkish are written by hand; the other 30 were machine-translated and reviewed, and corrections
@@ -384,6 +387,35 @@ the file cache. With cgroup v1 (older distributions) the file is
 `/sys/fs/cgroup/memory<ControlGroup>/memory.stat` and the fields are `total_active_file`,
 `total_inactive_file`, `total_mapped_file`, `total_rss`, `total_cache` and `total_shmem`.
 
+## When an application fails
+
+- **It crashes or exits.** systemd starts it again after 3 seconds (`Restart=always`), whatever the
+  reason, also after a clean exit; only a Stop of the panel or the command line keeps it stopped.
+  The status card counts these restarts. After 10 starts within 2 minutes (for example an
+  application that crashes at once because its database is not up yet after a reboot) systemd
+  gives up; the scheduled reconcile starts it again within 10 minutes.
+- **The server reboots.** Every enabled application starts again, after the network and the local
+  database servers (MariaDB, MySQL, PostgreSQL); the last build runs, nothing is rebuilt.
+  Applications that were stopped, disabled or whose domain is suspended stay down.
+- **It reaches its memory limit.** The kernel first drops the cache of the files it read (see
+  [Memory](#memory)), then moves its memory to swap if the server has swap (it keeps running, much
+  slower); without swap, or with full swap, the kernel kills it and systemd starts it again. .NET
+  and Java keep their heap within the limit themselves (75 %): a request that needs more fails with
+  an out-of-memory error, the process keeps running.
+- **It reaches its CPU limit.** It is slowed down, never stopped: 150 % allows one and a half cores.
+- **It reaches its task limit.** Creating a further thread or process fails; it is not stopped.
+- **It hangs without crashing** (a deadlock, an endless loop, a full thread pool). systemd does not
+  notice it. Turn on the **health watch** (domain settings, *Advanced*; it needs a health check
+  path): Runway then requests the path every 30 seconds (10 to 3600) and restarts the application
+  in place after 3 failed checks in a row (1 to 20). A check fails when the path does not answer
+  with 2xx or 3xx within 5 seconds, or nothing listens. No checks in the first 60 seconds after a
+  start, while a deployment runs, or for stopped applications; a port held by another user is not
+  counted. After 3 restarts within an hour it only reports the failures (status card, application
+  log) until the oldest of them is an hour ago, so a wrong health path cannot restart an
+  application for ever. With zero-downtime deployments it restarts the running version in place
+  too, like *Restart in place*. One timer (`runway-health.timer`, every 10 seconds) serves every
+  application with the watch and exists only while one has it on.
+
 ## Deploying with Git
 
 Runway watches two trigger files in the application directory (a systemd path unit, active
@@ -445,6 +477,8 @@ plesk ext runway --update                            # update Runway to it (see 
 | Mount path | URL prefix for `path` mode, for example `/api` | |
 | Static paths | up to 20 URL prefixes the web server serves from the document root (the files must be there) | |
 | Health check path | `GET` with a 2 s timeout, shown as healthy/unhealthy | |
+| Health watch | restart the application in place when the health check path fails several times in a row (needs a health check path; see [When an application fails](#when-an-application-fails)) | off |
+| Check interval, failed checks | how often the health watch checks (10-3600 s) and after how many failed checks in a row it restarts (1-20) | 30 s, 3 |
 | Build command | runs with `bash -c` in the application directory as the system user | per runtime |
 | Start command | runs with `bash -c` in the application directory as the system user | per runtime |
 | Trigger files | watch `tmp/deploy.txt` and `tmp/restart.txt` | on |
@@ -474,13 +508,13 @@ plesk ext runway --update                            # update Runway to it (see 
 |---|---|
 | Root helper | `/usr/local/psa/admin/sbin/modules/runway/runway-helper`, stable copy `/opt/runway/bin/runway-helper` used by the units |
 | Toolchains | `/opt/runway/<runtime>/...` (`/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/dotnet`, `/opt/runway/uv/uv`, ...) |
-| State, job logs, caches | `/var/lib/runway/{apps,jobs,locks,cache}` (root, 0700); the updater's last check in `/var/lib/runway/cache/update.json` |
+| State, job logs, caches | `/var/lib/runway/{apps,jobs,locks,cache,health}` (root, 0700); the updater's last check in `/var/lib/runway/cache/update.json`; the health watch's failures and restarts in `/var/lib/runway/health/<id>.json` |
 | Environment files | `/etc/runway/env/<domainId>.env` (root, 0600) |
-| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, `runway-job-admin.service`; with zero-downtime deployments the slots `runway-app-<id>-a.service` and `-b.service` (environment files `<id>-a.env`, `<id>-b.env`) and `runway-converge.service` (repairs an interrupted switch at boot) |
+| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, `runway-job-admin.service`; with zero-downtime deployments the slots `runway-app-<id>-a.service` and `-b.service` (environment files `<id>-a.env`, `<id>-b.env`) and `runway-converge.service` (repairs an interrupted switch at boot); while an application has the health watch on, `runway-health.timer` and `runway-health.service` |
 | Unix sockets | `/run/runway/<id>/app.sock`; the directory is recreated at boot from `/etc/tmpfiles.d/runway-<id>.conf`. Zero-downtime: `a.sock`, `b.sock` and the root-owned link `/run/runway/<id>.sock` the web server uses |
 | Zero-downtime include files (TCP) | `/etc/runway/web/<id>.nginx.conf` and `<id>.apache.conf` (the live port) |
 | Per-user caches | `~/.runway/` in the subscription |
-| Logs | `/var/log/plesk/panel.log` (PHP), `journalctl -u runway-app-<id>` (applications; with zero-downtime deployments also `-u runway-app-<id>-a -u runway-app-<id>-b`), `/var/lib/runway/jobs/*.log` (builds and toolchain jobs) |
+| Logs | `/var/log/plesk/panel.log` (PHP), `journalctl -u runway-app-<id>` (applications; with zero-downtime deployments also `-u runway-app-<id>-a -u runway-app-<id>-b`; also the restarts of the health watch), `journalctl -u runway-health` (every check that failed), `/var/lib/runway/jobs/*.log` (builds and toolchain jobs) |
 
 ## How it works
 

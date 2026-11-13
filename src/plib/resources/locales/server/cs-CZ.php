@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Nasazení bez výpadku může na tomto serveru zapnout pouze administrátor.',
     'errorReadyTimeout' => 'Časový limit připravenosti musí být celý počet sekund od %%min%% do %%max%%.',
     'errorDrainSeconds' => 'Doba doběhu musí být celý počet sekund od %%min%% do %%max%%.',
+    'errorHealthWatchPath' => 'Sledování stavu vyžaduje cestu kontroly stavu: zadejte ji, nebo sledování vypněte.',
+    'errorHealthWatchInterval' => 'Interval kontroly musí být celý počet sekund od %%min%% do %%max%%.',
+    'errorHealthWatchFailures' => 'Počet neúspěšných kontrol musí být celé číslo od %%min%% do %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit paměti (MiB)',

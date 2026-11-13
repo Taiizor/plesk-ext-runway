@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Vain järjestelmänvalvoja voi kytkeä katkottomat käyttöönotot päälle tällä palvelimella.',
     'errorReadyTimeout' => 'Valmiuden aikakatkaisun on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
     'errorDrainSeconds' => 'Tyhjennysajan on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
+    'errorHealthWatchPath' => 'Kunnonvalvonta vaatii kuntotarkistuksen polun: anna polku tai kytke valvonta pois päältä.',
+    'errorHealthWatchInterval' => 'Tarkistusvälin on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
+    'errorHealthWatchFailures' => 'Epäonnistuneiden tarkistusten määrän on oltava kokonaisluku väliltä %%min%%–%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Muistiraja (MiB)',

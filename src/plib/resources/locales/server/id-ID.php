@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Hanya administrator yang dapat mengaktifkan deployment tanpa downtime di server ini.',
     'errorReadyTimeout' => 'Batas waktu kesiapan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
     'errorDrainSeconds' => 'Periode pengurasan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
+    'errorHealthWatchPath' => 'Pemantauan kesehatan memerlukan jalur pemeriksaan kesehatan: masukkan jalurnya, atau nonaktifkan pemantauan.',
+    'errorHealthWatchInterval' => 'Interval pemeriksaan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
+    'errorHealthWatchFailures' => 'Jumlah pemeriksaan gagal harus berupa bilangan bulat antara %%min%% dan %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Batas memori (MiB)',

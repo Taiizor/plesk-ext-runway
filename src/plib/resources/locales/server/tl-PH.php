@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Sa server na ito, ang administrator lamang ang makakapag-on ng mga deployment na walang downtime.',
     'errorReadyTimeout' => 'Ang readiness timeout ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
     'errorDrainSeconds' => 'Ang drain period ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
+    'errorHealthWatchPath' => 'Kailangan ng health watch ng health check path: maglagay ng isa, o i-off ang health watch.',
+    'errorHealthWatchInterval' => 'Ang interval ng check ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
+    'errorHealthWatchFailures' => 'Ang bilang ng nabigong check ay dapat isang buong numero mula %%min%% hanggang %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',

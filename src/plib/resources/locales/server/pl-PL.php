@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Na tym serwerze tylko administrator może włączyć wdrożenia bez przestojów.',
     'errorReadyTimeout' => 'Limit czasu gotowości musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
     'errorDrainSeconds' => 'Okres wygaszania musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
+    'errorHealthWatchPath' => 'Monitorowanie stanu wymaga ścieżki kontroli stanu: wprowadź ją lub wyłącz monitorowanie.',
+    'errorHealthWatchInterval' => 'Odstęp między kontrolami musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
+    'errorHealthWatchFailures' => 'Liczba nieudanych kontroli musi być liczbą całkowitą od %%min%% do %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit pamięci (MiB)',

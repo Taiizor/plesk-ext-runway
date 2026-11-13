@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Seul l\'administrateur peut activer les déploiements sans interruption sur ce serveur.',
     'errorReadyTimeout' => 'Le délai de disponibilité doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
     'errorDrainSeconds' => 'La durée de vidage doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
+    'errorHealthWatchPath' => 'La surveillance d\'état nécessite un chemin de vérification d\'état : saisissez-en un ou désactivez la surveillance.',
+    'errorHealthWatchInterval' => 'L\'intervalle de vérification doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
+    'errorHealthWatchFailures' => 'Le nombre de vérifications échouées doit être un nombre entier compris entre %%min%% et %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de mémoire (Mio)',

@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Nur der Administrator kann auf diesem Server Zero-Downtime-Bereitstellungen aktivieren.',
     'errorReadyTimeout' => 'Das Bereitschafts-Timeout muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
     'errorDrainSeconds' => 'Die Auslaufzeit muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
+    'errorHealthWatchPath' => 'Die Health-Check-Überwachung benötigt einen Health-Check-Pfad: Geben Sie einen ein oder deaktivieren Sie die Überwachung.',
+    'errorHealthWatchInterval' => 'Das Prüfintervall muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
+    'errorHealthWatchFailures' => 'Die Anzahl fehlgeschlagener Prüfungen muss eine ganze Zahl zwischen %%min%% und %%max%% sein.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Speicherlimit (MiB)',

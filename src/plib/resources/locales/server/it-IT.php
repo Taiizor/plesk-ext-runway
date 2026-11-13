@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Su questo server solo l\'amministratore può attivare le implementazioni senza interruzioni.',
     'errorReadyTimeout' => 'Il timeout di disponibilità deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
     'errorDrainSeconds' => 'Il periodo di drenaggio deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
+    'errorHealthWatchPath' => 'Il monitoraggio dell\'health check richiede un percorso dell\'health check: inseriscine uno oppure disattiva il monitoraggio.',
+    'errorHealthWatchInterval' => 'L\'intervallo di controllo deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
+    'errorHealthWatchFailures' => 'Il numero di controlli non riusciti deve essere un numero intero compreso tra %%min%% e %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite di memoria (MiB)',

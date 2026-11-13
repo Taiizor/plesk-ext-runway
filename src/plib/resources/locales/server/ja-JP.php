@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'このサーバでゼロダウンタイムデプロイを有効にできるのは管理者のみです。',
     'errorReadyTimeout' => '準備完了のタイムアウトは %%min%% から %%max%% までの整数（秒）で指定してください。',
     'errorDrainSeconds' => 'ドレイン期間は %%min%% から %%max%% までの整数（秒）で指定してください。',
+    'errorHealthWatchPath' => 'ヘルスチェック監視にはヘルスチェックパスが必要です。パスを入力するか、監視をオフにしてください。',
+    'errorHealthWatchInterval' => 'チェック間隔は %%min%% から %%max%% までの整数（秒）で指定してください。',
+    'errorHealthWatchFailures' => '連続失敗回数は %%min%% から %%max%% までの整数で指定してください。',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'メモリ上限（MiB）',

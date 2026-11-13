@@ -32,6 +32,54 @@ const detailText = (translate, prefix, code, params, fallback) => (
     code ? helperText(translate, `${prefix}.${code}`, params, fallback) : (fallback || '')
 );
 
+/**
+ * Health watch (opt-in, docs/DESIGN.md section 8): its setting, the failed checks in a row so far,
+ * the last restart with its reason (the health check that failed) and a pause after too many
+ * restarts within an hour.
+ */
+const healthWatchValue = (translate, current, worker) => {
+    const watch = isObject(current.health_watch) ? current.health_watch : null;
+    if (worker || !watch) {
+        return null;
+    }
+    const reason = detailText(translate, 'Domain.status.healthDetail', watch.restart_code, watch.restart_params, watch.restart_detail);
+    return (
+        <span>
+            <Translate
+                content="Domain.status.healthWatchOn"
+                params={{ interval: String(watch.interval), failures: String(watch.failures_limit) }}
+            />
+            {watch.failures > 0 && !watch.paused ? (
+                <div>
+                    <Text intent="warning" fontSize="sm">
+                        <Translate
+                            content="Domain.status.healthWatchFailing"
+                            params={{ count: String(watch.failures), limit: String(watch.failures_limit) }}
+                        />
+                    </Text>
+                </div>
+            ) : null}
+            {watch.restarted_iso ? (
+                <div>
+                    <Text intent="muted" fontSize="sm">
+                        <Translate
+                            content="Domain.status.healthWatchRestarted"
+                            params={{ time: isolate(formatTime(watch.restarted_iso)), reason: isolate(reason) }}
+                        />
+                    </Text>
+                </div>
+            ) : null}
+            {watch.paused ? (
+                <div>
+                    <Text intent="danger" fontSize="sm">
+                        <Translate content="Domain.status.healthWatchPaused" params={{ count: String(watch.restarts_last_hour) }} />
+                    </Text>
+                </div>
+            ) : null}
+        </span>
+    );
+};
+
 /** The application's URL: api/app's appUrl (https when the domain has SSL/TLS, mount path in path mode). */
 const siteUrl = (data, config) => {
     if (typeof data.appUrl === 'string' && data.appUrl) {
@@ -276,6 +324,7 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
                 </span>
             ) : null,
         },
+        { key: 'healthWatch', label: <Translate content="Domain.status.healthWatch" />, value: healthWatchValue(translate, current, worker) },
         { key: 'zeroDowntime', label: <Translate content="Domain.status.zeroDowntime" />, value: worker ? null : zeroDowntimeValue(current) },
         { key: 'switch', label: <Translate content="Domain.status.switch" />, value: switchValue(translate, deploy, deploying) },
         { key: 'versions', label: <Translate content="Domain.status.versions" />, value: switchable ? versionsValue(current) : null },

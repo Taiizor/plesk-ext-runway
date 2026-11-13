@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Hanya pentadbir boleh mendayakan penyebaran tanpa masa henti pada pelayan ini.',
     'errorReadyTimeout' => 'Tamat masa kesediaan mestilah nombor bulat saat antara %%min%% dan %%max%%.',
     'errorDrainSeconds' => 'Tempoh penyaliran mestilah nombor bulat saat antara %%min%% dan %%max%%.',
+    'errorHealthWatchPath' => 'Pemantauan kesihatan memerlukan laluan semakan kesihatan: masukkan satu laluan, atau matikan pemantauan.',
+    'errorHealthWatchInterval' => 'Selang semakan mestilah nombor bulat saat antara %%min%% dan %%max%%.',
+    'errorHealthWatchFailures' => 'Bilangan semakan gagal mestilah nombor bulat antara %%min%% dan %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Had memori (MiB)',

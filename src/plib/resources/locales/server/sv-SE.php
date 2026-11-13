@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'På den här servern kan endast administratören aktivera driftsättningar utan avbrott.',
     'errorReadyTimeout' => 'Tidsgränsen för beredskap måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
     'errorDrainSeconds' => 'Tömningsperioden måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
+    'errorHealthWatchPath' => 'Hälsoövervakningen kräver en sökväg för hälsokontroll: ange en, eller stäng av övervakningen.',
+    'errorHealthWatchInterval' => 'Kontrollintervallet måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
+    'errorHealthWatchFailures' => 'Antalet misslyckade kontroller måste vara ett heltal mellan %%min%% och %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnesgräns (MiB)',

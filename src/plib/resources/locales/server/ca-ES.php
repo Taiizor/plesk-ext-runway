@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Només l\'administrador pot activar els desplegaments sense interrupció en aquest servidor.',
     'errorReadyTimeout' => 'El termini de disponibilitat ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
     'errorDrainSeconds' => 'El període de buidatge ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
+    'errorHealthWatchPath' => 'La supervisió d\'estat necessita un camí de comprovació d\'estat: introduïu-ne un o desactiveu la supervisió.',
+    'errorHealthWatchInterval' => 'L\'interval de comprovació ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
+    'errorHealthWatchFailures' => 'El nombre de comprovacions fallides ha de ser un nombre enter entre %%min%% i %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límit de memòria (MiB)',

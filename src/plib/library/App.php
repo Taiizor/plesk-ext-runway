@@ -38,6 +38,14 @@ class Modules_Runway_App
     const READY_TIMEOUT_MIN = 5;
     const DRAIN_SECONDS_MIN = 0;
 
+    /** Health watch (docs/DESIGN.md section 7): check interval in seconds and failed checks in a row. */
+    const HEALTH_WATCH_INTERVAL_DEFAULT = 30;
+    const HEALTH_WATCH_INTERVAL_MIN = 10;
+    const HEALTH_WATCH_INTERVAL_MAX = 3600;
+    const HEALTH_WATCH_FAILURES_DEFAULT = 3;
+    const HEALTH_WATCH_FAILURES_MIN = 1;
+    const HEALTH_WATCH_FAILURES_MAX = 20;
+
     /**
      * Plesk stores domain settings in dom_param.val, a varchar(5000); MariaDB in Plesk's default
      * (non-strict) sql_mode silently truncates longer values, which would turn the app into "not
@@ -147,6 +155,9 @@ class Modules_Runway_App
             'mountPath' => '',
             'staticPaths' => [],
             'healthPath' => '',
+            'healthWatch' => false,
+            'healthWatchInterval' => self::HEALTH_WATCH_INTERVAL_DEFAULT,
+            'healthWatchFailures' => self::HEALTH_WATCH_FAILURES_DEFAULT,
             'buildCmd' => $commands['build'],
             'startCmd' => $commands['start'],
             'autoDeploy' => true,
@@ -677,8 +688,8 @@ class Modules_Runway_App
     {
         $config = [];
         foreach (['enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths',
-                     'healthPath', 'buildCmd', 'startCmd', 'autoDeploy', 'port', 'zeroDowntime', 'readyTimeout',
-                     'drainSeconds', 'switchable'] as $key) {
+                     'healthPath', 'healthWatch', 'healthWatchInterval', 'healthWatchFailures', 'buildCmd', 'startCmd',
+                     'autoDeploy', 'port', 'zeroDowntime', 'readyTimeout', 'drainSeconds', 'switchable'] as $key) {
             $config[$key] = $this->get($key);
         }
         $config['enabled'] = (bool)$config['enabled'];
@@ -687,6 +698,9 @@ class Modules_Runway_App
         $config['zeroDowntime'] = (bool)$config['zeroDowntime'];
         $config['readyTimeout'] = (int)$config['readyTimeout'];
         $config['drainSeconds'] = (int)$config['drainSeconds'];
+        $config['healthWatch'] = (bool)$config['healthWatch'];
+        $config['healthWatchInterval'] = (int)$config['healthWatchInterval'];
+        $config['healthWatchFailures'] = (int)$config['healthWatchFailures'];
         $config['switchable'] = (bool)$config['switchable'];
         $config['staticPaths'] = is_array($config['staticPaths']) ? array_values($config['staticPaths']) : [];
         return $config;
@@ -743,7 +757,7 @@ class Modules_Runway_App
             }
         }
 
-        foreach (['enabled', 'autoDeploy'] as $key) {
+        foreach (['enabled', 'autoDeploy', 'healthWatch'] as $key) {
             if ($has($key)) {
                 $bool = self::toBool($values[$key]);
                 if ($bool === null) {
@@ -769,7 +783,10 @@ class Modules_Runway_App
         }
         $caps = self::zeroDowntimeCaps();
         foreach (['readyTimeout' => [self::READY_TIMEOUT_MIN, $caps['ready'], 'errorReadyTimeout'],
-                     'drainSeconds' => [self::DRAIN_SECONDS_MIN, $caps['drain'], 'errorDrainSeconds']] as $key => $rule) {
+                     'drainSeconds' => [self::DRAIN_SECONDS_MIN, $caps['drain'], 'errorDrainSeconds'],
+                     'healthWatchInterval' => [self::HEALTH_WATCH_INTERVAL_MIN, self::HEALTH_WATCH_INTERVAL_MAX, 'errorHealthWatchInterval'],
+                     'healthWatchFailures' => [self::HEALTH_WATCH_FAILURES_MIN, self::HEALTH_WATCH_FAILURES_MAX, 'errorHealthWatchFailures']]
+                 as $key => $rule) {
             if (!$has($key)) {
                 continue;
             }
@@ -913,6 +930,13 @@ class Modules_Runway_App
         if ($runtimeMeta && isset($runtimeMeta['supports_build']) && $runtimeMeta['supports_build'] === false) {
             $data['buildCmd'] = '';
             unset($errors['buildCmd']);
+        }
+
+        // Health watch (docs/DESIGN.md section 7): it requests the health check path, so it needs one.
+        // Workers have none: the form hides the field and the payload keeps the watch off for them.
+        if (!empty($data['healthWatch']) && $data['listen'] !== self::LISTEN_NONE && trim((string)$data['healthPath']) === ''
+            && !isset($errors['healthPath'])) {
+            $errors['healthWatch'][] = pm_Locale::lmsg('errorHealthWatchPath');
         }
 
         $env = null;
@@ -1124,6 +1148,13 @@ class Modules_Runway_App
             'zero_downtime' => $this->data['listen'] !== self::LISTEN_NONE && !empty($this->data['zeroDowntime']),
             'ready_timeout' => self::clampSetting($this->data, 'readyTimeout', self::READY_TIMEOUT_MIN, self::zeroDowntimeCaps()['ready'], self::READY_TIMEOUT_DEFAULT),
             'drain_seconds' => self::clampSetting($this->data, 'drainSeconds', self::DRAIN_SECONDS_MIN, self::zeroDowntimeCaps()['drain'], self::DRAIN_SECONDS_DEFAULT),
+            // Health watch: only with a health check path (never for workers).
+            'health_watch' => $this->data['listen'] !== self::LISTEN_NONE && (string)$this->data['healthPath'] !== ''
+                && !empty($this->data['healthWatch']),
+            'health_interval' => self::clampSetting($this->data, 'healthWatchInterval', self::HEALTH_WATCH_INTERVAL_MIN,
+                self::HEALTH_WATCH_INTERVAL_MAX, self::HEALTH_WATCH_INTERVAL_DEFAULT),
+            'health_failures' => self::clampSetting($this->data, 'healthWatchFailures', self::HEALTH_WATCH_FAILURES_MIN,
+                self::HEALTH_WATCH_FAILURES_MAX, self::HEALTH_WATCH_FAILURES_DEFAULT),
             'build_timeout' => Modules_Runway_Settings::get('buildTimeout'),
             'limits' => [
                 'memory_mb' => (int)$this->data['memoryMb'],

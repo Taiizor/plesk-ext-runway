@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'يمكن للمسؤول فقط تفعيل النشر دون توقف على هذا الخادم.',
     'errorReadyTimeout' => 'يجب أن تكون مهلة الجاهزية عددًا صحيحًا من الثواني بين %%min%% و%%max%%.',
     'errorDrainSeconds' => 'يجب أن تكون فترة التصريف عددًا صحيحًا من الثواني بين %%min%% و%%max%%.',
+    'errorHealthWatchPath' => 'تحتاج مراقبة السلامة إلى مسار لفحص السلامة: أدخل مسارًا أو عطّل المراقبة.',
+    'errorHealthWatchInterval' => 'يجب أن يكون الفاصل الزمني بين الفحوصات عددًا صحيحًا من الثواني بين %%min%% و%%max%%.',
+    'errorHealthWatchFailures' => 'يجب أن يكون عدد الفحوصات الفاشلة عددًا صحيحًا بين %%min%% و%%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'حد الذاكرة (MiB)',

@@ -357,6 +357,27 @@ check "app/save: readyTimeout below 5 s is refused" "d['status'] == 'error' and 
     "$(post app/save "{\"site_id\": $SITE_ID, \"readyTimeout\": 4}")"
 check "app/save: drainSeconds above the server cap is refused" "d['status'] == 'error' and list(d['errors']) == ['drainSeconds'] and '30' in d['errors']['drainSeconds'][0]" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"drainSeconds\": 31}")"
+# Health watch (docs/DESIGN.md section 7): needs a health check path; interval 10-3600 s, 1-20 failures.
+check "app/save: the health watch needs a health check path" "d['status'] == 'error' and list(d['errors']) == ['healthWatch']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatch\": true, \"healthPath\": \"\"}")"
+check "app/save: a health watch interval below 10 s is refused" "d['status'] == 'error' and list(d['errors']) == ['healthWatchInterval']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatchInterval\": 9}")"
+check "app/save: more than 20 failed checks are refused" "d['status'] == 'error' and list(d['errors']) == ['healthWatchFailures']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatchFailures\": 21}")"
+HP_BEFORE=$(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['healthPath']")
+check "app/save: health watch on (configuration)" \
+    "d['status'] == 'success' and (d['data']['config']['healthWatch'], d['data']['config']['healthWatchInterval'], d['data']['config']['healthWatchFailures']) == (True, 15, 2)" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthWatch\": true, \"healthWatchInterval\": 15, \"healthWatchFailures\": 2}")"
+# The helper state and the timer live in the container (this script runs on the development machine).
+HW_STATE=$(dock exec "$CONTAINER" python3 -c "import json; s = json.load(open('/var/lib/runway/apps/$SITE_ID.json')); print((s['health_watch'], s['health_interval'], s['health_failures']))" 2>&1)
+HW_TIMER=$(dock exec "$CONTAINER" systemctl is-active runway-health.timer 2>&1)
+[ "$HW_STATE" = "(True, 15, 2)" ] && [ "$HW_TIMER" = "active" ] \
+    && ok "health watch on: helper state and runway-health.timer" || bad "health watch on: state $HW_STATE, timer $HW_TIMER"
+check "app/status: health_watch with interval and failures" \
+    "isinstance(d['data']['health_watch'], dict) and (d['data']['health_watch']['interval'], d['data']['health_watch']['failures_limit']) == (15, 2)" \
+    "$(get "app/status?site_id=$SITE_ID")"
+check "app/save: health watch off" "d['status'] == 'success' and d['data']['config']['healthWatch'] is False" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatch\": false, \"healthPath\": \"$HP_BEFORE\"}")"
 check "app: zero-downtime may be turned on by an administrator; caps of the timeouts" \
     "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is True and d['data']['zeroDowntimeCaps'] == {'ready': 120, 'drain': 30} and 'zeroDowntime' in d['data']['config']" \
     "$(get "app?site_id=$SITE_ID")"

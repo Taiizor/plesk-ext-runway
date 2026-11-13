@@ -59,9 +59,9 @@ Runway/
 |---|---|
 | Helper | `/usr/local/psa/admin/sbin/modules/runway/runway-helper`, stable copy `/opt/runway/bin/runway-helper` |
 | Toolchains | `/opt/runway/<runtime>/...` (e.g. `/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/bun/1.3.2`, `/opt/runway/java/21.0.5`, `/opt/runway/dotnet` (shared root, versions inside), `/opt/runway/python/3.13.1` (uv-managed), `/opt/runway/uv/uv`) |
-| State | `/var/lib/runway/{apps,jobs,locks,cache}` (root 0700) |
+| State | `/var/lib/runway/{apps,jobs,locks,cache,health}` (root 0700; `health/<id>.json`: the health watch, §7) |
 | Env files | `/etc/runway/env/<domainId>.env` (root 0600) |
-| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service` and `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left); zero-downtime slots `runway-app-<id>-a.service`, `-b.service` and the boot unit `runway-converge.service` (§12.3) |
+| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service` and `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left); zero-downtime slots `runway-app-<id>-a.service`, `-b.service` and the boot unit `runway-converge.service` (§12.3); `runway-health.timer` + `runway-health.service` while an application has the health watch on (§7) |
 | Sockets | `/run/runway/<id>/app.sock` (dir `sysuser:psaserv` 2750, created by the helper as root; at boot by `systemd-tmpfiles` from `/etc/tmpfiles.d/runway-<id>.conf`, plus `runway.conf` for `/run/runway` itself); zero-downtime: `a.sock`, `b.sock` and the root link `/run/runway/<id>.sock` (§12.3) |
 | Web include files | zero-downtime tcp applications: `/etc/runway/web/<id>.nginx.conf`, `<id>.apache.conf` (root 0644, the live port) |
 | Per-user caches | `~/.runway/` in the subscription (GOPATH, GOCACHE, CARGO_HOME, BUN_INSTALL cache, Maven/Gradle caches, NUGET_PACKAGES, pip/uv cache, GEM_HOME, Composer cache) |
@@ -176,7 +176,7 @@ Rules for every adapter:
 - `static_paths`: up to 20 URL prefixes (`^/[A-Za-z0-9._~-]+(/[A-Za-z0-9._~-]+)*$`) excluded from
   the proxy regex so nginx/Apache serve them from the document root (SPA assets).
 - `health_path`: optional path; `app-status` performs one GET (2 s timeout, Host = domain) and
-  reports `healthy|unhealthy|unknown`. No automatic restart in 1.0.
+  reports `healthy|unhealthy|unknown`. Automatic restarts only with the opt-in health watch (§7).
 
 ## 6. HTTP API (PHP `ApiController`, all JSON, `index.php/api/<action>`)
 
@@ -210,7 +210,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/app/fetch` | POST | domain | `{url (https:// only; http:// only with the helper's test flag), sha256?, extract?: bool, filename?, build?: bool}` → starts a deploy job in `fetch` mode (download as the user into the app root, verify, chmod +x / extract, optional build, restart unless stopped) → `{job, message}`; needs a configured app (the UI disables the button until the settings are saved) |
 
 Config fields (JSON, camelCase on the API, snake_case toward the helper):
-`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10).
+`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, healthWatch (bool, needs healthPath: field error errorHealthWatchPath), healthWatchInterval (10-3600, default 30), healthWatchFailures (1-20, default 3), buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10).
 
 ## 7. Helper command contract (`runway-helper <command>`, JSON payload on stdin)
 
@@ -225,12 +225,12 @@ their code.
 | `toolchains` | — | `{runtimes:{key:{installed:[{id,label,path,version?,kind?}], in_use:{id:[domains]}, toolchain, build_deps}}, build_deps, job}`; `kind` (`detected\|managed`) marks PHP entries (`plesk-<x.y>` vs `frankenphp-<ver>`), `version` the resolved version of channels (rust `stable` → `1.x.y`) |
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
-| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
+| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
 | `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
-| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params`, and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
+| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params, health_watch` (null while off, see below), and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
 | `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
@@ -239,6 +239,7 @@ their code.
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
 | `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
 | `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
+| `_health [now]` (internal) | — | run by `runway-health.service` every 10 s (`runway-health.timer`): the health watch below; `now` checks every watched application at once, without the interval and the start grace (tests, by hand) |
 
 Memory of an application unit (`app-status` `service` and `slots`, `apps-list`):
 
@@ -277,6 +278,40 @@ Under a 1 GiB limit such an application kept swapping and answered 4 to 13 times
 of staying within 75 % of the limit. Java 21 finds the limits either way. Units without memory or
 CPU limit and systemd before 254 keep the files of 1.0.0. The line takes effect when the service
 restarts next; `install` re-renders the units without restarting them.
+
+Health watch (opt-in per application, off by default): `health_watch` (forced off without a
+`health_path`, so never for workers), `health_interval` (10-3600 s, default 30) and
+`health_failures` (1-20, default 3) of `app-apply`. `sync_health_units()` (after `app-apply`,
+`app-remove`, `install`/`reapply-all` and `uninstall`) installs and starts
+`runway-health.timer` (`OnActiveSec=10`, `OnUnitActiveSec=10`, `AccuracySec=1`) with the oneshot
+`runway-health.service` (`runway-helper _health`) while at least one stored state has the watch
+on, and removes both otherwise (servers without it run nothing); it also deletes the watch state
+of applications that turned it off. A run of `_health` takes every watched application whose
+check is due (`health_interval` since the last check, 2 s of timer slack) and skips it while its
+deploy lock is held or its deploy unit is active (a deployment, a save or a switch restarts it
+itself). Under the deploy lock:
+- Disabled, suspended, stopped or tampered applications, and a live unit that is not
+  `active (running)`, are not checked (systemd restarts a crashed application itself) and their
+  failures are reset. Every instance (`<unit>@ActiveEnterTimestampMonotonic`) starts with zero
+  failures and gets 60 s (`HEALTH_WATCH_GRACE`) before its first check.
+- A listener `foreign` or `tampered` is recorded as `skipped` and not counted (a restart would not
+  help). Otherwise one `health_check()` with a 5 s timeout: healthy (2xx/3xx) resets the failures
+  and a pause; anything else (another status, no HTTP answer, a timeout, nothing listening) adds
+  one.
+- At `health_failures` failed checks in a row the application is restarted in place: `prepare_start`
+  and `systemctl restart --no-block` of the 1.0 unit, or `zd_plain_restart` with zero-downtime
+  slots (never a switch: the new version would start next to a hung one). At most 3 restarts
+  within an hour (`HEALTH_WATCH_MAX_RESTARTS`, `HEALTH_WATCH_WINDOW`); beyond that the watch only
+  records the failures and sets `paused` until the oldest restart is an hour old (a wrong health
+  path must not restart an application for ever). Restarts and the first pause are written to
+  the application's journal (`journal_note`, shown in its application log); every failed check
+  is printed to the journal of `runway-health.service`.
+- State: `/var/lib/runway/health/<id>.json` (`failures, checked_epoch, result, detail, code,
+  params, instance, restarts[], restarted_epoch, restart_detail, restart_code, restart_params,
+  paused`), removed with the application. `app-status` reports it as `health_watch: {interval,
+  failures_limit, failures, checked_iso, result (healthy|unhealthy|skipped|null), detail, code,
+  params, restarts_last_hour, max_restarts, restarted_iso, restart_detail, restart_code,
+  restart_params, paused}`; `code`/`params` are those of `health_code` (translated like it).
 
 Document roots (`app-inspect`, `app-page`): `document_roots` lists the document roots of the
 webspace relative to the home directory (the panel's `documentRoots`, §6; invalid entries are
@@ -418,6 +453,10 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   colours and a black mark would vanish there. Its hover text is the button title ("Runway"):
   Plesk 18.0.82 accepts no callable title, and a per-row `tooltip` or `additionalComments`
   callable reaches the list data but is not shown.
+- Health watch: the checkbox *Restart when the health check keeps failing* below the health check
+  path (not for workers) with *Check interval* and *Failed checks in a row* while it is on; the
+  status card's row *Health watch* shows the setting, the failed checks in a row so far, the last
+  restart with its reason (the `health_code` texts) and the pause after 3 restarts within an hour.
 - Polling pauses when `document.hidden` except for 2 min after a user action; status updates
   every 6 s (2 s while a job runs). Confirmations use ui-library `Dialog`, never `window.confirm`.
 - Translations: `src/plib/resources/locales/*.php` key `'app' => [...]` nested per component

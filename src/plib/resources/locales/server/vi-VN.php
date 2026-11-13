@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Trên máy chủ này, chỉ quản trị viên mới có thể bật triển khai không gián đoạn.',
     'errorReadyTimeout' => 'Thời gian chờ sẵn sàng phải là một số nguyên giây từ %%min%% đến %%max%%.',
     'errorDrainSeconds' => 'Thời gian chờ hoàn tất yêu cầu phải là một số nguyên giây từ %%min%% đến %%max%%.',
+    'errorHealthWatchPath' => 'Giám sát tình trạng cần có đường dẫn kiểm tra tình trạng: hãy nhập một đường dẫn hoặc tắt giám sát.',
+    'errorHealthWatchInterval' => 'Khoảng thời gian kiểm tra phải là một số nguyên giây từ %%min%% đến %%max%%.',
+    'errorHealthWatchFailures' => 'Số lần kiểm tra thất bại phải là một số nguyên từ %%min%% đến %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Giới hạn bộ nhớ (MiB)',

@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => '이 서버에서는 관리자만 무중단 배포를 켤 수 있습니다.',
     'errorReadyTimeout' => '준비 제한 시간은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
     'errorDrainSeconds' => '드레이닝 기간은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
+    'errorHealthWatchPath' => '헬스 체크 감시에는 헬스 체크 경로가 필요합니다. 경로를 입력하거나 감시를 끄십시오.',
+    'errorHealthWatchInterval' => '체크 간격은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
+    'errorHealthWatchFailures' => '연속 실패 횟수는 %%min%%과(와) %%max%% 사이의 정수여야 합니다.',
 
     // Field names used in error messages
     'fieldMemoryMb' => '메모리 제한(MiB)',

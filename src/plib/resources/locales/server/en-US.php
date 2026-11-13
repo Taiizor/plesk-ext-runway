@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Only the administrator can turn on zero-downtime deployments on this server.',
     'errorReadyTimeout' => 'The readiness timeout must be a whole number of seconds between %%min%% and %%max%%.',
     'errorDrainSeconds' => 'The drain period must be a whole number of seconds between %%min%% and %%max%%.',
+    'errorHealthWatchPath' => 'The health watch needs a health check path: enter one, or turn the watch off.',
+    'errorHealthWatchInterval' => 'The check interval must be a whole number of seconds between %%min%% and %%max%%.',
+    'errorHealthWatchFailures' => 'The number of failed checks must be a whole number between %%min%% and %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memory limit (MiB)',

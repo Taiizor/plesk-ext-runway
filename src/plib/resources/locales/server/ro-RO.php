@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Pe acest server, doar administratorul poate activa implementările fără întrerupere.',
     'errorReadyTimeout' => 'Timpul limită de pregătire trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
     'errorDrainSeconds' => 'Perioada de golire trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
+    'errorHealthWatchPath' => 'Monitorizarea stării necesită o cale de verificare a stării: introduceți una sau dezactivați monitorizarea.',
+    'errorHealthWatchInterval' => 'Intervalul de verificare trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
+    'errorHealthWatchFailures' => 'Numărul de verificări eșuate trebuie să fie un număr întreg între %%min%% și %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limita de memorie (MiB)',

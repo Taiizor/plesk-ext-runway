@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Somente o administrador pode ativar implantações sem tempo de inatividade neste servidor.',
     'errorReadyTimeout' => 'O tempo limite de prontidão deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
     'errorDrainSeconds' => 'O período de drenagem deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
+    'errorHealthWatchPath' => 'O monitoramento de integridade precisa de um caminho de verificação de integridade: informe um ou desative o monitoramento.',
+    'errorHealthWatchInterval' => 'O intervalo de verificação deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
+    'errorHealthWatchFailures' => 'O número de verificações com falha deve ser um número inteiro entre %%min%% e %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',

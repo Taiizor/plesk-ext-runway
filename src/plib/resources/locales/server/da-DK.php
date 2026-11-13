@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Kun administratoren kan slå udrulninger uden nedetid til på denne server.',
     'errorReadyTimeout' => 'Parathedstimeouten skal være et helt antal sekunder mellem %%min%% og %%max%%.',
     'errorDrainSeconds' => 'Afviklingstiden skal være et helt antal sekunder mellem %%min%% og %%max%%.',
+    'errorHealthWatchPath' => 'Sundhedsovervågningen kræver en sti til sundhedstjek: angiv en, eller slå overvågningen fra.',
+    'errorHealthWatchInterval' => 'Tjekintervallet skal være et helt antal sekunder mellem %%min%% og %%max%%.',
+    'errorHealthWatchFailures' => 'Antallet af mislykkede tjek skal være et helt tal mellem %%min%% og %%max%%.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Hukommelsesgrænse (MiB)',

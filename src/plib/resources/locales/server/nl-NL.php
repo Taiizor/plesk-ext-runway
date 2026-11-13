@@ -63,6 +63,9 @@ return [
     'errorZeroDowntimeAdmin' => 'Op deze server kan alleen de beheerder deployments zonder downtime inschakelen.',
     'errorReadyTimeout' => 'De time-out voor gereedheid moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
     'errorDrainSeconds' => 'De afbouwperiode moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
+    'errorHealthWatchPath' => 'De healthcheck-bewaking vereist een healthcheck-pad: voer er een in of schakel de bewaking uit.',
+    'errorHealthWatchInterval' => 'Het controle-interval moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
+    'errorHealthWatchFailures' => 'Het aantal mislukte controles moet een geheel getal tussen %%min%% en %%max%% zijn.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Geheugenlimiet (MiB)',

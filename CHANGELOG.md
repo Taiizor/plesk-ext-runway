@@ -28,6 +28,16 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   card and the overview show the application's memory with the file cache below it, and the status
   card suggests static paths when a web application's file cache is large. README section
   *Memory*.
+- Health watch (opt-in per application, *Advanced*, off by default): requests the health check
+  path every 30 seconds (10-3600) and restarts the application in place after 3 failed checks in a
+  row (1-20), for an application that hangs without crashing (systemd restarts a crashed one by
+  itself). A check fails without a 2xx or 3xx answer within 5 seconds. No checks in the first 60
+  seconds after a start, during a deployment or for stopped applications; at most 3 restarts within
+  an hour, then it only reports. The status card shows the failed checks, the last restart and its
+  reason, the application log notes every restart, and `plesk ext runway --status` shows the
+  watch. One timer, `runway-health.timer`, serves every application with the watch and exists only
+  while one has it on. README section *When an application fails* explains what happens on
+  crashes, reboots, limits and hangs.
 - The domain page warns, without blocking the save, while the application root is a document root
   of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one, and names the
   domain's document root at the static paths; `api/app` adds `domain.documentRoot`,
