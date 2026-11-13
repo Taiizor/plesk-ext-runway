@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Monitorizarea stării necesită o cale de verificare a stării: introduceți una sau dezactivați monitorizarea.',
     'errorHealthWatchInterval' => 'Intervalul de verificare trebuie să fie un număr întreg de secunde între %%min%% și %%max%%.',
     'errorHealthWatchFailures' => 'Numărul de verificări eșuate trebuie să fie un număr întreg între %%min%% și %%max%%.',
+    'errorHealthMatch' => 'Conținutul așteptat al răspunsului poate avea cel mult %%max%% de caractere și nu poate conține sfârșituri de linie sau caractere de control.',
+    'errorHealthMatchJson' => 'Conținutul așteptat al răspunsului începe cu { dar nu este un obiect JSON valid.',
+    'errorHealthMatchPath' => 'Conținutul așteptat al răspunsului necesită o cale de verificare a stării: introduceți una sau goliți conținutul.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limita de memorie (MiB)',

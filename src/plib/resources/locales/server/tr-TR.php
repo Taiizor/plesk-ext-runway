@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Sağlık izleme bir sağlık kontrolü yolu gerektirir: bir yol girin ya da izlemeyi kapatın.',
     'errorHealthWatchInterval' => 'Kontrol aralığı %%min%% ile %%max%% arasında tam sayı (saniye) olmalıdır.',
     'errorHealthWatchFailures' => 'Başarısız kontrol sayısı %%min%% ile %%max%% arasında bir tam sayı olmalıdır.',
+    'errorHealthMatch' => 'Beklenen yanıt içeriği en fazla %%max%% karakter olmalı ve satır sonu ya da kontrol karakteri içermemelidir.',
+    'errorHealthMatchJson' => 'Beklenen yanıt içeriği { ile başlıyor ancak geçerli bir JSON nesnesi değil.',
+    'errorHealthMatchPath' => 'Beklenen yanıt içeriği bir sağlık kontrolü yolu gerektirir: bir yol girin ya da içeriği silin.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Bellek sınırı (MiB)',

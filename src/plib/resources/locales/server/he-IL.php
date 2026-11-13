@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'ניטור התקינות דורש נתיב בדיקת תקינות: הזן נתיב או השבת את הניטור.',
     'errorHealthWatchInterval' => 'המרווח בין הבדיקות חייב להיות מספר שלם של שניות בין %%min%% ל-%%max%%.',
     'errorHealthWatchFailures' => 'מספר הבדיקות הכושלות חייב להיות מספר שלם בין %%min%% ל-%%max%%.',
+    'errorHealthMatch' => 'תוכן התגובה הצפוי יכול להכיל לכל היותר %%max%% תווים ואינו יכול להכיל מעברי שורה או תווי בקרה.',
+    'errorHealthMatchJson' => 'תוכן התגובה הצפוי מתחיל ב-{ אך אינו אובייקט JSON חוקי.',
+    'errorHealthMatchPath' => 'תוכן התגובה הצפוי דורש נתיב בדיקת תקינות: הזן נתיב או נקה את התוכן.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'מגבלת זיכרון (MiB)',

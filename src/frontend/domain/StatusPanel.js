@@ -28,6 +28,9 @@ const HEALTH = {
 // i18n-keys: Domain.status.listenerDetail.socket_not_socket Domain.status.listenerDetail.socket_owner Domain.status.listenerDetail.worker
 // i18n-keys: Domain.status.healthDetail.no_path Domain.status.healthDetail.not_listening Domain.status.healthDetail.failed
 // i18n-keys: Domain.status.healthDetail.no_http Domain.status.healthDetail.http
+// With an expected response content (health_match): found, not found, not a JSON object.
+// i18n-keys: Domain.status.healthDetail.http_match Domain.status.healthDetail.body_mismatch
+// i18n-keys: Domain.status.healthDetail.body_not_json
 const detailText = (translate, prefix, code, params, fallback) => (
     code ? helperText(translate, `${prefix}.${code}`, params, fallback) : (fallback || '')
 );

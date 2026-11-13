@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Kailangan ng health watch ng health check path: maglagay ng isa, o i-off ang health watch.',
     'errorHealthWatchInterval' => 'Ang interval ng check ay dapat isang buong bilang ng segundo mula %%min%% hanggang %%max%%.',
     'errorHealthWatchFailures' => 'Ang bilang ng nabigong check ay dapat isang buong numero mula %%min%% hanggang %%max%%.',
+    'errorHealthMatch' => 'Ang inaasahang content ng response ay dapat hanggang %%max%% character lamang at hindi dapat maglaman ng mga line break o control character.',
+    'errorHealthMatchJson' => 'Nagsisimula sa { ang inaasahang content ng response pero hindi ito wastong JSON object.',
+    'errorHealthMatchPath' => 'Kailangan ng inaasahang content ng response ng health check path: maglagay ng isa, o i-clear ang content.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limitasyon ng memorya (MiB)',

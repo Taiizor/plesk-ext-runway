@@ -47,6 +47,14 @@ class Modules_Runway_App
     const HEALTH_WATCH_FAILURES_MAX = 20;
 
     /**
+     * Expected response content of the health check (docs/DESIGN.md section 7, health_match): at
+     * most this many characters after trimming, without control characters (C0, DEL and C1; the
+     * same rules as v_health_match in the helper). Text that starts with "{" is a JSON object.
+     */
+    const MAX_HEALTH_MATCH = 200;
+    const RE_HEALTH_MATCH_CTRL = '/[\x{00}-\x{1f}\x{7f}-\x{9f}]/u';
+
+    /**
      * Plesk stores domain settings in dom_param.val, a varchar(5000); MariaDB in Plesk's default
      * (non-strict) sql_mode silently truncates longer values, which would turn the app into "not
      * configured". The encoded configuration is therefore limited to this many characters, and
@@ -155,6 +163,7 @@ class Modules_Runway_App
             'mountPath' => '',
             'staticPaths' => [],
             'healthPath' => '',
+            'healthMatch' => '',
             'healthWatch' => false,
             'healthWatchInterval' => self::HEALTH_WATCH_INTERVAL_DEFAULT,
             'healthWatchFailures' => self::HEALTH_WATCH_FAILURES_DEFAULT,
@@ -688,11 +697,12 @@ class Modules_Runway_App
     {
         $config = [];
         foreach (['enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths',
-                     'healthPath', 'healthWatch', 'healthWatchInterval', 'healthWatchFailures', 'buildCmd', 'startCmd',
-                     'autoDeploy', 'port', 'zeroDowntime', 'readyTimeout', 'drainSeconds', 'switchable'] as $key) {
+                     'healthPath', 'healthMatch', 'healthWatch', 'healthWatchInterval', 'healthWatchFailures', 'buildCmd',
+                     'startCmd', 'autoDeploy', 'port', 'zeroDowntime', 'readyTimeout', 'drainSeconds', 'switchable'] as $key) {
             $config[$key] = $this->get($key);
         }
         $config['enabled'] = (bool)$config['enabled'];
+        $config['healthMatch'] = is_string($config['healthMatch']) ? $config['healthMatch'] : '';
         $config['autoDeploy'] = (bool)$config['autoDeploy'];
         $config['port'] = (int)$config['port'];
         $config['zeroDowntime'] = (bool)$config['zeroDowntime'];
@@ -906,6 +916,23 @@ class Modules_Runway_App
             $data['healthPath'] = $health;
         }
 
+        // Expected response content of the health check (docs/DESIGN.md section 7, health_match):
+        // text, or a JSON object when it starts with "{". The same rules as v_health_match.
+        if ($has('healthMatch')) {
+            if (!is_string($values['healthMatch'])) {
+                $errors['healthMatch'][] = pm_Locale::lmsg('errorInvalidValue');
+            } else {
+                $expected = trim($values['healthMatch']);
+                $length = preg_match('//u', $expected) === 1 ? self::utf8Length($expected) : -1;
+                if ($length < 0 || $length > self::MAX_HEALTH_MATCH || preg_match(self::RE_HEALTH_MATCH_CTRL, $expected) !== 0) {
+                    $errors['healthMatch'][] = pm_Locale::lmsg('errorHealthMatch', ['max' => self::MAX_HEALTH_MATCH]);
+                } elseif ($expected !== '' && $expected[0] === '{' && !self::isJsonObject($expected)) {
+                    $errors['healthMatch'][] = pm_Locale::lmsg('errorHealthMatchJson');
+                }
+                $data['healthMatch'] = $expected;
+            }
+        }
+
         if ($has('buildCmd')) {
             $buildCmd = trim(str_replace("\r\n", "\n", is_scalar($values['buildCmd']) ? (string)$values['buildCmd'] : ''));
             if (strlen($buildCmd) > self::MAX_BUILD_CMD || preg_match('/[\x00-\x09\x0b-\x1f\x7f]/', $buildCmd)) {
@@ -937,6 +964,11 @@ class Modules_Runway_App
         if (!empty($data['healthWatch']) && $data['listen'] !== self::LISTEN_NONE && trim((string)$data['healthPath']) === ''
             && !isset($errors['healthPath'])) {
             $errors['healthWatch'][] = pm_Locale::lmsg('errorHealthWatchPath');
+        }
+        // The expected response content is checked in the answer of the health check path.
+        if (is_string($data['healthMatch']) && $data['healthMatch'] !== '' && $data['listen'] !== self::LISTEN_NONE
+            && trim((string)$data['healthPath']) === '' && !isset($errors['healthPath']) && !isset($errors['healthMatch'])) {
+            $errors['healthMatch'][] = pm_Locale::lmsg('errorHealthMatchPath');
         }
 
         $env = null;
@@ -979,7 +1011,7 @@ class Modules_Runway_App
             if ($length > self::MAX_CONFIG_CHARS) {
                 $field = 'buildCmd';
                 $longest = -1;
-                foreach (['buildCmd', 'startCmd', 'staticPaths', 'healthPath', 'appRoot', 'mountPath'] as $candidate) {
+                foreach (['buildCmd', 'startCmd', 'staticPaths', 'healthPath', 'healthMatch', 'appRoot', 'mountPath'] as $candidate) {
                     $size = strlen(json_encode(isset($data[$candidate]) ? $data[$candidate] : ''));
                     if ($has($candidate) && $size > $longest) {
                         $field = $candidate;
@@ -1019,6 +1051,30 @@ class Modules_Runway_App
     {
         $json = (string)json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return function_exists('mb_strlen') ? mb_strlen($json, 'UTF-8') : strlen($json);
+    }
+
+    /**
+     * Length in characters (code points) of a valid UTF-8 string, as Python's len() counts them.
+     *
+     * @param string $text
+     * @return int
+     */
+    private static function utf8Length($text)
+    {
+        return function_exists('mb_strlen') ? mb_strlen($text, 'UTF-8') : (int)preg_match_all('/./su', $text);
+    }
+
+    /**
+     * Whether a text is one JSON object (the JSON mode of the expected response content; the helper
+     * parses it with json.loads and refuses NaN and Infinity, which json_decode refuses too).
+     *
+     * @param string $text
+     * @return bool
+     */
+    private static function isJsonObject($text)
+    {
+        $value = json_decode($text);
+        return json_last_error() === JSON_ERROR_NONE && $value instanceof stdClass;
     }
 
     /**
@@ -1143,6 +1199,9 @@ class Modules_Runway_App
             'mount_path' => $this->data['mode'] === self::MODE_PATH ? (string)$this->data['mountPath'] : '',
             'static_paths' => is_array($this->data['staticPaths']) ? array_values($this->data['staticPaths']) : [],
             'health_path' => $this->data['listen'] !== self::LISTEN_NONE ? (string)$this->data['healthPath'] : '',
+            // Expected response content of the health check: only with a health check path (never for workers).
+            'health_match' => $this->data['listen'] !== self::LISTEN_NONE && (string)$this->data['healthPath'] !== ''
+                && is_string($this->data['healthMatch']) ? $this->data['healthMatch'] : '',
             // Zero-downtime deployments (docs/DESIGN.md section 12): never for workers; the
             // timeouts within the current caps of the server settings.
             'zero_downtime' => $this->data['listen'] !== self::LISTEN_NONE && !empty($this->data['zeroDowntime']),

@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'ヘルスチェック監視にはヘルスチェックパスが必要です。パスを入力するか、監視をオフにしてください。',
     'errorHealthWatchInterval' => 'チェック間隔は %%min%% から %%max%% までの整数（秒）で指定してください。',
     'errorHealthWatchFailures' => '連続失敗回数は %%min%% から %%max%% までの整数で指定してください。',
+    'errorHealthMatch' => '期待する応答内容は %%max%% 文字以内で、改行や制御文字を含めることはできません。',
+    'errorHealthMatchJson' => '期待する応答内容は { で始まっていますが、有効な JSON オブジェクトではありません。',
+    'errorHealthMatchPath' => '期待する応答内容にはヘルスチェックパスが必要です。パスを入力するか、内容を消去してください。',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'メモリ上限（MiB）',

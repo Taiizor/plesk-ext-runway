@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => '헬스 체크 감시에는 헬스 체크 경로가 필요합니다. 경로를 입력하거나 감시를 끄십시오.',
     'errorHealthWatchInterval' => '체크 간격은 %%min%%과(와) %%max%% 사이의 정수(초)여야 합니다.',
     'errorHealthWatchFailures' => '연속 실패 횟수는 %%min%%과(와) %%max%% 사이의 정수여야 합니다.',
+    'errorHealthMatch' => '예상 응답 내용은 최대 %%max%%자여야 하며 줄 바꿈이나 제어 문자를 포함할 수 없습니다.',
+    'errorHealthMatchJson' => '예상 응답 내용이 {로 시작하지만 유효한 JSON 객체가 아닙니다.',
+    'errorHealthMatchPath' => '예상 응답 내용에는 헬스 체크 경로가 필요합니다. 경로를 입력하거나 내용을 지우십시오.',
 
     // Field names used in error messages
     'fieldMemoryMb' => '메모리 제한(MiB)',

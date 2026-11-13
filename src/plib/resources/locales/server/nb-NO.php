@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Helseovervåkingen krever en bane for helsesjekk: angi en, eller slå av overvåkingen.',
     'errorHealthWatchInterval' => 'Sjekkintervallet må være et helt antall sekunder mellom %%min%% og %%max%%.',
     'errorHealthWatchFailures' => 'Antallet mislykkede sjekker må være et heltall mellom %%min%% og %%max%%.',
+    'errorHealthMatch' => 'Det forventede responsinnholdet kan være på høyst %%max%% tegn og kan ikke inneholde linjeskift eller kontrolltegn.',
+    'errorHealthMatchJson' => 'Det forventede responsinnholdet starter med {, men er ikke et gyldig JSON-objekt.',
+    'errorHealthMatchPath' => 'Det forventede responsinnholdet krever en bane for helsesjekk: angi en, eller tøm innholdet.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnegrense (MiB)',

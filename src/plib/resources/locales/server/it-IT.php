@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Il monitoraggio dell\'health check richiede un percorso dell\'health check: inseriscine uno oppure disattiva il monitoraggio.',
     'errorHealthWatchInterval' => 'L\'intervallo di controllo deve essere un numero intero di secondi compreso tra %%min%% e %%max%%.',
     'errorHealthWatchFailures' => 'Il numero di controlli non riusciti deve essere un numero intero compreso tra %%min%% e %%max%%.',
+    'errorHealthMatch' => 'Il contenuto previsto della risposta deve avere al massimo %%max%% caratteri e non deve contenere interruzioni di riga o caratteri di controllo.',
+    'errorHealthMatchJson' => 'Il contenuto previsto della risposta inizia con { ma non è un oggetto JSON valido.',
+    'errorHealthMatchPath' => 'Il contenuto previsto della risposta richiede un percorso dell\'health check: inseriscine uno oppure cancella il contenuto.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite di memoria (MiB)',

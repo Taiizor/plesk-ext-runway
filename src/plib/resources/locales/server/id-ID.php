@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Pemantauan kesehatan memerlukan jalur pemeriksaan kesehatan: masukkan jalurnya, atau nonaktifkan pemantauan.',
     'errorHealthWatchInterval' => 'Interval pemeriksaan harus berupa bilangan bulat detik antara %%min%% dan %%max%%.',
     'errorHealthWatchFailures' => 'Jumlah pemeriksaan gagal harus berupa bilangan bulat antara %%min%% dan %%max%%.',
+    'errorHealthMatch' => 'Konten respons yang diharapkan maksimal %%max%% karakter dan tidak boleh mengandung karakter ganti baris atau karakter kontrol.',
+    'errorHealthMatchJson' => 'Konten respons yang diharapkan diawali dengan { tetapi bukan objek JSON yang valid.',
+    'errorHealthMatchPath' => 'Konten respons yang diharapkan memerlukan jalur pemeriksaan kesehatan: masukkan jalurnya, atau kosongkan kontennya.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Batas memori (MiB)',

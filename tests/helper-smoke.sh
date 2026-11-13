@@ -114,6 +114,7 @@ import (
 	"net/http"
 	"os"
 	"syscall"
+	"time"
 )
 
 // Files mapped by /map stay mapped while the application runs.
@@ -130,6 +131,52 @@ func main() {
 			return
 		}
 		fmt.Fprint(w, "ok")
+	})
+	// Health check path of the expected response content tests (health_match): JSON by default,
+	// {"status": "down", ...} while the file "body-down" exists, text while "body-text" exists, a
+	// raw chunked answer in three pieces while "body-chunked" exists (net/http answers an HTTP/1.0
+	// request without chunks), one byte every 200 ms for 10 s while "body-slow" exists, and 503
+	// with the text "Healthy" while "unhealthy" exists.
+	http.HandleFunc("/state", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat("unhealthy"); err == nil {
+			http.Error(w, "Healthy", http.StatusServiceUnavailable)
+			return
+		}
+		if _, err := os.Stat("body-text"); err == nil {
+			fmt.Fprint(w, "Service is Healthy")
+			return
+		}
+		if _, err := os.Stat("body-slow"); err == nil {
+			w.WriteHeader(http.StatusOK)
+			for i := 0; i < 50; i++ {
+				fmt.Fprint(w, " ")
+				w.(http.Flusher).Flush()
+				time.Sleep(200 * time.Millisecond)
+			}
+			return
+		}
+		if _, err := os.Stat("body-chunked"); err == nil {
+			conn, buf, err := w.(http.Hijacker).Hijack()
+			if err != nil {
+				return
+			}
+			defer conn.Close()
+			buf.WriteString("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n")
+			for _, part := range []string{`{"status":`, ` "ok", `, `"n": 1}`} {
+				fmt.Fprintf(buf, "%x\r\n%s\r\n", len(part), part)
+				buf.Flush()
+				time.Sleep(50 * time.Millisecond)
+			}
+			buf.WriteString("0\r\n\r\n")
+			buf.Flush()
+			return
+		}
+		status := "ok"
+		if _, err := os.Stat("body-down"); err == nil {
+			status = "down"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"status": "%s", "n": 1, "db": {"up": true, "ms": 3}}`, status)
 	})
 	// A file served from the application root: its page cache is charged to the service.
 	http.HandleFunc("/blob", func(w http.ResponseWriter, r *http.Request) {
@@ -344,6 +391,96 @@ wait_new_pid 0 || bad "start after the watch tests"
     && [ ! -e /etc/systemd/system/runway-health.service ] && [ ! -e /var/lib/runway/health/$ID.json ] && [ "$(hw "d['health_watch']")" = "None" ] \
     && ok "watch off: timer, service and watch state removed" || bad "watch off: $(ls /etc/systemd/system/runway-health.* /var/lib/runway/health/ 2>&1)"
 watch_apply '' >/dev/null
+
+echo "== expected response content of the health check (docs/DESIGN.md section 7, health_match)"
+# jstr TEXT: TEXT as a JSON string literal.
+jstr() { python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"; }
+# match_apply TEXT [EXTRA_FIELDS]: the sample with the health path /state and this expected content.
+match_apply() { watch_apply ", \"health_path\": \"/state\", \"health_match\": $(jstr "$1")${2:-}"; }
+# match_status: (health, health_code) of app-status (the health check with its 2 s timeout).
+match_status() { hw "(d['health'], d['health_code'])"; }
+# match_case NAME TEXT EXPECTED: app-status with this expected content gives EXPECTED.
+match_case() {
+    local st
+    [ "$(match_apply "$2")" = "True" ] || { bad "$1: apply refused"; return; }
+    st=$(match_status)
+    [ "$st" = "$3" ] && ok "$1: $st" || bad "$1: $st, expected $3 ($(hw "d['health_detail']"))"
+}
+rm -f "$APP/unhealthy" "$APP/body-down" "$APP/body-text" "$APP/body-chunked" "$APP/body-slow"
+# Validation (the expected text is customer-controlled as well).
+expect_reject "expected content: text starting with { that is not JSON" '"health_path": "/state", "health_match": "{status: ok}"'
+expect_reject "expected content: a JSON object with NaN" '"health_path": "/state", "health_match": "{\"a\": NaN}"'
+expect_reject "expected content: 201 characters" "\"health_path\": \"/state\", \"health_match\": \"$(printf 'x%.0s' $(seq 201))\""
+expect_reject "expected content: a control character" '"health_path": "/state", "health_match": "a\u0001b"'
+expect_reject "expected content: not a string" '"health_path": "/state", "health_match": {"status": "ok"}'
+[ "$(match_apply "$(printf 'ş%.0s' $(seq 200))")" = "True" ] && [ "$(hw "len(d['health_match'])")" = "200" ] \
+    && ok "expected content: 200 characters (2-byte UTF-8 each) are accepted" || bad "200 multibyte characters: $(hw "len(d['health_match'])")"
+[ "$(watch_apply ', "health_match": "Healthy"')" = "True" ] && [ "$(python3 -c "import json; print(json.load(open('/var/lib/runway/apps/$ID.json'))['health_match'])")" = "" ] \
+    && ok "without a health check path the expected content is dropped" || bad "expected content without a path was kept"
+[ "$(match_apply '  {"status":"ok"}  ')" = "True" ] && [ "$(python3 -c "import json; print(json.load(open('/var/lib/runway/apps/$ID.json'))['health_match'])")" = '{"status":"ok"}' ] \
+    && [ "$(hw "d['health_match']")" = '{"status":"ok"}' ] && ok "expected content trimmed in the state and reported by app-status" || bad "stored expected content: $(hw "d['health_match']")"
+# Text mode: a case-sensitive substring of the body.
+match_case "text not in the JSON answer" 'Healthy' "('unhealthy', 'body_mismatch')"
+match_case "text that is part of the JSON answer" '"n": 1' "('healthy', 'http_match')"
+[ "$(hw "(d['health_detail'], d['health_params'])")" = "('HTTP 200 from /state, expected content found', {'code': 200, 'path': '/state'})" ] \
+    && ok "detail and params of a match (no body in them)" || bad "match detail: $(hw "(d['health_detail'], d['health_params'])")"
+runuser -u "$USER_NAME" -- touch "$APP/body-text"
+match_case "text found in a text answer" 'Healthy' "('healthy', 'http_match')"
+match_case "text is case-sensitive" 'healthy' "('unhealthy', 'body_mismatch')"
+match_case "a JSON object expected, the answer is text" '{"status":"ok"}' "('unhealthy', 'body_not_json')"
+[ "$(hw "d['health_detail']")" = "HTTP 200 from /state, the response is not a JSON object" ] && ok "detail of an answer that is not JSON" || bad "not-JSON detail: $(hw "d['health_detail']")"
+rm -f "$APP/body-text"
+# JSON mode: subsets with JSON types; spacing and key order do not matter.
+match_case "JSON with other spacing and key order" '{"n":1,"status":"ok"}' "('healthy', 'http_match')"
+match_case "JSON nested object as a subset" '{ "db": { "up": true } }' "('healthy', 'http_match')"
+match_case "JSON nested key missing" '{"db": {"up": true, "region": "eu"}}' "('unhealthy', 'body_mismatch')"
+match_case "JSON \"1\" is not 1" '{"n": "1"}' "('unhealthy', 'body_mismatch')"
+match_case "JSON true is not 1" '{"n": true}' "('unhealthy', 'body_mismatch')"
+match_case "JSON 1 is not true" '{"db": {"up": 1}}' "('unhealthy', 'body_mismatch')"
+match_case "JSON with another value" '{"status": "down"}' "('unhealthy', 'body_mismatch')"
+[ "$(hw "d['health_detail']")" = "HTTP 200 from /state, expected content not found" ] && ok "detail of a mismatch" || bad "mismatch detail: $(hw "d['health_detail']")"
+runuser -u "$USER_NAME" -- touch "$APP/body-chunked"
+match_case "a chunked JSON answer" '{"status": "ok", "n": 1}' "('healthy', 'http_match')"
+rm -f "$APP/body-chunked"
+runuser -u "$USER_NAME" -- touch "$APP/unhealthy"
+match_case "HTTP 503 stays an HTTP failure (also with the content in the body)" 'Healthy' "('unhealthy', 'http')"
+rm -f "$APP/unhealthy"
+runuser -u "$USER_NAME" -- touch "$APP/body-slow"
+[ "$(match_apply 'Healthy')" = "True" ] || bad "apply for the slow answer"
+t0=$(date +%s%N)
+st=$(hw "(d['health'], d['health_code'], d['health_detail'])")
+elapsed=$(( ($(date +%s%N) - t0) / 1000000 ))
+case "$st" in
+    "('unhealthy', 'failed', 'Health check failed: timed out')") [ "$elapsed" -lt 6000 ] && ok "a slowly sent answer cannot extend the 2 s deadline (app-status took ${elapsed} ms)" || bad "slow answer: app-status took ${elapsed} ms" ;;
+    *) bad "slow answer: $st after ${elapsed} ms" ;;
+esac
+rm -f "$APP/body-slow"
+# The health watch restarts an application whose answer lacks the expected content.
+[ "$(match_apply '{"status": "ok"}' ', "health_watch": true, "health_interval": 10, "health_failures": 2')" = "True" ] || bad "apply watch with expected content"
+pid0=$(main_pid)
+"$H" _health now >/dev/null
+[ "$(hw "(d['health_watch']['result'], d['health_watch']['code'])")" = "('healthy', 'http_match')" ] && ok "health watch: the expected content is found" || bad "watch with content: $(hw "d['health_watch']")"
+runuser -u "$USER_NAME" -- touch "$APP/body-down"
+"$H" _health now >/dev/null
+[ "$(main_pid)" = "$pid0" ] && [ "$(hw "(d['health_watch']['failures'], d['health_watch']['code'])")" = "(1, 'body_mismatch')" ] \
+    && ok "health watch: an answer without the expected content counts as a failed check" || bad "watch mismatch: $(hw "d['health_watch']")"
+"$H" _health now >/dev/null
+if wait_new_pid "$pid0"; then
+    [ "$(hw "(d['health_watch']['restart_code'], d['health_watch']['restart_detail'])")" = "('body_mismatch', 'HTTP 200 from /state, expected content not found')" ] \
+        && ok "health watch: restarted after 2 answers without the expected content (reason body_mismatch)" || bad "watch restart reason: $(hw "d['health_watch']")"
+else
+    bad "health watch: no restart after 2 answers without the expected content: $(hw "d['health_watch']")"
+fi
+[ "$(call app-logs "{\"domain_id\": $ID, \"lines\": 100}" | jexpr "'(last: HTTP 200 from /state, expected content not found)' in d['log']")" = "True" ] \
+    && ok "the application log names the missing content as the reason" || bad "application log of the content restart"
+rm -f "$APP/body-down"
+[ "$(match_apply '' ', "health_watch": false')" = "True" ] && [ ! -e /etc/systemd/system/runway-health.timer ] && [ "$(hw "d['health_code']")" = "http" ] \
+    && ok "expected content off: the status line decides again" || bad "content off: $(hw "(d['health_code'], d['health_match'])")"
+# Every app-apply restarts the trigger watcher (runway-deploy-<id>.path): the many saves of this
+# section exceed systemd's start limit (5 within 10 s). Reset it for the trigger tests below.
+systemctl reset-failed runway-deploy-$ID.path 2>/dev/null
+watch_apply '' >/dev/null
+[ "$(systemctl is-active runway-deploy-$ID.path)" = "active" ] || bad "trigger watcher after the expected content tests: $(systemctl is-active runway-deploy-$ID.path)"
 
 echo "== trigger files"
 pid1=$(systemctl show -p MainPID --value runway-app-$ID)
@@ -739,6 +876,11 @@ func main() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
+		// ZD_STATUS: a JSON answer {"status": "<value>"} for the expected response content.
+		if s := os.Getenv("ZD_STATUS"); s != "" {
+			fmt.Fprintf(w, `{"status": %q}`, s)
+			return
+		}
 		fmt.Fprint(w, "ok")
 	})
 	var ln net.Listener
@@ -887,6 +1029,12 @@ call app-apply "{$(zd_base '{"ZD_FAIL": "1"}'), \"listen\": \"tcp\", \"zero_down
 st=$(wait_job deploy-$ID)
 [ "$st" = "failed" ] && job_msg | grep -q 'was not ready within 20 s (HTTP 503 from /healthz)' && [ "$(slot_now)" = "b" ] && [ "$(systemctl is-active runway-app-$ID-a)" != "active" ] \
     && ok "a new version that fails its health check is stopped, the old one keeps serving" || bad "failed health: $st $(job_msg)"
+# A new version that answers 200 without the expected response content never gets traffic.
+call app-apply "{$(zd_base '{"ZD_STATUS": "starting"}'), \"listen\": \"tcp\", \"zero_downtime\": true, \"health_match\": \"{\\\"status\\\": \\\"ok\\\"}\"}" >/dev/null
+st=$(wait_job deploy-$ID)
+[ "$st" = "failed" ] && job_msg | grep -q 'was not ready within 20 s (HTTP 200 from /healthz, expected content not found)' && [ "$(slot_now)" = "b" ] \
+    && [ "$(systemctl is-active runway-app-$ID-a)" != "active" ] && [ "$(curl -s --max-time 5 http://127.0.0.1:$ZD_TCP_PORT/)" = "zd b" ] \
+    && ok "a new version without the expected response content is stopped, the old one keeps serving" || bad "readiness with expected content: $st $(job_msg)"
 STANDBY=$(zd_status | jexpr "d['slots']['a']['endpoint'].split(':')[1]")
 runuser -u nobody -- python3 -c "import socket,time; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1', $STANDBY)); s.listen(); time.sleep(60)" &
 SQUAT=$!
@@ -908,7 +1056,7 @@ st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json'
 st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json')); print((d['slot'], d.get('switch')))")
 [ "$st" != "('$LIVE', None)" ] && [ "$(echo "$st" | cut -c3)" != "$LIVE" ] && [ "$(systemctl is-active runway-app-$ID-$LIVE)" != "active" ] \
     && journalctl -u runway-app-$ID.service -n 20 --no-pager | grep -q 'settled an interrupted switch' && ok "the convergence completes the switch from the pointer ($st)" || bad "convergence after kill: $st"
-loop_stop "tcp: turning on, restart, build, failed health, held standby port, killed job"
+loop_stop "tcp: turning on, restart, build, failed health, missing content, held standby port, killed job"
 call app-apply "{$(zd_base '{"ZD_DELAY": "6s"}'), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
 for _ in $(seq 1 40); do [ "$(call job-status "{\"job\": \"deploy-$ID\"}" | field "['phase']" 2>/dev/null)" = "waiting" ] && break; sleep 0.5; done
 call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}" | grep -q 'A deployment is running' && ok "a save is refused while a switch runs" || bad "app-apply during a switch was not refused"
@@ -1078,10 +1226,18 @@ for listen in ("tcp", "unix", "none"):
         for name in ("render_deploy_service", "render_deploy_path"):
             if getattr(old, name)(s_old) != getattr(new, name)(s_new):
                 diffs.append("%s %s %s" % (listen, limits, name))
+        # The expected response content of the health check never reaches a unit or env file.
+        s_match, _ = new.validate_app(dict(payload, health_match='{"status": "ok"}'))
+        if s_match["health_match"] != ("" if listen == "none" else '{"status": "ok"}'):
+            diffs.append("%s %s health_match %r" % (listen, limits, s_match["health_match"]))
+        if (new.render_env_file(s_match, pw), new.render_app_unit(s_match, pw), new.render_deploy_service(s_match),
+                new.render_deploy_path(s_match)) != (new.render_env_file(s_new, pw), unit_new, new.render_deploy_service(s_new),
+                                                     new.render_deploy_path(s_new)):
+            diffs.append("%s %s files depend on health_match" % (listen, limits))
 print("same" if not diffs else "different: " + ", ".join(diffs))
 PYEOF
 )
-    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off)" || bad "1.0 rendering: $res"
+    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off; an expected response content changes no file)" || bad "1.0 rendering: $res"
 else
     echo "SKIP  byte-identical 1.0 rendering (no /root/runway-helper-1.0.0; plesk-e2e.sh smoke copies it from git)"
 fi

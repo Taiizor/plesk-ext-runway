@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Az állapotfigyeléshez állapot-ellenőrzési útvonal szükséges: adjon meg egyet, vagy kapcsolja ki a figyelést.',
     'errorHealthWatchInterval' => 'Az ellenőrzési időköz csak %%min%% és %%max%% közötti egész számú másodperc lehet.',
     'errorHealthWatchFailures' => 'A sikertelen ellenőrzések száma csak %%min%% és %%max%% közötti egész szám lehet.',
+    'errorHealthMatch' => 'A várt választartalom legfeljebb %%max%% karakter hosszú lehet, és nem tartalmazhat sortörést vagy vezérlőkaraktert.',
+    'errorHealthMatchJson' => 'A várt választartalom { karakterrel kezdődik, de nem érvényes JSON-objektum.',
+    'errorHealthMatchPath' => 'A várt választartalomhoz állapot-ellenőrzési útvonal szükséges: adjon meg egyet, vagy törölje a tartalmat.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memóriakorlát (MiB)',

@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'La surveillance d\'état nécessite un chemin de vérification d\'état : saisissez-en un ou désactivez la surveillance.',
     'errorHealthWatchInterval' => 'L\'intervalle de vérification doit être un nombre entier de secondes compris entre %%min%% et %%max%%.',
     'errorHealthWatchFailures' => 'Le nombre de vérifications échouées doit être un nombre entier compris entre %%min%% et %%max%%.',
+    'errorHealthMatch' => 'Le contenu attendu de la réponse doit comporter au maximum %%max%% caractères et ne doit pas contenir de sauts de ligne ni de caractères de contrôle.',
+    'errorHealthMatchJson' => 'Le contenu attendu de la réponse commence par { mais n\'est pas un objet JSON valide.',
+    'errorHealthMatchPath' => 'Le contenu attendu de la réponse nécessite un chemin de vérification d\'état : saisissez-en un ou videz le contenu.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de mémoire (Mio)',

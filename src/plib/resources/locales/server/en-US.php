@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'The health watch needs a health check path: enter one, or turn the watch off.',
     'errorHealthWatchInterval' => 'The check interval must be a whole number of seconds between %%min%% and %%max%%.',
     'errorHealthWatchFailures' => 'The number of failed checks must be a whole number between %%min%% and %%max%%.',
+    'errorHealthMatch' => 'The expected response content must be at most %%max%% characters long and must not contain line breaks or control characters.',
+    'errorHealthMatchJson' => 'The expected response content starts with { but is not a valid JSON object.',
+    'errorHealthMatchPath' => 'The expected response content needs a health check path: enter one, or clear the content.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Memory limit (MiB)',

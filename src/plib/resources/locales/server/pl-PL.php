@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Monitorowanie stanu wymaga ścieżki kontroli stanu: wprowadź ją lub wyłącz monitorowanie.',
     'errorHealthWatchInterval' => 'Odstęp między kontrolami musi być całkowitą liczbą sekund od %%min%% do %%max%%.',
     'errorHealthWatchFailures' => 'Liczba nieudanych kontroli musi być liczbą całkowitą od %%min%% do %%max%%.',
+    'errorHealthMatch' => 'Oczekiwana treść odpowiedzi może mieć maksymalnie %%max%% znaków i nie może zawierać znaków nowego wiersza ani znaków sterujących.',
+    'errorHealthMatchJson' => 'Oczekiwana treść odpowiedzi zaczyna się od {, ale nie jest prawidłowym obiektem JSON.',
+    'errorHealthMatchPath' => 'Oczekiwana treść odpowiedzi wymaga ścieżki kontroli stanu: wprowadź ją lub wyczyść treść.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit pamięci (MiB)',

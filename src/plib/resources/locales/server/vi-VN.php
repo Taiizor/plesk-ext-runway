@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Giám sát tình trạng cần có đường dẫn kiểm tra tình trạng: hãy nhập một đường dẫn hoặc tắt giám sát.',
     'errorHealthWatchInterval' => 'Khoảng thời gian kiểm tra phải là một số nguyên giây từ %%min%% đến %%max%%.',
     'errorHealthWatchFailures' => 'Số lần kiểm tra thất bại phải là một số nguyên từ %%min%% đến %%max%%.',
+    'errorHealthMatch' => 'Nội dung phản hồi mong đợi phải dài tối đa %%max%% ký tự và không được chứa ký tự xuống dòng hoặc ký tự điều khiển.',
+    'errorHealthMatchJson' => 'Nội dung phản hồi mong đợi bắt đầu bằng { nhưng không phải là đối tượng JSON hợp lệ.',
+    'errorHealthMatchPath' => 'Nội dung phản hồi mong đợi cần có đường dẫn kiểm tra tình trạng: hãy nhập một đường dẫn hoặc xóa nội dung.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Giới hạn bộ nhớ (MiB)',

@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => '健康监控需要健康检查路径：请输入一个路径，或关闭健康监控。',
     'errorHealthWatchInterval' => '检查间隔必须是 %%min%% 到 %%max%% 之间的整数秒。',
     'errorHealthWatchFailures' => '检查失败次数必须是 %%min%% 到 %%max%% 之间的整数。',
+    'errorHealthMatch' => '预期响应内容最多 %%max%% 个字符，且不能包含换行符或控制字符。',
+    'errorHealthMatchJson' => '预期响应内容以 { 开头，但不是有效的 JSON 对象。',
+    'errorHealthMatchPath' => '预期响应内容需要健康检查路径：请输入一个路径，或清空该内容。',
 
     // Field names used in error messages
     'fieldMemoryMb' => '内存限制（MiB）',

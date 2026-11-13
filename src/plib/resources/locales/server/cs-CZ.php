@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Sledování stavu vyžaduje cestu kontroly stavu: zadejte ji, nebo sledování vypněte.',
     'errorHealthWatchInterval' => 'Interval kontroly musí být celý počet sekund od %%min%% do %%max%%.',
     'errorHealthWatchFailures' => 'Počet neúspěšných kontrol musí být celé číslo od %%min%% do %%max%%.',
+    'errorHealthMatch' => 'Očekávaný obsah odpovědi smí mít nejvýše %%max%% znaků a nesmí obsahovat zalomení řádků ani řídicí znaky.',
+    'errorHealthMatchJson' => 'Očekávaný obsah odpovědi začíná znakem {, ale není platným objektem JSON.',
+    'errorHealthMatchPath' => 'Očekávaný obsah odpovědi vyžaduje cestu kontroly stavu: zadejte ji, nebo obsah vymažte.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limit paměti (MiB)',

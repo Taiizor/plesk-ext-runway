@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => '健康監控需要健康檢查路徑：請輸入路徑，或關閉健康監控。',
     'errorHealthWatchInterval' => '檢查間隔必須是介於 %%min%% 到 %%max%% 之間的整數秒數。',
     'errorHealthWatchFailures' => '檢查失敗次數必須是介於 %%min%% 到 %%max%% 之間的整數。',
+    'errorHealthMatch' => '預期回應內容最多 %%max%% 個字元，且不得包含換行或控制字元。',
+    'errorHealthMatchJson' => '預期回應內容以 { 開頭，但不是有效的 JSON 物件。',
+    'errorHealthMatchPath' => '預期回應內容需要健康檢查路徑：請輸入路徑，或清除該內容。',
 
     // Field names used in error messages
     'fieldMemoryMb' => '記憶體限制 (MiB)',

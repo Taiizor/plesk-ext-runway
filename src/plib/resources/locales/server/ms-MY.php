@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Pemantauan kesihatan memerlukan laluan semakan kesihatan: masukkan satu laluan, atau matikan pemantauan.',
     'errorHealthWatchInterval' => 'Selang semakan mestilah nombor bulat saat antara %%min%% dan %%max%%.',
     'errorHealthWatchFailures' => 'Bilangan semakan gagal mestilah nombor bulat antara %%min%% dan %%max%%.',
+    'errorHealthMatch' => 'Kandungan respons yang dijangka mestilah tidak melebihi %%max%% aksara dan tidak boleh mengandungi pemisah baris atau aksara kawalan.',
+    'errorHealthMatchJson' => 'Kandungan respons yang dijangka bermula dengan { tetapi bukan objek JSON yang sah.',
+    'errorHealthMatchPath' => 'Kandungan respons yang dijangka memerlukan laluan semakan kesihatan: masukkan satu laluan, atau kosongkan kandungan.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Had memori (MiB)',

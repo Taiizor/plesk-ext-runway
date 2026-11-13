@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'La supervisió d\'estat necessita un camí de comprovació d\'estat: introduïu-ne un o desactiveu la supervisió.',
     'errorHealthWatchInterval' => 'L\'interval de comprovació ha de ser un nombre enter de segons entre %%min%% i %%max%%.',
     'errorHealthWatchFailures' => 'El nombre de comprovacions fallides ha de ser un nombre enter entre %%min%% i %%max%%.',
+    'errorHealthMatch' => 'El contingut esperat de la resposta ha de tenir com a màxim %%max%% caràcters i no pot contenir salts de línia ni caràcters de control.',
+    'errorHealthMatchJson' => 'El contingut esperat de la resposta comença amb { però no és un objecte JSON vàlid.',
+    'errorHealthMatchPath' => 'El contingut esperat de la resposta necessita un camí de comprovació d\'estat: introduïu-ne un o esborreu el contingut.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Límit de memòria (MiB)',

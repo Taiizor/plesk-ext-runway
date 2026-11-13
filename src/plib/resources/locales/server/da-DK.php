@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Sundhedsovervågningen kræver en sti til sundhedstjek: angiv en, eller slå overvågningen fra.',
     'errorHealthWatchInterval' => 'Tjekintervallet skal være et helt antal sekunder mellem %%min%% og %%max%%.',
     'errorHealthWatchFailures' => 'Antallet af mislykkede tjek skal være et helt tal mellem %%min%% og %%max%%.',
+    'errorHealthMatch' => 'Det forventede svarindhold må højst være %%max%% tegn langt og må ikke indeholde linjeskift eller kontroltegn.',
+    'errorHealthMatchJson' => 'Det forventede svarindhold starter med {, men er ikke et gyldigt JSON-objekt.',
+    'errorHealthMatchPath' => 'Det forventede svarindhold kræver en sti til sundhedstjek: angiv en, eller ryd indholdet.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Hukommelsesgrænse (MiB)',

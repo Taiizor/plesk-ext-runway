@@ -38,6 +38,18 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   watch. One timer, `runway-health.timer`, serves every application with the watch and exists only
   while one has it on. README section *When an application fails* explains what happens on
   crashes, reboots, limits and hangs.
+- Expected response content of the health check (opt-in per application, *Advanced*, right below
+  the health check path; needs one, never for workers): besides a 2xx or 3xx status, the answer
+  must then contain it. A JSON object such as `{"status":"ok"}` must be contained in a JSON answer
+  (its keys with equal values and JSON types, nested objects as subsets, spacing and key order do
+  not matter); any other text such as `Healthy` must appear in the answer (case-sensitive). At most
+  200 characters. The status card, the health watch and the zero-downtime readiness check use it,
+  so a new version whose answer does not match never gets traffic. The helper reads at most 64 KiB
+  of the answer within the check's timeout (also when it is sent slowly), decodes a chunked answer
+  and never puts the answer into a status text; new health codes `http_match`, `body_mismatch`
+  and `body_not_json`. Without the setting the check reads the status line only, as before.
+  `api/app` config field `healthMatch`, helper state `health_match`, `plesk ext runway --status`
+  shows it on the *Health* line.
 - The domain page warns, without blocking the save, while the application root is a document root
   of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one, and names the
   domain's document root at the static paths; `api/app` adds `domain.documentRoot`,

@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Kunnonvalvonta vaatii kuntotarkistuksen polun: anna polku tai kytke valvonta pois päältä.',
     'errorHealthWatchInterval' => 'Tarkistusvälin on oltava kokonaisluku sekunteina väliltä %%min%%–%%max%%.',
     'errorHealthWatchFailures' => 'Epäonnistuneiden tarkistusten määrän on oltava kokonaisluku väliltä %%min%%–%%max%%.',
+    'errorHealthMatch' => 'Vastauksen odotetussa sisällössä saa olla enintään %%max%% merkkiä, eikä se saa sisältää rivinvaihtoja tai ohjausmerkkejä.',
+    'errorHealthMatchJson' => 'Vastauksen odotettu sisältö alkaa merkillä {, mutta se ei ole kelvollinen JSON-objekti.',
+    'errorHealthMatchPath' => 'Vastauksen odotettu sisältö vaatii kuntotarkistuksen polun: anna polku tai tyhjennä sisältö.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Muistiraja (MiB)',

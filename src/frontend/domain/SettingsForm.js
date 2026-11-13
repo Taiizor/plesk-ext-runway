@@ -9,8 +9,8 @@ import {
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
-const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'healthWatch', 'healthWatchInterval',
-    'healthWatchFailures', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
+const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch',
+    'healthWatchInterval', 'healthWatchFailures', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
     'zeroDowntime', 'readyTimeout', 'drainSeconds'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
 // Fields the default commands depend on.
@@ -75,6 +75,8 @@ export const formValues = data => {
         mountPath: text(config.mountPath),
         staticPaths: Array.isArray(config.staticPaths) ? config.staticPaths.join('\n') : text(config.staticPaths),
         healthPath: text(config.healthPath),
+        // Expected response content of the health check ("" = only the status counts).
+        healthMatch: text(config.healthMatch),
         // Health watch: defaults 30 s and 3 failed checks in a row.
         healthWatch: Boolean(config.healthWatch),
         healthWatchInterval: text(config.healthWatchInterval || 30),
@@ -125,6 +127,8 @@ const requestBody = (values, data, isAdmin, supportsBuild) => {
                 body[key] = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
             });
         }
+        // Expected response content: as typed (the server trims it and refuses it without a path).
+        body.healthMatch = values.healthMatch;
         // Health watch: the interval and the failures only while it is on.
         body.healthWatch = Boolean(values.healthWatch);
         if (values.healthWatch) {
@@ -192,6 +196,11 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
         || (isObject(data.appRootDocumentRoot) && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
             ? data.appRootDocumentRoot : null);
     const documentRoot = isObject(data.domain) && typeof data.domain.documentRoot === 'string' ? data.domain.documentRoot : '';
+    // The expected response content and the health watch need a health check path: disabled
+    // without one, unless they are set (so they can still be cleared or turned off). Any character
+    // keeps the content field open: the server trims fewer characters than String.trim() does.
+    const healthPathSet = String(values.healthPath || '').trim() !== '';
+    const healthNeedsPath = healthPathSet ? null : <span>{' '}<Translate content="Domain.form.healthNeedsPath" /></span>;
 
     // Validation errors in the advanced part open it.
     useEffect(() => {
@@ -214,7 +223,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const visible = ['enabled', 'runtime', 'appRoot', 'mode', 'startCmd', 'env', 'autoDeploy']
         .concat(supportsBuild ? ['buildCmd'] : [])
         .concat(kind !== 'none' ? ['toolchain'] : [])
-        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'healthWatch', 'zeroDowntime'])
+        .concat(worker ? [] : ['listen', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch', 'zeroDowntime'])
         .concat(!worker && values.healthWatch ? ['healthWatchInterval', 'healthWatchFailures'] : [])
         .concat(!worker && values.zeroDowntime ? ['readyTimeout', 'drainSeconds'] : [])
         .concat(values.mode === 'path' ? ['mountPath'] : [])
@@ -486,10 +495,35 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         />
                     )}
                     {!worker && (
+                        <FormFieldText
+                            name="healthMatch"
+                            label={<Translate content="Domain.form.healthMatch" />}
+                            description={(
+                                <span>
+                                    <Translate
+                                        content="Domain.form.healthMatchHint"
+                                        params={{ json: isolate('{"status":"ok"}'), text: isolate('Healthy') }}
+                                    />
+                                    {healthNeedsPath}
+                                </span>
+                            )}
+                            placeholder={'{"status":"ok"}'}
+                            size="xl"
+                            disabled={!healthPathSet && !values.healthMatch}
+                            inputProps={codeInput}
+                        />
+                    )}
+                    {!worker && (
                         <FormFieldCheckbox
                             name="healthWatch"
                             label={<Translate content="Domain.form.healthWatch" />}
-                            description={<Translate content="Domain.form.healthWatchHint" />}
+                            description={(
+                                <span>
+                                    <Translate content="Domain.form.healthWatchHint" />
+                                    {healthNeedsPath}
+                                </span>
+                            )}
+                            disabled={!healthPathSet && !values.healthWatch}
                         />
                     )}
                     {!worker && values.healthWatch && (

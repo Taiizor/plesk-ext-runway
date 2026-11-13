@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Hälsoövervakningen kräver en sökväg för hälsokontroll: ange en, eller stäng av övervakningen.',
     'errorHealthWatchInterval' => 'Kontrollintervallet måste vara ett helt antal sekunder mellan %%min%% och %%max%%.',
     'errorHealthWatchFailures' => 'Antalet misslyckade kontroller måste vara ett heltal mellan %%min%% och %%max%%.',
+    'errorHealthMatch' => 'Det förväntade innehållet i svaret får vara högst %%max%% tecken långt och får inte innehålla radbrytningar eller kontrolltecken.',
+    'errorHealthMatchJson' => 'Det förväntade innehållet i svaret börjar med { men är inte ett giltigt JSON-objekt.',
+    'errorHealthMatchPath' => 'Det förväntade innehållet i svaret kräver en sökväg för hälsokontroll: ange en, eller töm innehållet.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Minnesgräns (MiB)',

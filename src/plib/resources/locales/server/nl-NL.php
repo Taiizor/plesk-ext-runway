@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'De healthcheck-bewaking vereist een healthcheck-pad: voer er een in of schakel de bewaking uit.',
     'errorHealthWatchInterval' => 'Het controle-interval moet een geheel aantal seconden tussen %%min%% en %%max%% zijn.',
     'errorHealthWatchFailures' => 'Het aantal mislukte controles moet een geheel getal tussen %%min%% en %%max%% zijn.',
+    'errorHealthMatch' => 'De verwachte inhoud van het antwoord mag maximaal %%max%% tekens lang zijn en mag geen regeleinden of stuurtekens bevatten.',
+    'errorHealthMatchJson' => 'De verwachte inhoud van het antwoord begint met { maar is geen geldig JSON-object.',
+    'errorHealthMatchPath' => 'De verwachte inhoud van het antwoord vereist een healthcheck-pad: voer er een in of maak de inhoud leeg.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Geheugenlimiet (MiB)',

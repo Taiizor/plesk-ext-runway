@@ -61,7 +61,8 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - Environment variables, stored root-only on the server and never passed on a command line.
 - Listen on a TCP port, on a Unix socket, or run a background worker without a proxy.
 - Proxy the whole domain or only a path prefix (for example `/api`), let the web server serve
-  static folders, and check a health path.
+  static folders, and check a health path (optionally also the content of its answer, for example
+  `{"status":"ok"}`).
 - Start, stop, restart, build and redeploy; live status (state, PID, the application's memory
   apart from the kernel's file cache, restarts, listener check), application journal and build
   log. **Stop persists**: a stopped application stays stopped across reboots, deployments and
@@ -285,7 +286,8 @@ instead:
    the running one, on its own port or socket (`PORT`, `LISTEN_ADDR` or `RUNWAY_SOCKET` name it;
    `RUNWAY_SLOT` says which slot).
 2. Runway waits until it listens and, when a health check path is set, until that path answers
-   2xx or 3xx, at most for the **readiness timeout** (default 60 s).
+   2xx or 3xx (with the expected response content, when one is set), at most for the **readiness
+   timeout** (default 60 s).
 3. The web server's traffic moves to the new version: in **Unix socket** mode by atomically
    re-pointing a root-owned symbolic link (`/run/runway/<id>.sock`, nothing is reloaded); in
    **TCP** mode by rewriting a root-owned include file (`/etc/runway/web/<id>.nginx.conf`) and a
@@ -294,7 +296,8 @@ instead:
    10 s); then the old version stops.
 
 A new version that exits, does not listen or fails its health check in time is stopped; the old
-version keeps serving and the deployment is reported as failed with the reason. **Restart in
+version keeps serving and the deployment is reported as failed with the reason. With an expected
+response content, a new version whose answer does not contain it never gets traffic. **Restart in
 place** (a button next to *Restart*, `plesk ext runway --restart <domain> -plain`) restarts the
 running version the classic way, for example to replace a running but broken instance or to run a
 build whose switch failed.
@@ -408,9 +411,11 @@ the file cache. With cgroup v1 (older distributions) the file is
   notice it. Turn on the **health watch** (domain settings, *Advanced*; it needs a health check
   path): Runway then requests the path every 30 seconds (10 to 3600) and restarts the application
   in place after 3 failed checks in a row (1 to 20). A check fails when the path does not answer
-  with 2xx or 3xx within 5 seconds, or nothing listens. No checks in the first 60 seconds after a
-  start, while a deployment runs, or for stopped applications; a port held by another user is not
-  counted. After 3 restarts within an hour it only reports the failures (status card, application
+  with 2xx or 3xx within 5 seconds, or nothing listens. With an **expected response content** (see
+  [Domain settings](#domain-settings)) an answer without it fails too, for example an application
+  that still answers 200 but no longer reports `{"status":"ok"}`. No checks in the first 60
+  seconds after a start, while a deployment runs, or for stopped applications; a port held by
+  another user is not counted. After 3 restarts within an hour it only reports the failures (status card, application
   log) until the oldest of them is an hour ago, so a wrong health path cannot restart an
   application for ever. With zero-downtime deployments it restarts the running version in place
   too, like *Restart in place*. One timer (`runway-health.timer`, every 10 seconds) serves every
@@ -476,7 +481,8 @@ plesk ext runway --update                            # update Runway to it (see 
 | Proxy mode | `web` (whole domain), `path` (one prefix), `worker` (= listen `none`) | `web` |
 | Mount path | URL prefix for `path` mode, for example `/api` | |
 | Static paths | up to 20 URL prefixes the web server serves from the document root (the files must be there) | |
-| Health check path | `GET` with a 2 s timeout, shown as healthy/unhealthy | |
+| Health check path | `GET` with a 2 s timeout, shown as healthy/unhealthy: healthy is a 2xx or 3xx answer (that also contains the expected response content, when one is set) | |
+| Expected response content | optional, needs a health check path. A JSON object such as `{"status":"ok"}`: the answer must be JSON that contains these keys with equal values (spacing, key order and further keys do not matter; nested objects are compared the same way, everything else exactly and with its JSON type: `"1"` is not `1`, `true` is not `1`). Any other text such as `Healthy`: it must appear in the answer (case-sensitive). The first 64 KiB of the answer are read. The status card, the health watch and zero-downtime deployments use it (a new version whose answer does not match never gets traffic) | |
 | Health watch | restart the application in place when the health check path fails several times in a row (needs a health check path; see [When an application fails](#when-an-application-fails)) | off |
 | Check interval, failed checks | how often the health watch checks (10-3600 s) and after how many failed checks in a row it restarts (1-20) | 30 s, 3 |
 | Build command | runs with `bash -c` in the application directory as the system user | per runtime |

@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'Die Health-Check-Überwachung benötigt einen Health-Check-Pfad: Geben Sie einen ein oder deaktivieren Sie die Überwachung.',
     'errorHealthWatchInterval' => 'Das Prüfintervall muss eine ganze Zahl von Sekunden zwischen %%min%% und %%max%% sein.',
     'errorHealthWatchFailures' => 'Die Anzahl fehlgeschlagener Prüfungen muss eine ganze Zahl zwischen %%min%% und %%max%% sein.',
+    'errorHealthMatch' => 'Der erwartete Antwortinhalt darf höchstens %%max%% Zeichen lang sein und keine Zeilenumbrüche oder Steuerzeichen enthalten.',
+    'errorHealthMatchJson' => 'Der erwartete Antwortinhalt beginnt mit {, ist aber kein gültiges JSON-Objekt.',
+    'errorHealthMatchPath' => 'Der erwartete Antwortinhalt benötigt einen Health-Check-Pfad: Geben Sie einen ein oder leeren Sie den Inhalt.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Speicherlimit (MiB)',

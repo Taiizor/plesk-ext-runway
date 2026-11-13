@@ -278,7 +278,12 @@ class Modules_Runway_Cli
             if (is_array($health)) {
                 $health = isset($health['state']) ? $health['state'] : (isset($health['status']) ? $health['status'] : json_encode($health));
             }
-            $facts[] = ['Health', (string)$health . ($config['healthPath'] !== '' ? ' (' . $config['healthPath'] . ')' : '')];
+            // What the helper checks: its health check path and, when set, the expected response
+            // content the answer must contain (both "" for a worker, whatever the panel kept).
+            $path = isset($status['health_path']) && is_string($status['health_path']) ? $status['health_path'] : $config['healthPath'];
+            $expected = isset($status['health_match']) && is_string($status['health_match']) ? $status['health_match'] : '';
+            $match = $path !== '' && $expected !== '' ? ', expecting ' . $expected : '';
+            $facts[] = ['Health', (string)$health . ($path !== '' ? ' (' . $path . $match . ')' : '')];
         }
         foreach (self::healthWatchFacts($status) as $fact) {
             $facts[] = $fact;

@@ -165,10 +165,13 @@ HOME_DIR=$(dock exec "$CONTAINER" plesk db -Ne "select s.home from sys_users s j
 [ -n "$HOME_DIR" ] || HOME_DIR=/var/www/vhosts/$DOMAIN
 
 APP=$(get "app?site_id=$SITE_ID")
-SAVED=$(echo "$APP" | jexpr "json.dumps(dict([('site_id', $SITE_ID)] + [(k, v) for k, v in d['data']['config'].items() if k in ('enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths', 'healthPath', 'buildCmd', 'startCmd', 'autoDeploy')]))")
+SAVED=$(echo "$APP" | jexpr "json.dumps(dict([('site_id', $SITE_ID)] + [(k, v) for k, v in d['data']['config'].items() if k in ('enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths', 'healthPath', 'healthMatch', 'buildCmd', 'startCmd', 'autoDeploy')]))")
 case "$SAVED" in ERROR*) bad "cannot read the configuration: $APP"; SAVED=""; exit 1 ;; esac
 UNIX_RE=$(get context | jexpr "json.dumps(dict((r['key'], r.get('unix_toolchain_re') or '') for r in d['data']['runtimes']))")
-check_save=$(post app/save "{\"site_id\": $SITE_ID, \"enabled\": false, \"appRoot\": \"$APP_ROOT\", \"healthPath\": \"/\"}")
+# No expected response content: the samples answer "/" with their own text, so a value left
+# behind (e.g. by an interrupted api-smoke) would make every case unhealthy. restore() saves the
+# previous one again.
+check_save=$(post app/save "{\"site_id\": $SITE_ID, \"enabled\": false, \"appRoot\": \"$APP_ROOT\", \"healthPath\": \"/\", \"healthMatch\": \"\"}")
 [ "$(echo "$check_save" | jexpr "d['status']")" = "success" ] && ok "switched $DOMAIN to $APP_ROOT (disabled)" || { bad "save: $check_save"; exit 1; }
 
 run_case() {

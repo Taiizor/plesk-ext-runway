@@ -66,6 +66,9 @@ return [
     'errorHealthWatchPath' => 'A monitorização de estado requer um caminho de verificação de estado: introduza um ou desative a monitorização.',
     'errorHealthWatchInterval' => 'O intervalo de verificação deve ser um número inteiro de segundos entre %%min%% e %%max%%.',
     'errorHealthWatchFailures' => 'O número de verificações falhadas deve ser um número inteiro entre %%min%% e %%max%%.',
+    'errorHealthMatch' => 'O conteúdo esperado da resposta deve ter no máximo %%max%% caracteres e não pode conter quebras de linha nem caracteres de controlo.',
+    'errorHealthMatchJson' => 'O conteúdo esperado da resposta começa com { mas não é um objeto JSON válido.',
+    'errorHealthMatchPath' => 'O conteúdo esperado da resposta requer um caminho de verificação de estado: introduza um ou limpe o conteúdo.',
 
     // Field names used in error messages
     'fieldMemoryMb' => 'Limite de memória (MiB)',

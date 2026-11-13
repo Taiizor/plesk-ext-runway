@@ -177,6 +177,10 @@ Rules for every adapter:
   the proxy regex so nginx/Apache serve them from the document root (SPA assets).
 - `health_path`: optional path; `app-status` performs one GET (2 s timeout, Host = domain) and
   reports `healthy|unhealthy|unknown`. Automatic restarts only with the opt-in health watch (§7).
+  `health_match` (optional, needs `health_path`): the expected response content; a 2xx/3xx answer
+  is healthy only when its body contains it (a JSON object as a subset, other text as a
+  case-sensitive substring, §7). The status card, the health watch and the zero-downtime readiness
+  check (§12.4) all use the same check.
 
 ## 6. HTTP API (PHP `ApiController`, all JSON, `index.php/api/<action>`)
 
@@ -201,7 +205,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/update/check` | POST | admin | forced check (helper `update-check {force: true}`; within 60 s of the previous check the cache answers) → `api/update` shape plus `checked`; a failed check is `error`, not an API error; HTTP 404 of GitHub (nothing published) is `latest: null` |
 | `api/update/install` | POST | admin | `{version: "X.Y.Z-R"}` (the version the administrator saw; field error `version` when malformed) → helper `update-install` → `{job, version, message}`; refused unless it is the cached available update, newer than the installed one, and no admin job runs |
 | `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active,documentRoot}, documentRoots:[{domain, path, own}], appRootDocumentRoot, defaultAppRoot, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}`. `documentRoots`: the document roots (`pm_Domain::getDocumentRoot()`) of the domains with hosting in the same webspace (same home directory and system user, from `pm_Domain::getDomainsByClient()`), relative to the home directory, `own` marking the domain's own (also `domain.documentRoot`; null when unknown). The web server serves every file there whenever it does not pass a request to an application (application disabled or removed, worker mode, paths outside the mount path, static paths; a stopped or failed application answers 502), so the settings form warns, without blocking the save, while the typed application root is one of them or lies below one (compared as text), or while it is the stored root and `appRootDocumentRoot` names an entry: the document root the stored root lies in with symbolic links resolved (helper `app-page` `document_root`, §7; null otherwise); `defaultAppRoot` (`apps/<domain>`) is its suggestion. `plesk ext runway --status` warns the same way (`app-inspect` when the text comparison finds nothing) |
-| `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, static paths 1000 in total. A save is an explicit start (helper `resume`) |
+| `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, healthMatch 200 characters, static paths 1000 in total. A save is an explicit start (helper `resume`) |
 | `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy, plain?: bool}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again. Zero-downtime: `restart` of a running switchable application answers with the switch job; `plain: true` restarts in place (§12.10) |
 | `api/app/status` | GET | domain | helper `app-status` |
 | `api/app/logs` | GET | domain | `?kind=app\|deploy&lines=N` → `{log, kind}` |
@@ -210,7 +214,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/app/fetch` | POST | domain | `{url (https:// only; http:// only with the helper's test flag), sha256?, extract?: bool, filename?, build?: bool}` → starts a deploy job in `fetch` mode (download as the user into the app root, verify, chmod +x / extract, optional build, restart unless stopped) → `{job, message}`; needs a configured app (the UI disables the button until the settings are saved) |
 
 Config fields (JSON, camelCase on the API, snake_case toward the helper):
-`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, healthWatch (bool, needs healthPath: field error errorHealthWatchPath), healthWatchInterval (10-3600, default 30), healthWatchFailures (1-20, default 3), buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10).
+`enabled, runtime, toolchain, appRoot, listen (tcp|unix|none), mode (web|path|worker), mountPath, staticPaths[], healthPath, healthMatch (string, default "" = off; trimmed like PHP's trim(), at most 200 characters, no control characters (C0, DEL, C1): field error errorHealthMatch; text that starts with "{" must be a JSON object: errorHealthMatchJson; needs healthPath: errorHealthMatchPath; a non-string: errorInvalidValue), healthWatch (bool, needs healthPath: field error errorHealthWatchPath), healthWatchInterval (10-3600, default 30), healthWatchFailures (1-20, default 3), buildCmd, startCmd, autoDeploy, zeroDowntime, readyTimeout, drainSeconds, env (text, API only)`; admin-only: `memoryMb, cpuPercent, tasks`; read-only: `port`, `switchable` (§12.10). Workers (listen `none`) keep a stored `healthMatch`, but the payload sends `health_match: ""` for them and whenever `healthPath` is empty.
 
 ## 7. Helper command contract (`runway-helper <command>`, JSON payload on stdin)
 
@@ -225,12 +229,12 @@ their code.
 | `toolchains` | — | `{runtimes:{key:{installed:[{id,label,path,version?,kind?}], in_use:{id:[domains]}, toolchain, build_deps}}, build_deps, job}`; `kind` (`detected\|managed`) marks PHP entries (`plesk-<x.y>` vs `frankenphp-<ver>`), `version` the resolved version of channels (rust `stable` → `1.x.y`) |
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
-| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
+| `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, health_match, health_watch, health_interval, health_failures, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
 | `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
-| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params, health_watch` (null while off, see below), and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
+| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health_match, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params, health_watch` (null while off, see below), and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
 | `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
@@ -295,9 +299,10 @@ itself). Under the deploy lock:
   failures are reset. Every instance (`<unit>@ActiveEnterTimestampMonotonic`) starts with zero
   failures and gets 60 s (`HEALTH_WATCH_GRACE`) before its first check.
 - A listener `foreign` or `tampered` is recorded as `skipped` and not counted (a restart would not
-  help). Otherwise one `health_check()` with a 5 s timeout: healthy (2xx/3xx) resets the failures
-  and a pause; anything else (another status, no HTTP answer, a timeout, nothing listening) adds
-  one.
+  help). Otherwise one `health_check()` with a 5 s timeout: healthy (2xx/3xx, with the expected
+  response content when `health_match` is set) resets the failures and a pause; anything else
+  (another status, no HTTP answer, a timeout, nothing listening, `body_mismatch`, `body_not_json`)
+  adds one.
 - At `health_failures` failed checks in a row the application is restarted in place: `prepare_start`
   and `systemctl restart --no-block` of the 1.0 unit, or `zd_plain_restart` with zero-downtime
   slots (never a switch: the new version would start next to a hung one). At most 3 restarts
@@ -313,6 +318,41 @@ itself). Under the deploy lock:
   params, restarts_last_hour, max_restarts, restarted_iso, restart_detail, restart_code,
   restart_params, paused}`; `code`/`params` are those of `health_code` (translated like it).
 
+Expected response content (opt-in per application, off by default): `health_match` of `app-apply`
+(`v_health_match`: forced to `""` without a `health_path`, so never for workers; trimmed with PHP's
+trim() characters; at most 200 characters (`HEALTH_MATCH_MAX`) without control characters (C0, DEL,
+C1); text that starts with `{` must parse as a JSON object, NaN and Infinity refused; otherwise a
+`HelperError`). `health_check()` (status card 2 s, health watch 5 s, zero-downtime readiness 2 s)
+then works as follows; without it the code path is the 1.0 one (status line only):
+- The request is unchanged (HTTP/1.0, `Connection: close`, no `Accept-Encoding`). The response is
+  read until the server closes the connection, the body of its `Content-Length` is complete, or
+  64 KiB (`HEALTH_BODY_MAX`, status line, headers and body together) arrived; every `recv` waits
+  only for the time left until the check's deadline, so a server that sends slowly cannot extend
+  it (a timeout is `failed`).
+- Only a 2xx/3xx status is matched; any other status stays `http` (unhealthy). The body follows the
+  first empty line (CRLF, a bare LF is tolerated); `Transfer-Encoding: chunked` is decoded (size
+  lines at most 8 hex digits, extensions and trailers ignored; a coding cut off at the read limit
+  keeps what arrived, a malformed one is no body); `Content-Length` cuts the body. A body cut at
+  64 KiB is matched as far as it was read.
+- JSON mode (the expected text starts with `{`): the body (UTF-8, a leading BOM ignored) must parse
+  as a JSON object (`json.loads` on at most 64 KiB; `ValueError` and `RecursionError` count as not
+  JSON, NaN and Infinity too) and contain every key of the expected object with an equal value:
+  nested objects are compared as subsets, recursively; everything else (strings, numbers, booleans,
+  null, arrays and the objects inside arrays) by equality with JSON types (`"1"` is not `1`, `true`
+  is not `1` although Python's `True == 1`; `1` equals `1.0`). Key order and whitespace do not
+  matter.
+- Text mode (anything else): a case-sensitive substring of the body, compared as UTF-8 bytes
+  (`bytes in bytes`, no regular expression).
+- Results: found: healthy, `health_code` `http_match` ("HTTP 200 from /healthz, expected content
+  found"); not found: unhealthy, `body_mismatch` ("HTTP 200 from /healthz, expected content not
+  found"); JSON mode and the body is not a JSON object: unhealthy, `body_not_json` ("HTTP 200 from
+  /healthz, the response is not a JSON object"). Params `{code, path}` as for `http`; the body never
+  reaches a detail text or the params (it is untrusted output of the customer's application).
+- `app-status` reports `health_match` (`""` while off); with `health_path` these are the values the
+  checks use, which `plesk ext runway --status` shows on its *Health* line (so a worker that kept a
+  path and a content in the panel shows neither). Unit and environment files never depend on
+  it (an application without it renders the files of 1.0.0).
+
 Document roots (`app-inspect`, `app-page`): `document_roots` lists the document roots of the
 webspace relative to the home directory (the panel's `documentRoots`, §6; invalid entries are
 dropped, at most 50). `document_root` of the inspection is the first of them that the
@@ -324,8 +364,8 @@ web server serves because link and target have the same owner.
 
 Codes for translation: `listener_code` ∈ `ok, none, foreign, tampered, socket_symlink,
 socket_not_socket, socket_owner, worker`, `health_code` ∈ `no_path, not_listening, failed, no_http,
-http` (params as in the English detail); job statuses carry `title_key` (`install, update,
-build_deps, self_update` (params `{version}`), `deploy_build, deploy_restart, deploy_fetch`, and for a deployment of a stopped application
+http, http_match, body_mismatch, body_not_json` (params as in the English detail); job statuses
+carry `title_key` (`install, update, build_deps, self_update` (params `{version}`), `deploy_build, deploy_restart, deploy_fetch`, and for a deployment of a stopped application
 `deploy_build_only`, `deploy_restart_skipped`, `deploy_fetch_only`, chosen when the job starts) +
 `title_params`. The panel translates
 them (`Domain.status.listenerDetail.*`, `Domain.status.healthDetail.*`, `Common.jobTitle.*`) and
@@ -413,7 +453,8 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   start it", a tampered app an explanation of the containment),
   project card (detection, "Create sample app", "Fetch binary from URL" drawers), settings form
   with progressive disclosure (basic: enabled, runtime, toolchain, app root, listen/mode; "Advanced"
-  section: commands, env, mount path, static paths, health path, triggers, limits (admin)),
+  section: commands, env, mount path, static paths, health path, expected response content, health
+  watch, triggers, limits (admin)),
   logs card (tabs app/deploy, auto-refresh), help card, danger zone (remove). The status card's
   "Memory" fact is `memory_used_bytes` with "+ <size> file cache (the kernel frees it when memory
   is needed)" (from 1 MiB on); for web and path applications whose cache is at least 256 MiB and at
@@ -453,10 +494,21 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   colours and a black mark would vanish there. Its hover text is the button title ("Runway"):
   Plesk 18.0.82 accepts no callable title, and a per-row `tooltip` or `additionalComments`
   callable reaches the list data but is not shown.
-- Health watch: the checkbox *Restart when the health check keeps failing* below the health check
-  path (not for workers) with *Check interval* and *Failed checks in a row* while it is on; the
-  status card's row *Health watch* shows the setting, the failed checks in a row so far, the last
-  restart with its reason (the `health_code` texts) and the pause after 3 restarts within an hour.
+- Expected response content: the text field *Expected response content* right below the health
+  check path (not for workers; `dir="ltr"`, monospace, placeholder `{"status":"ok"}`); its hint
+  explains both modes with the examples `{"status":"ok"}` (JSON: the keys and values must be
+  present, spacing and order do not matter) and `Healthy` (text: must appear in the response,
+  case-sensitive), both passed as `isolate()`d params. While the health check path is empty the
+  field is disabled with the note *Enter a health check path first* (`Domain.form.healthNeedsPath`),
+  unless it still holds a value (it can then be cleared; the save answers `errorHealthMatchPath`).
+  The status card's health row translates the codes `http_match`, `body_mismatch` and
+  `body_not_json` (`Domain.status.healthDetail.*`).
+- Health watch: the checkbox *Restart when the health check keeps failing* below the expected
+  response content (not for workers) with *Check interval* and *Failed checks in a row* while it is
+  on; disabled with the same note while the health check path is empty, unless it is checked (so
+  it can still be turned off); the status card's row *Health watch* shows the setting, the failed
+  checks in a row so far, the last restart with its reason (the `health_code` texts) and the pause
+  after 3 restarts within an hour.
 - Polling pauses when `document.hidden` except for 2 min after a user action; status updates
   every 6 s (2 s while a job runs). Confirmations use ui-library `Dialog`, never `window.confirm`.
 - Translations: `src/plib/resources/locales/*.php` key `'app' => [...]` nested per component
@@ -536,10 +588,12 @@ Status: implemented for 1.1.0. With the setting off, every contract of §3–§1
   (button, `api/app/control`, CLI `--restart`), `tmp/restart.txt` and saving the settings (a 1.0
   save restarts the application) replace the running version without a gap. The new version
   starts in the other **slot** next to the running one; Runway waits until it listens and, when a
-  health path is set, until that path answers 2xx/3xx, bounded by `readyTimeout`; then it switches
+  health path is set, until that path answers 2xx/3xx (with the expected response content
+  `health_match` when one is set, §7), bounded by `readyTimeout`; then it switches
   the web server's traffic to the new slot, waits up to `drainSeconds` for the requests in flight on
   the old version and stops the old version. A new version that does not become ready is stopped,
-  the old version keeps serving and the deployment fails with the reason.
+  the old version keeps serving and the deployment fails with the reason: a new version whose
+  answer does not contain the expected content never gets traffic.
 - **Restart in place** (`api/app/control {op: restart, plain: true}`, a button next to Restart,
   CLI `--restart <domain> -plain`) restarts the running version as 1.0 does (short interruption):
   for applications that cannot run twice, to replace a running but broken instance, or to activate
@@ -692,8 +746,10 @@ clock of its own.
    application's user that accepts a connection; anything else at that path is tampering
    (containment); tcp: the listeners of N's port are exactly the application's uid (another uid
    fails the switch with the hijack detail). With a health path: one GET through N's endpoint (2 s,
-   `Host` = domain) must answer 2xx/3xx. Ready = listener ok and (no health path or healthy); the
-   limit fails it with the last listener or health detail.
+   `Host` = domain) must answer 2xx/3xx, and with `health_match` its body must contain the expected
+   content (`health_check()`, §7). Ready = listener ok and (no health path or healthy); the
+   limit fails it with the last listener or health detail ("The new version was not ready within
+   60 s (HTTP 200 from /healthz, expected content not found)").
 4. **switching** (the commit point; a SIGTERM only sets a flag from here to the end of the switch,
    and the helper's child processes, e.g. `systemctl reload`, run with SIGTERM ignored: systemd
    sends it to every process of the deploy unit). Under the state lock re-check enabled,
@@ -748,6 +804,7 @@ intent record, which the convergence or the boot unit settles from the pointer (
 | N exits or crash-loops | old version | "The new version exited during startup (status=1/FAILURE); it must listen on $RUNWAY_SOCKET (/run/runway/12/b.sock). The running version keeps serving; Restart in place runs the new version with an interruption." |
 | N binds L's socket path | old version (restarted in place when its socket was removed) | "The new version listens on /run/runway/12/app.sock instead of $RUNWAY_SOCKET (...)" |
 | no listener or health in time | old version | "The new version was not ready within 60 s (HTTP 503 from /healthz); the running version keeps serving." |
+| expected response content missing (`health_match`) | old version | "The new version was not ready within 60 s (HTTP 200 from /healthz, expected content not found); the running version keeps serving." |
 | N's port held by another uid | old version | "Port 20031 is held by uid 1005" (only during the wait: the prepare step moves N to another port) |
 | tampered socket path | none (contained, as 1.0) | "The socket path was tampered with (...); the application was stopped." |
 | reload fails (tcp) | old version | "The web server could not be reloaded: nginx: [emerg] ...; the running version keeps serving." |
@@ -1075,9 +1132,9 @@ CLI (§9):
 - `tests/helper-smoke.sh` (fake id 999 with a fake generated configuration that carries the marker
   and an nginx test server on 127.0.0.1 that uses the switchable snippets): with the Go sample in
   both listen modes, a request loop through nginx counts every non-2xx answer (expected 0) during a
-  deploy and during a restart; a new version whose health path answers 503 fails the job while the
-  old one keeps serving; an old slot that unlinks its socket on exit leaves the active one
-  reachable; the tamper check accepts the root link and still contains a symlink at a slot socket;
+  deploy and during a restart; a new version whose health path answers 503, or 200 without the
+  expected response content, fails the job while the old one keeps serving; an old slot that
+  unlinks its socket on exit leaves the active one reachable; the tamper check accepts the root link and still contains a symlink at a slot socket;
   a new version that binds `app.sock` fails the first switch at once; a held standby port moves to
   another port; a save during a switch is refused; Stop during a switch; a job killed (fault flag)
   after the traffic moved is settled by the convergence (`runway-helper _converge`, tcp and unix);

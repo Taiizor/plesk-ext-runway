@@ -59,6 +59,10 @@ SWITCHES_BEFORE=""
 ZD_BEFORE=""
 # Set while the navigation check has turned on the administrator's Power User view.
 POWER_USER_RESTORE=""
+# Set while the health watch and expected content checks have changed the health settings of
+# SITE_ID (cleanup restores the health check path HP_BEFORE, without a watch or a content).
+HM_RESTORE=""
+HP_BEFORE=""
 
 # Git Bash on Windows: no path conversion for docker arguments (but keep it for curl's
 # cookie jar path, which is a POSIX path there).
@@ -179,6 +183,11 @@ cleanup() {
     if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
     if [ -n "$ZD_BEFORE" ]; then post settings "$ZD_BEFORE" >/dev/null; fi
     if [ -n "$POWER_USER_RESTORE" ]; then dock exec "$CONTAINER" plesk bin poweruser --off >/dev/null 2>&1; fi
+    # A run stopped during the health checks must not leave an expected content behind (other
+    # tests, e.g. runtime-e2e.sh, would find every application unhealthy).
+    if [ -n "$HM_RESTORE" ]; then
+        post app/save "{\"site_id\": $SITE_ID, \"healthMatch\": \"\", \"healthWatch\": false, \"healthPath\": \"$HP_BEFORE\"}" >/dev/null
+    fi
     dock exec "$CONTAINER" rm -f /root/runway-smoke-loop.py /root/runway-smoke-loop.out /root/runway-smoke-loop.stop >/dev/null 2>&1
     # "[.]" keeps pkill from matching (and killing) this very shell.
     dock exec "$CONTAINER" sh -c "rm -rf /root/runway-smoke-www /etc/runway/allow-insecure-fetch; pkill -f 'http[.]server $FETCH_PORT'" >/dev/null 2>&1
@@ -365,6 +374,7 @@ check "app/save: a health watch interval below 10 s is refused" "d['status'] == 
 check "app/save: more than 20 failed checks are refused" "d['status'] == 'error' and list(d['errors']) == ['healthWatchFailures']" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatchFailures\": 21}")"
 HP_BEFORE=$(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['healthPath']")
+HM_RESTORE=1
 check "app/save: health watch on (configuration)" \
     "d['status'] == 'success' and (d['data']['config']['healthWatch'], d['data']['config']['healthWatchInterval'], d['data']['config']['healthWatchFailures']) == (True, 15, 2)" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthWatch\": true, \"healthWatchInterval\": 15, \"healthWatchFailures\": 2}")"
@@ -378,6 +388,66 @@ check "app/status: health_watch with interval and failures" \
     "$(get "app/status?site_id=$SITE_ID")"
 check "app/save: health watch off" "d['status'] == 'success' and d['data']['config']['healthWatch'] is False" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatch\": false, \"healthPath\": \"$HP_BEFORE\"}")"
+# Expected response content of the health check (docs/DESIGN.md section 7, health_match): needs a
+# health check path; text that starts with "{" must be a JSON object; at most 200 characters
+# without control characters. These five fail validation in PHP.
+check "app/save: the expected response content needs a health check path" "d['status'] == 'error' and list(d['errors']) == ['healthMatch']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthMatch\": \"Healthy\", \"healthPath\": \"\"}")"
+check "app/save: an expected content that starts with { must be a JSON object" "d['status'] == 'error' and list(d['errors']) == ['healthMatch'] and 'JSON' in d['errors']['healthMatch'][0]" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthMatch\": \"{status: ok}\"}")"
+check "app/save: an expected content longer than 200 characters is refused" "d['status'] == 'error' and list(d['errors']) == ['healthMatch'] and '200' in d['errors']['healthMatch'][0]" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthMatch\": \"$("$PY" -c "print('x' * 201)")\"}")"
+check "app/save: a control character in the expected content is refused" "d['status'] == 'error' and list(d['errors']) == ['healthMatch']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthMatch\": \"a\\u0001b\"}")"
+check "app/save: the expected content must be text" "d['status'] == 'error' and list(d['errors']) == ['healthMatch']" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthMatch\": {\"status\": \"ok\"}}")"
+# hm_state EXPR: EXPR on s = the helper state of SITE_ID (inside the container).
+hm_state() { dock exec "$CONTAINER" python3 -c "import json; s = json.load(open('/var/lib/runway/apps/$SITE_ID.json')); print($1)" 2>&1; }
+# hm_status CODE: health_code of app/status once it is CODE (polled up to 30 s; the save restarts the app).
+hm_status() {
+    local code=""
+    for _ in $(seq 1 15); do
+        code=$(get "app/status?site_id=$SITE_ID" | jexpr "d['data'].get('health_code')")
+        [ "$code" = "$1" ] && break
+        sleep 2
+    done
+    echo "$code"
+}
+out=$(post app/save "{\"site_id\": $SITE_ID, \"healthPath\": \"/\", \"healthMatch\": \"  {\\\"status\\\": \\\"ok\\\"}  \"}")
+check "app/save: expected response content stored trimmed (configuration)" "d['status'] == 'success' and d['data']['config']['healthMatch'] == '{\"status\": \"ok\"}'" "$out"
+check "app: the configuration returns healthMatch" "d['data']['config']['healthMatch'] == '{\"status\": \"ok\"}'" "$(get "app?site_id=$SITE_ID")"
+[ "$(hm_state "s['health_match'] == '{\"status\": \"ok\"}' and s['health_path'] == '/'")" = "True" ] \
+    && ok "expected response content in the helper state" || bad "helper state: $(hm_state "(s.get('health_path'), s.get('health_match'))")"
+wait_deploy "$SITE_ID" >/dev/null
+if [ "$CONFIGURED" = "True" ] && [ "$(get "app/status?site_id=$SITE_ID" | jexpr "d['data']['service']['active_state']")" = "active" ]; then
+    # The Go sample answers "/" with text: a JSON object is expected, so the check fails.
+    code=$(hm_status body_not_json)
+    [ "$code" = "body_not_json" ] && ok "app/status: a text answer where a JSON object is expected (body_not_json)" || bad "app/status with a JSON expectation: $code"
+    out=$(cli --status "$DOMAIN")
+    echo "$out" | grep -F 'Health:' | grep -qF '(/, expecting {"status": "ok"})' && ok "CLI --status shows the expected content on the Health line" \
+        || bad "CLI --status Health line: $(echo "$out" | grep -F 'Health:')"
+    post app/save "{\"site_id\": $SITE_ID, \"healthMatch\": \"Hello from Go\"}" >/dev/null
+    wait_deploy "$SITE_ID" >/dev/null
+    code=$(hm_status http_match)
+    [ "$code" = "http_match" ] && check "app/status: the text is found (http_match, healthy)" \
+        "d['data']['health'] == 'healthy' and d['data']['health_detail'] == 'HTTP 200 from /, expected content found' and d['data']['health_match'] == 'Hello from Go'" \
+        "$(get "app/status?site_id=$SITE_ID")" || bad "app/status with a text expectation: $code"
+else
+    skip "app/status with an expected content: the application of $DOMAIN is not running"
+fi
+# 200 times U+015F (2 bytes in UTF-8), sent as JSON escapes so the request stays ASCII.
+MB200=""
+for _ in $(seq 200); do MB200="$MB200\\u015f"; done
+check "app/save: 200 characters (2 bytes each in UTF-8) are accepted" "d['status'] == 'success' and len(d['data']['config']['healthMatch']) == 200" \
+    "$(post app/save "{\"site_id\": $SITE_ID, \"healthMatch\": \"$MB200\"}")"
+[ "$(hm_state "len(s['health_match'])")" = "200" ] && ok "the helper counts the same 200 characters" || bad "helper state of 200 characters: $(hm_state "len(s['health_match'])")"
+wait_deploy "$SITE_ID" >/dev/null
+out=$(post app/save "{\"site_id\": $SITE_ID, \"healthMatch\": \"\", \"healthPath\": \"$HP_BEFORE\"}")
+check "app/save: expected response content cleared" "d['status'] == 'success' and d['data']['config']['healthMatch'] == ''" "$out"
+# Restored: nothing left for cleanup (which tries again when this save failed).
+if [ "$(echo "$out" | jexpr "d['status']")" = "success" ]; then HM_RESTORE=""; fi
+[ "$(hm_state "s['health_match']")" = "" ] && ok "helper state without the expected content" || bad "helper state after clearing: $(hm_state "s['health_match']")"
+wait_deploy "$SITE_ID" >/dev/null
 check "app: zero-downtime may be turned on by an administrator; caps of the timeouts" \
     "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is True and d['data']['zeroDowntimeCaps'] == {'ready': 120, 'drain': 30} and 'zeroDowntime' in d['data']['config']" \
     "$(get "app?site_id=$SITE_ID")"
@@ -648,6 +718,23 @@ if [ -n "$SUB_ID" ]; then
         check "a worker ignores zero-downtime deployments (never switchable)" "d['status'] == 'success' and d['data']['config']['switchable'] is False and d['data']['job'] is None" \
             "$(post app/save "{\"site_id\": $SUB_ID, \"zeroDowntime\": true}")"
         post app/save "{\"site_id\": $SUB_ID, \"zeroDowntime\": false}" >/dev/null
+        # A worker needs no health check path for a kept expected content (no errorHealthMatchPath).
+        check "app/save: a worker may keep an expected content without a health check path (no field error)" \
+            "d['status'] == 'success' and (d['data']['config']['healthPath'], d['data']['config']['healthMatch']) == ('', 'Healthy')" \
+            "$(post app/save "{\"site_id\": $SUB_ID, \"healthPath\": \"\", \"healthMatch\": \"Healthy\"}")"
+        check "app/save: a worker keeps a health check path and an expected content" \
+            "d['status'] == 'success' and (d['data']['config']['healthPath'], d['data']['config']['healthMatch']) == ('/', 'Healthy')" \
+            "$(post app/save "{\"site_id\": $SUB_ID, \"healthPath\": \"/\", \"healthMatch\": \"Healthy\"}")"
+        st=$(dock exec "$CONTAINER" python3 -c "import json; s = json.load(open('/var/lib/runway/apps/$SUB_ID.json')); print((s['health_path'], s['health_match']))" 2>&1)
+        [ "$st" = "('', '')" ] && ok "a worker's helper state has neither a health path nor an expected content" || bad "worker helper state: $st"
+        # The Health line shows what the helper checks, not the values the panel kept for the worker.
+        line=$(cli --status "$SUB_DOMAIN" | grep -F 'Health:')
+        if [ -n "$line" ] && ! echo "$line" | grep -qF '('; then
+            ok "CLI --status: a worker's Health line shows neither the kept path nor the expected content"
+        else
+            bad "CLI --status Health line of a worker: ${line:-none}"
+        fi
+        post app/save "{\"site_id\": $SUB_ID, \"healthPath\": \"\", \"healthMatch\": \"\"}" >/dev/null
         check "app/save: mode web gives the worker a listener again" "d['status'] == 'success' and d['data']['config']['listen'] in ('tcp', 'unix') and d['data']['config']['mode'] == 'web'" \
             "$(post app/save "{\"site_id\": $SUB_ID, \"mode\": \"web\", \"listen\": \"none\"}")"
     fi
