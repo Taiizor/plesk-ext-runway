@@ -142,6 +142,18 @@ https_get() {
     ip=$(dock exec "$CONTAINER" hostname -I | awk '{print $1}')
     dock exec "$CONTAINER" curl -s -k "$@" --resolve "$host:443:$ip" "https://$host$path"
 }
+# wait_body DOMAIN PATH TEXT: the body of PATH once it is TEXT (polled up to 30 s), else the last one.
+# After a document root change nginx follows at once, but Apache, which serves what nginx passes on
+# (e.g. .txt files in proxy mode), may answer from the old root for a few seconds until it reloads.
+wait_body() {
+    local body=""
+    for _ in $(seq 1 15); do
+        body=$(https_get "$1" "$2")
+        [ "$body" = "$3" ] && break
+        sleep 2
+    done
+    echo "$body"
+}
 # A request loop inside the container through nginx (HTTPS to the container's address, Host =
 # the domain), counting every answer that is not 2xx: loop_start DOMAIN, loop_stop NAME.
 LOOP_PY=$(cat <<'PYEOF'
@@ -419,8 +431,12 @@ HW_TIMER=$(dock exec "$CONTAINER" systemctl is-active runway-health.timer 2>&1)
 check "app/status: health_watch with interval and failures" \
     "isinstance(d['data']['health_watch'], dict) and (d['data']['health_watch']['interval'], d['data']['health_watch']['failures_limit']) == (15, 2)" \
     "$(get "app/status?site_id=$SITE_ID")"
+# Every successful save of the built application starts a deployment; the next save must wait for it
+# ("A deployment is running for this application" otherwise, on a slow runner).
+wait_deploy "$SITE_ID" >/dev/null
 check "app/save: health watch off" "d['status'] == 'success' and d['data']['config']['healthWatch'] is False" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"healthWatch\": false, \"healthPath\": \"$HP_BEFORE\"}")"
+wait_deploy "$SITE_ID" >/dev/null
 # Expected response content of the health check (docs/DESIGN.md section 7, health_match): needs a
 # health check path; text that starts with "{" must be a JSON object; at most 200 characters
 # without control characters. These five fail validation in PHP.
@@ -616,12 +632,7 @@ if [ "$RUNNING" = "True" ]; then
     # wait for it, then give the answer a few seconds as well.
     wait_conf -qF '|(media)(/|$))' "$NGINX_CONF" >/dev/null
     dock exec "$CONTAINER" runuser -u "$SYSUSER" -- sh -c "umask 022; mkdir -p '$HOME_DIR/$DR_TARGET/media' && echo runway-smoke-static > '$HOME_DIR/$DR_TARGET/media/smoke.txt'"
-    body=""
-    for _ in $(seq 1 5); do
-        body=$(https_get "$DOMAIN" /media/smoke.txt)
-        [ "$body" = "runway-smoke-static" ] && break
-        sleep 2
-    done
+    body=$(wait_body "$DOMAIN" /media/smoke.txt runway-smoke-static)
     [ "$body" = "runway-smoke-static" ] && ok "nginx serves the static path /media from $DR_TARGET/media" || bad "/media/smoke.txt answered: $(echo "$body" | head -c 200)"
     https_get "$DOMAIN" /runway-smoke-page | grep -q 'Hello from Go' && ok "every other path still reaches the application" || bad "/runway-smoke-page: $(https_get "$DOMAIN" /runway-smoke-page | head -c 200)"
 else
@@ -889,14 +900,14 @@ if [ -n "$SUB_ID" ]; then
         wait_conf -qF "root \"$SUB_HOME/$SUB_TARGET\";" "$CONF/nginx.conf" >/dev/null
         dock exec "$CONTAINER" grep -qF 'location ~ ^/api(?!/(static)(/|$))(/|$) {' "$CONF/nginx.conf" \
             && ok "nginx: the Runway snippet of $SUB_DOMAIN is still there" || bad "nginx configuration of $SUB_DOMAIN: $(dock exec "$CONTAINER" grep -n 'root "\|Runway' "$CONF/nginx.conf")"
-        body=$(https_get "$SUB_DOMAIN" /api/static/smoke.txt)
+        body=$(wait_body "$SUB_DOMAIN" /api/static/smoke.txt runway-smoke-sub)
         [ "$body" = "runway-smoke-sub" ] && ok "nginx serves the static path /api/static from the new document root" || bad "/api/static/smoke.txt answered: $(echo "$body" | head -c 200)"
         code=$(https_get "$SUB_DOMAIN" /api/x -o /dev/null -w '%{http_code}')
         [ "$code" = "200" ] && ok "/api/x still reaches the application" || bad "/api/x answered HTTP $code"
         # A marker file outside /api proves that the rest of the site comes from the new root (the
         # old root has a default page too, so an HTTP 200 alone would prove nothing).
         dock exec "$CONTAINER" runuser -u "$SUB_USER" -- sh -c "umask 022; echo runway-smoke-root > '$SUB_HOME/$SUB_TARGET/runway-smoke-root.txt'"
-        body=$(https_get "$SUB_DOMAIN" /runway-smoke-root.txt)
+        body=$(wait_body "$SUB_DOMAIN" /runway-smoke-root.txt runway-smoke-root)
         [ "$body" = "runway-smoke-root" ] && ok "path mode: the rest of the site comes from the new document root" || bad "/runway-smoke-root.txt answered: $(echo "$body" | head -c 200)"
     else
         skip "static path from the new document root of $SUB_DOMAIN: its application is not running"
