@@ -47,6 +47,31 @@ const endpoint = row => {
 };
 
 /**
+ * Memory of a running application: its own memory (memoryUsedBytes, else systemd's
+ * MemoryCurrent), with the kernel's file cache charged to its service below it.
+ */
+const memoryCell = row => {
+    if (row.state !== 'running') {
+        return null;
+    }
+    const text = formatBytes(typeof row.memoryUsedBytes === 'number' ? row.memoryUsedBytes : row.memoryBytes);
+    if (!text) {
+        return null;
+    }
+    const cache = typeof row.memoryCacheBytes === 'number' && row.memoryCacheBytes >= 1024 * 1024 ? formatBytes(row.memoryCacheBytes) : null;
+    return (
+        <span>
+            {text}
+            {cache ? (
+                <div>
+                    <Text intent="muted" fontSize="sm"><Translate content="Overview.memoryCache" params={{ size: isolate(cache) }} /></Text>
+                </div>
+            ) : null}
+        </span>
+    );
+};
+
+/**
  * "Last update check" of the server panel: time (or "never"), the result or the error of the
  * check, and "Check now" (a forced check; the helper answers from its cache within a minute).
  */
@@ -163,7 +188,7 @@ const Overview = ({ baseUrl }) => {
             key: 'memory',
             title: <Translate content="Overview.columnMemory" />,
             align: 'right',
-            render: row => (row.state === 'running' && formatBytes(row.memoryBytes)) || '—',
+            render: row => memoryCell(row) || '—',
         },
         {
             key: 'actions',

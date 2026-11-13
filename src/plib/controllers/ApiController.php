@@ -113,7 +113,12 @@ class ApiController extends pm_Controller_Action
                         && (!isset($config['listen']) || $config['listen'] !== Modules_Runway_App::LISTEN_NONE),
                     'switching' => $state && !empty($state['switching']),
                     'state' => self::appState($config, $state),
+                    // memoryBytes: systemd's MemoryCurrent (page cache included); memoryUsedBytes: the
+                    // application's own memory; memoryCacheBytes: the file cache (null: unknown).
                     'memoryBytes' => $state && isset($state['memory_bytes']) ? $state['memory_bytes'] : null,
+                    'memoryUsedBytes' => $state && isset($state['memory_used_bytes']) ? $state['memory_used_bytes']
+                        : ($state && isset($state['memory_bytes']) ? $state['memory_bytes'] : null),
+                    'memoryCacheBytes' => $state && isset($state['memory_cache_bytes']) ? $state['memory_cache_bytes'] : null,
                     'url' => Modules_Runway_App::siteUrl($domain),
                     'appUrl' => Modules_Runway_App::appUrl($domain, $config),
                 ];
@@ -345,8 +350,11 @@ class ApiController extends pm_Controller_Action
         $isAdmin = Modules_Runway_Access::isAdmin();
         $page = null;
         $pageError = null;
+        // Document roots of the webspace: the form warns when the application root lies in one,
+        // and names the domain's own one for static paths.
+        $documentRoots = Modules_Runway_App::documentRoots($domain);
         try {
-            $page = $app->loadPage();
+            $page = $app->loadPage($documentRoots);
         } catch (Exception $e) {
             $pageError = $e->getMessage();
         }
@@ -359,6 +367,12 @@ class ApiController extends pm_Controller_Action
         if (isset($page['inspect']['home'])) {
             $home = (string)$page['inspect']['home'];
         }
+        $documentRoot = null;
+        foreach ($documentRoots as $root) {
+            if ($root['own']) {
+                $documentRoot = $root['path'];
+            }
+        }
         return [
             'domain' => [
                 'id' => (int)$domain->getId(),
@@ -367,7 +381,16 @@ class ApiController extends pm_Controller_Action
                 'home' => $home,
                 'sysuser' => (string)$domain->getSysUserLogin(),
                 'active' => Modules_Runway_App::domainIsActive($domain),
+                'documentRoot' => $documentRoot,
             ],
+            'documentRoots' => $documentRoots,
+            // The document root the stored application root lies in with symbolic links resolved
+            // (the form compares what is typed as text).
+            'appRootDocumentRoot' => Modules_Runway_App::documentRootByPath(
+                $documentRoots,
+                isset($page['inspect']['document_root']) ? $page['inspect']['document_root'] : null
+            ),
+            'defaultAppRoot' => Modules_Runway_App::defaultAppRoot($domain),
             'configured' => $app->isConfigured(),
             'config' => $app->config(),
             // null when the stored variables could not be loaded: omit "env" when saving then.

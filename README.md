@@ -25,8 +25,8 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
 [Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
-[Listen modes](#listen-modes) · [Zero-downtime deployments](#zero-downtime-deployments) · [Deploying with Git](#deploying-with-git) ·
-[Command line](#command-line) · [Configuration reference](#configuration-reference) ·
+[Listen modes](#listen-modes) · [Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
+[Deploying with Git](#deploying-with-git) · [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
 [License](#license)
 
@@ -61,9 +61,10 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 - Listen on a TCP port, on a Unix socket, or run a background worker without a proxy.
 - Proxy the whole domain or only a path prefix (for example `/api`), let the web server serve
   static folders, and check a health path.
-- Start, stop, restart, build and redeploy; live status (state, PID, memory, restarts,
-  listener check), application journal and build log. **Stop persists**: a stopped application
-  stays stopped across reboots, deployments and trigger files until it is started again.
+- Start, stop, restart, build and redeploy; live status (state, PID, the application's memory
+  apart from the kernel's file cache, restarts, listener check), application journal and build
+  log. **Stop persists**: a stopped application stays stopped across reboots, deployments and
+  trigger files until it is started again.
 - **Create sample app** writes a minimal application for the chosen runtime; prebuilt binaries
   or archives can be fetched from an HTTPS URL (optional SHA-256 check).
 - Trigger files for Git and CI deployments.
@@ -122,10 +123,13 @@ extensionUpload = true
 
 Then use *Extensions > My Extensions > Upload Extension*.
 
-After the installation **Runway** appears in the administrator's navigation and in every
-domain's *Dev Tools* (*Websites & Domains*). Customers see it when their service plan or
-subscription has the **Runway applications management** permission
-(*Service Plans > Permissions*).
+After the installation **Runway** appears in the administrator's navigation (in the Service
+Provider view under *Server Management*, in the Power User view as an entry of its own) and in
+every domain's *Dev Tools* (*Websites & Domains*). Customers see it, in their navigation too, when
+their service plan or subscription has the **Runway applications management** permission
+(*Service Plans > Permissions*). In *Websites & Domains* a domain whose Runway application is
+enabled shows Runway's mark among the icons of its row (a Node.js or .NET icon in a row comes from
+Plesk's Node.js or .NET Toolkit extension, which is turned on or off separately for that domain).
 
 ## Updating
 
@@ -168,7 +172,13 @@ setting. The trust model of the updater is described in [SECURITY.md](SECURITY.m
    compile native code (Rust, Ruby gems with extensions, Python packages without wheels) also
    need **Install build dependencies** once.
 2. Upload the application into the subscription. The default application directory is
-   `apps/<domain>` (outside `httpdocs`, so the sources are never served).
+   `apps/<domain>`: outside the document root (`httpdocs`, or the folder of a subdomain), whose
+   files the web server serves whenever it does not pass a request to the application
+   (application disabled or removed, worker mode, paths outside the URL path of `path` mode,
+   static paths; a stopped or failed application answers 502 instead). An application directory
+   inside a document root works, but its sources, binaries and settings files with secrets
+   (`appsettings.json`, `.env`) can then be downloaded; the domain page and
+   `plesk ext runway --status` warn about it, also when a symbolic link puts the directory there.
 3. Open the domain's **Runway** page, choose runtime and version, check the build and start
    commands (Runway suggests them from the project files), enable the application and save.
    Runway builds it, starts the service and points the domain at it.
@@ -253,7 +263,10 @@ log.Fatal(http.ListenAndServe(os.Getenv("LISTEN_ADDR"), handler))
 
 The **proxy mode** decides what nginx forwards: the whole domain (`web`) or one path prefix
 (`path`, for example `/api`, the rest stays on the document root). **Static paths** (up to 20
-URL prefixes such as `/assets`) are always served from the document root. Let's Encrypt
+URL prefixes such as `/assets`) are always served by the web server itself from the **document
+root**, not from the application directory: `/assets/app.css` is `assets/app.css` in the document
+root, so the files must be there. Large files (videos, images, downloads) served this way do not
+use the application's memory (see [Memory](#memory)). Let's Encrypt
 (`/.well-known/acme-challenge/`) and the Plesk web statistics are never proxied.
 
 ## Zero-downtime deployments
@@ -324,6 +337,43 @@ Customers can turn it on only when the administrator allows it (*Settings*, *Zer
 deployments for customers*); the administrator also caps the readiness timeout (default 120 s)
 and the drain period (default 30 s) of every application.
 
+## Memory
+
+The status card and the overview show two figures for a running application:
+
+- **Memory**: the application's own memory: heap, stacks, shared memory, kernel and socket
+  buffers, and the files it maps into memory (its program code and libraries, .NET assemblies,
+  database files that SQLite or bbolt map).
+- **File cache**: the kernel's cache of the other files the application read or wrote. Linux
+  charges it to the application's service, so systemd's `MemoryCurrent` (`systemctl status`)
+  includes it: an application that serves 1 GB of videos shows about 1 GB more there. The kernel
+  frees this cache whenever memory is needed; a memory limit of the application limits the cache
+  too, which only means that files are read from disk again, never that the application is
+  killed.
+
+An application that serves large static files (videos, images, downloads) can leave them to the
+web server: keep them in the document root at their URL path and add the URL prefix to **Static
+paths** (domain settings, *Advanced*). The web server (nginx, or Apache) then serves them itself,
+and their cache is charged to it instead of the application. The status card suggests this when
+the cache is large. In .NET serve files with `app.UseStaticFiles()` or return them as streams
+(`PhysicalFile(...)`, `Results.File(path, ...)`, a `FileStream`), not as `byte[]` or
+`MemoryStream`: those copy every file into the managed heap, which can grow by gigabytes under
+load (up to the garbage collector's heap limit, by default 75 % of the application's memory limit
+when it has one).
+
+The figures come from the service's cgroup (`memory.stat`). To look at them on the server (with
+zero-downtime deployments the unit is `runway-app-<id>-a` or `-b`):
+
+```sh
+grep -E '^(anon|file|file_mapped|active_file|inactive_file|shmem) ' \
+    "/sys/fs/cgroup$(systemctl show -p ControlGroup --value runway-app-<id>)/memory.stat"
+```
+
+The file cache is `active_file + inactive_file - file_mapped`, the memory is `MemoryCurrent` minus
+the file cache. With cgroup v1 (older distributions) the file is
+`/sys/fs/cgroup/memory<ControlGroup>/memory.stat` and the fields are `total_active_file`,
+`total_inactive_file`, `total_mapped_file`, `total_rss`, `total_cache` and `total_shmem`.
+
 ## Deploying with Git
 
 Runway watches two trigger files in the application directory (a systemd path unit, active
@@ -379,11 +429,11 @@ plesk ext runway --update                            # update Runway to it (see 
 | Enabled | build, run and proxy the application | off |
 | Runtime | `go`, `rust`, `bun`, `java`, `dotnet`, `python`, `ruby`, `php`, `binary` | |
 | Toolchain | installed version of the runtime | |
-| Application directory | relative to the subscription's home directory | `apps/<domain>` |
+| Application directory | relative to the subscription's home directory; keep it outside the document roots (the domain page warns) | `apps/<domain>` |
 | Listen | `tcp`, `unix`, `none` | per runtime (`tcp` for most) |
 | Proxy mode | `web` (whole domain), `path` (one prefix), `worker` (= listen `none`) | `web` |
 | Mount path | URL prefix for `path` mode, for example `/api` | |
-| Static paths | up to 20 URL prefixes served from the document root | |
+| Static paths | up to 20 URL prefixes the web server serves from the document root (the files must be there) | |
 | Health check path | `GET` with a 2 s timeout, shown as healthy/unhealthy | |
 | Build command | runs with `bash -c` in the application directory as the system user | per runtime |
 | Start command | runs with `bash -c` in the application directory as the system user | per runtime |
@@ -539,7 +589,7 @@ On Windows with Git Bash prefix `docker` commands with `MSYS_NO_PATHCONV=1`.
 bun install                     # once: @plesk/plesk-ext-sdk (React 18, Plesk UI Library, webpack)
 bun run build                   # frontend only -> src/htdocs/index.php + src/htdocs/dist/
 bun run dev                     # frontend watch mode
-bun run assets                  # after editing assets/logo*.svg: icons, nav logo, docs/social-preview.png
+bun run assets                  # after editing assets/logo*.svg: icons, nav logo, row icon, docs/social-preview.png
 python build.py                 # frontend build + dist/runway-<version>-<release>.zip (verified)
 python build.py --no-frontend   # package the existing frontend build
 python build.py --check         # validate the source tree (fails on leftover placeholders)
@@ -556,7 +606,7 @@ Repository layout:
 | `src/plib/` | PHP: `controllers/ApiController.php` (JSON API), `hooks/`, `library/` (`Modules_Runway_*`), `resources/locales/`, `scripts/` |
 | `src/sbin/runway-helper` | the root helper (python3, standard library only, 3.8+) |
 | `tests/` | `helper-smoke.sh`, `api-smoke.sh`, `runtime-e2e.sh`, `customer-smoke.sh`, `check_locales.py` |
-| `scripts/` | `plesk-dev.sh` and `plesk-dev.ps1`: the local Plesk test server; `render-assets.ts` (`bun run assets`): icons and the social preview from `assets/` |
+| `scripts/` | `plesk-dev.sh` and `plesk-dev.ps1`: the local Plesk test server; `render-assets.ts` (`bun run assets`): icons (catalog, Dev Tools, navigation, domain row) and the social preview from `assets/` |
 | `assets/` | `logo.svg` (the mark) and `logo-tile.svg` (the mark on its tile), the masters of every rendered icon |
 | `examples/` | a minimal application per runtime |
 | `docs/` | [DESIGN.md](docs/DESIGN.md) (decisions and contracts), [runtimes/](docs/runtimes), [RELEASING.md](docs/RELEASING.md) |

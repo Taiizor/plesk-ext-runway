@@ -57,6 +57,8 @@ CREATED_SUB=0
 MAX_APPS_BEFORE=""
 SWITCHES_BEFORE=""
 ZD_BEFORE=""
+# Set while the navigation check has turned on the administrator's Power User view.
+POWER_USER_RESTORE=""
 
 # Git Bash on Windows: no path conversion for docker arguments (but keep it for curl's
 # cookie jar path, which is a POSIX path there).
@@ -176,6 +178,7 @@ cleanup() {
     if [ -n "$MAX_APPS_BEFORE" ]; then post settings "{\"maxAppsPerSubscription\": $MAX_APPS_BEFORE}" >/dev/null; fi
     if [ -n "$SWITCHES_BEFORE" ]; then post settings "$SWITCHES_BEFORE" >/dev/null; fi
     if [ -n "$ZD_BEFORE" ]; then post settings "$ZD_BEFORE" >/dev/null; fi
+    if [ -n "$POWER_USER_RESTORE" ]; then dock exec "$CONTAINER" plesk bin poweruser --off >/dev/null 2>&1; fi
     dock exec "$CONTAINER" rm -f /root/runway-smoke-loop.py /root/runway-smoke-loop.out /root/runway-smoke-loop.stop >/dev/null 2>&1
     # "[.]" keeps pkill from matching (and killing) this very shell.
     dock exec "$CONTAINER" sh -c "rm -rf /root/runway-smoke-www /etc/runway/allow-insecure-fetch; pkill -f 'http[.]server $FETCH_PORT'" >/dev/null 2>&1
@@ -287,7 +290,14 @@ check "update: status of the built-in updater (no network)" \
 APP=$(get "app?site_id=$SITE_ID")
 check "app" "d['status'] == 'success' and d['data']['domain']['id'] == $SITE_ID and 'config' in d['data'] and d['data']['config']['mode'] in ('web', 'path', 'worker')" "$APP"
 check "app: defaults and toolchains for every runtime" "sorted(d['data']['defaults']) == $KEYS and sorted(d['data']['toolchains']) == $KEYS and all('start_cmd' in v for v in d['data']['defaults'].values())" "$APP"
+check "app: document roots of the webspace (own one: httpdocs) and the default application root" \
+    "d['data']['domain']['documentRoot'] == 'httpdocs' and {'domain': '$DOMAIN', 'path': 'httpdocs', 'own': True} in d['data']['documentRoots'] and d['data']['defaultAppRoot'] == 'apps/$DOMAIN'" "$APP"
 check "app/status" "d['status'] == 'success' and 'service' in d['data']" "$(get "app/status?site_id=$SITE_ID")"
+check "app/status: memory_used_bytes and memory_cache_bytes next to memory_bytes" \
+    "set(['memory_bytes', 'memory_used_bytes', 'memory_cache_bytes']) <= set(d['data']['service']) and (d['data']['service']['memory_bytes'] is None or d['data']['service']['memory_used_bytes'] <= d['data']['service']['memory_bytes'])" \
+    "$(get "app/status?site_id=$SITE_ID")"
+check "overview: memoryUsedBytes and memoryCacheBytes (the application's memory and the file cache)" \
+    "all('memoryUsedBytes' in a and 'memoryCacheBytes' in a for a in d['data']['apps']) and all(a['memoryUsedBytes'] is not None for a in d['data']['apps'] if a['state'] == 'running')" "$(get overview)"
 check "app/logs" "d['status'] == 'success' and d['data']['kind'] == 'deploy'" "$(get "app/logs?site_id=$SITE_ID&kind=deploy&lines=20")"
 check "unknown domain is rejected" "d['status'] == 'error'" "$(get 'app?site_id=999999')"
 
@@ -419,6 +429,53 @@ fi
 out=$(cli --update now); code=$?
 [ $code -eq 2 ] && echo "$out" | grep -q 'Usage: plesk ext runway --update \[-no-wait\]' && ok "CLI --update takes no argument (exit 2)" || bad "CLI --update argument ($code): $out"
 
+echo "== navigation and the icon of a domain row (hooks/CustomButtons.php)"
+# The panel pages carry the navigation and the rows of the domain list as JSON: the navigation
+# entry is "extNavButton_runway_<n>", a row button "extensionButton_<place>_<n>_runway".
+row_icon() { # row_icon PAGE SITE_ID: 0 when the page has Runway's row icon (header.svg) for the domain
+    curl -s -b "$JAR" "$PANEL$1" | grep -o '"extensionButton_[0-9]*_[0-9]*_runway"[^}]*' | grep 'header\.svg' | grep -q "site_id=$2\""
+}
+POWER_USER=$(dock exec "$CONTAINER" plesk db -Ne "select val from misc where param = 'power_user_panel'" | tr -d '\r')
+if [ "$POWER_USER" = "true" ]; then
+    skip "Service Provider view: the server uses the Power User view"
+else
+    curl -s -b "$JAR" "$PANEL/admin/domain/list" | grep -q 'extNavButton_runway_[0-9]' && ok "Service Provider view: Runway in the navigation" \
+        || bad "Service Provider view: no Runway entry in the navigation of /admin/domain/list"
+    # A subscription's page carries the tabs of the hosting panel ("navigationTabs"), where Plesk
+    # also renders PLACE_HOSTING_PANEL_TABS: the customer navigation must not become a tab there.
+    SUBSCRIPTION_ID=$(dock exec "$CONTAINER" plesk db -Ne "select id from Subscriptions where object_type = 'domain' and object_id = $SITE_ID" | tr -d '\r')
+    SUB_PAGE=$(curl -s -L -b "$JAR" "$PANEL/admin/subscription/overview/id/$SUBSCRIPTION_ID")
+    if ! echo "$SUB_PAGE" | grep -q '"navigationTabs":\[{'; then
+        bad "subscription page of $DOMAIN: no tabs found"
+    else
+        echo "$SUB_PAGE" | grep -q '"title":"Runway","href":"[^"]*runway' && bad "subscription page of $DOMAIN: a Runway tab (the customer navigation)" \
+            || ok "subscription page: no Runway tab for the administrator"
+        echo "$SUB_PAGE" | grep -q 'extNavButton_runway_[0-9]' && ok "subscription page: Runway stays in the Service Provider navigation" \
+            || bad "subscription page: no Runway entry in the navigation"
+    fi
+    if [ "$(get "app?site_id=$SITE_ID" | jexpr "d['data']['configured'] and d['data']['config']['enabled']")" = "True" ]; then
+        row_icon /admin/domain/list "$SITE_ID" && ok "domain list: Runway's icon in the row of $DOMAIN (enabled application)" || bad "domain list: no Runway icon for $DOMAIN"
+    else
+        skip "domain list icon: the application of $DOMAIN is not enabled (run with RUNWAY_SMOKE_DEPLOY=1)"
+    fi
+    # The Power User view has its own navigation (PLACE_HOSTING_PANEL_NAVIGATION); turned on for
+    # this check only (cleanup turns it off again when the test stops early).
+    POWER_USER_RESTORE=1
+    dock exec "$CONTAINER" plesk bin poweruser --on >/dev/null 2>&1
+fi
+# -L: an administrator without own subscriptions is redirected to /smb/web/setup. The navigation
+# of the Power User view links "My Profile" to /smb/my-profile (JSON: "\/smb\/my-profile").
+NAV_PAGE=$(curl -s -L -b "$JAR" "$PANEL/smb/web/view")
+echo "$NAV_PAGE" | grep -Eq 'smb\\?/my-profile' && [ "$(echo "$NAV_PAGE" | grep -o 'extNavButton_runway_[0-9]*' | sort -u | wc -l)" -eq 1 ] \
+    && ok "Power User view: Runway in the navigation, once" \
+    || bad "Power User view: Runway entries in the navigation of /smb/web/view: $(echo "$NAV_PAGE" | grep -o 'extNavButton_runway_[0-9]*' | sort -u | tr '\n' ' ')"
+echo "$NAV_PAGE" | grep -q '"title":"Runway","href":"[^"]*runway' && bad "Power User view: a Runway tab (the customer navigation)" \
+    || ok "Power User view: no Runway tab"
+if [ -n "$POWER_USER_RESTORE" ]; then
+    dock exec "$CONTAINER" plesk bin poweruser --off >/dev/null 2>&1
+    POWER_USER_RESTORE=""
+fi
+
 if [ "${RUNWAY_SMOKE_SUB:-1}" = "1" ]; then
     echo "== scratch subdomain $SUB_DOMAIN"
     if ! dock exec "$CONTAINER" plesk bin subdomain --info "$SUB" -domain "$DOMAIN" >/dev/null 2>&1; then
@@ -434,6 +491,38 @@ if [ -n "$SUB_ID" ]; then
     check "app/save: configure a disabled binary app" "d['status'] == 'success' and d['data']['config']['runtime'] == 'binary' and d['data']['config']['buildCmd'] == ''" "$out"
     check "app/save: a prebuilt binary never keeps a build command" "d['status'] == 'success' and d['data']['config']['buildCmd'] == ''" \
         "$(post app/save "{\"site_id\": $SUB_ID, \"runtime\": \"binary\", \"buildCmd\": \"go build -o bin/app ./cmd/server\"}")"
+    if [ "$POWER_USER" != "true" ]; then
+        row_icon /admin/domain/list "$SUB_ID" && bad "domain list: Runway icon for the disabled application of $SUB_DOMAIN" \
+            || ok "domain list: no Runway icon for a disabled application"
+    fi
+
+    echo "== application root in a document root (warning, never an error)"
+    SUB_DOCROOT=$(get "app?site_id=$SUB_ID" | jexpr "d['data']['domain']['documentRoot']")
+    check "app: the subdomain's own document root ($SUB_DOCROOT) and the one of $DOMAIN" \
+        "d['data']['domain']['documentRoot'] not in (None, '', 'httpdocs') and ('$DOMAIN', 'httpdocs', False) in [(r['domain'], r['path'], r['own']) for r in d['data']['documentRoots']]" \
+        "$(get "app?site_id=$SUB_ID")"
+    check "app/save: an application root inside the document root is saved" "d['status'] == 'success' and d['data']['config']['appRoot'] == '$SUB_DOCROOT/app'" \
+        "$(post app/save "{\"site_id\": $SUB_ID, \"appRoot\": \"$SUB_DOCROOT/app\"}")"
+    out=$(cli --status "$SUB_DOMAIN")
+    echo "$out" | grep -q "^Warning: *the app root is inside the document root of $SUB_DOMAIN ($SUB_DOCROOT)" && ok "CLI --status warns about it" || bad "CLI --status warning: $out"
+    post app/save "{\"site_id\": $SUB_ID, \"appRoot\": \"httpdocs\"}" >/dev/null
+    cli --status "$SUB_DOMAIN" | grep -q "^Warning: *the app root is inside the document root of $DOMAIN (httpdocs)" && ok "CLI --status: the document root of another domain of the subscription counts too" \
+        || bad "CLI --status warning for httpdocs: $(cli --status "$SUB_DOMAIN")"
+    post app/save "{\"site_id\": $SUB_ID, \"appRoot\": \"apps/$SUB_DOMAIN\"}" >/dev/null
+    cli --status "$SUB_DOMAIN" | grep -q '^Warning:' && bad "CLI --status warns although apps/$SUB_DOMAIN is outside the document roots" || ok "CLI --status: no warning outside the document roots"
+    check "app: no appRootDocumentRoot outside the document roots" "d['data']['appRootDocumentRoot'] is None" "$(get "app?site_id=$SUB_ID")"
+    # A symbolic link that puts the application root into a document root counts as well: the
+    # helper resolves the links as the system user (app-page, app-inspect: document_root).
+    SUB_HOME=$(get "app?site_id=$SUB_ID" | jexpr "d['data']['domain']['home']")
+    SUB_USER=$(get "app?site_id=$SUB_ID" | jexpr "d['data']['domain']['sysuser']")
+    dock exec "$CONTAINER" runuser -u "$SUB_USER" -- ln -sfn ../httpdocs "$SUB_HOME/apps/runway-smoke-link"
+    post app/save "{\"site_id\": $SUB_ID, \"appRoot\": \"apps/runway-smoke-link/runway-smoke-api\"}" >/dev/null
+    check "app: appRootDocumentRoot follows a link into the document root of $DOMAIN" \
+        "d['data']['appRootDocumentRoot'] == {'domain': '$DOMAIN', 'path': 'httpdocs', 'own': False}" "$(get "app?site_id=$SUB_ID")"
+    cli --status "$SUB_DOMAIN" | grep -q "^Warning: *the app root is inside the document root of $DOMAIN (httpdocs)" \
+        && ok "CLI --status: a link into a document root counts too" || bad "CLI --status warning for a link: $(cli --status "$SUB_DOMAIN")"
+    post app/save "{\"site_id\": $SUB_ID, \"appRoot\": \"apps/$SUB_DOMAIN\"}" >/dev/null
+    dock exec "$CONTAINER" sh -c "rm -f '$SUB_HOME/apps/runway-smoke-link'; rmdir '$SUB_HOME/httpdocs/runway-smoke-api' 2>/dev/null; true"
 
     MAX_APPS_BEFORE=$(get settings | jexpr "d['data']['maxAppsPerSubscription']")
     if [ "$(get "app?site_id=$SITE_ID" | jexpr "d['data']['config']['enabled']")" = "True" ]; then

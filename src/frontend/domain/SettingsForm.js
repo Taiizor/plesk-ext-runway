@@ -3,8 +3,8 @@
 import { createElement, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Form, FormField, FormFieldCheckbox, FormFieldSelect, FormFieldText, Panel, Section, SelectOption, Status, Translate,
-    useTranslate,
+    Alert, Button, Form, FormField, FormFieldCheckbox, FormFieldSelect, FormFieldText, Panel, Section, SelectOption, Status, Text,
+    Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
@@ -24,6 +24,23 @@ const noticeStyle = { display: 'inline-block', marginInlineStart: '12px', vertic
 const NOTICE_MS = 5000;
 
 const text = value => (value === null || value === undefined ? '' : String(value));
+
+/** An application root as the helper stores it: forward slashes, no leading or trailing slash. */
+const normalRoot = value => String(value || '').split('\\').join('/').replace(/^[ /]+|[ /]+$/g, '');
+
+/**
+ * The document root (an entry of api/app documentRoots: {domain, path}, relative to the
+ * subscription home directory) that an application root lies in, compared as text, or null. The
+ * web server serves the files there whenever it does not pass a request to the application.
+ */
+export const documentRootOf = (appRoot, roots) => {
+    const path = normalRoot(appRoot);
+    if (!path || !Array.isArray(roots)) {
+        return null;
+    }
+    return roots.filter(root => isObject(root) && typeof root.path === 'string' && root.path !== ''
+        && (path === root.path || path.indexOf(`${root.path}/`) === 0))[0] || null;
+};
 
 /** Caps of the zero-downtime timeouts from api/app (server settings), with the defaults of the server settings. */
 const zeroDowntimeCaps = data => {
@@ -155,6 +172,13 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     // Default commands of the chosen runtime, listen mode and toolchain (null: none known).
     const commandDefaults = runtimeDefaults(defaults, values.runtime, values.listen, values.toolchain);
     const fieldErrors = error && error.fieldErrors ? error.fieldErrors : null;
+    // A warning (never an error: saving stays possible) while the application root lies in a
+    // document root: what is typed compared as text, the stored root also with symbolic links
+    // resolved (api/app appRootDocumentRoot).
+    const exposed = documentRootOf(values.appRoot, data.documentRoots)
+        || (isObject(data.appRootDocumentRoot) && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
+            ? data.appRootDocumentRoot : null);
+    const documentRoot = isObject(data.domain) && typeof data.domain.documentRoot === 'string' ? data.domain.documentRoot : '';
 
     // Validation errors in the advanced part open it.
     useEffect(() => {
@@ -308,7 +332,26 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                 <FormFieldText
                     name="appRoot"
                     label={<Translate content="Domain.form.appRoot" />}
-                    description={<Translate content="Domain.form.appRootHint" />}
+                    description={(
+                        <span>
+                            <Translate content="Domain.form.appRootHint" />
+                            {exposed ? (
+                                <span style={{ display: 'block', marginTop: '4px' }}>
+                                    <Text intent="warning">
+                                        <Translate
+                                            content="Domain.form.appRootInDocroot"
+                                            params={{
+                                                domain: isolate(exposed.domain),
+                                                path: isolate(exposed.path),
+                                                file: isolate(values.runtime === 'dotnet' ? 'appsettings.json' : '.env'),
+                                                suggestion: isolate(data.defaultAppRoot || 'apps'),
+                                            }}
+                                        />
+                                    </Text>
+                                </span>
+                            ) : null}
+                        </span>
+                    )}
                     size="xl"
                     required
                     inputProps={pathInput}
@@ -396,7 +439,22 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         <FormFieldText
                             name="staticPaths"
                             label={<Translate content="Domain.form.staticPaths" />}
-                            description={<Translate content="Domain.form.staticPathsHint" />}
+                            description={(
+                                <span>
+                                    <Translate content="Domain.form.staticPathsHint" />
+                                    {' '}
+                                    <Translate
+                                        content="Domain.form.staticPathsExample"
+                                        params={{ prefix: isolate('/assets'), url: isolate('/assets/app.css'), file: isolate('assets/app.css') }}
+                                    />
+                                    {documentRoot ? (
+                                        <span>
+                                            {' '}
+                                            <Translate content="Domain.form.staticPathsDocroot" params={{ path: isolate(documentRoot) }} />
+                                        </span>
+                                    ) : null}
+                                </span>
+                            )}
                             multiline
                             rows={3}
                             size="xl"

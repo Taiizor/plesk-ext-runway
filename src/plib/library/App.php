@@ -260,6 +260,123 @@ class Modules_Runway_App
     }
 
     /**
+     * Document roots of the domains in the webspace of a domain (its subscription: the same home
+     * directory and system user), relative to the home directory, the domain's own first. The
+     * web server serves every file below a document root whenever it does not pass a request to
+     * an application (application disabled or removed, worker mode, paths outside the mount path,
+     * static paths), so an application root there exposes its files (docs/DESIGN.md section 6).
+     *
+     * @param pm_Domain $domain
+     * @return array[] [['domain' => display name, 'path' => relative path, 'own' => bool], ...]
+     */
+    public static function documentRoots(pm_Domain $domain)
+    {
+        try {
+            $home = rtrim((string)$domain->getHomePath(), '/');
+            $sysuser = (string)$domain->getSysUserLogin();
+        } catch (Exception $e) {
+            return [];
+        }
+        $domains = [$domain];
+        try {
+            foreach (pm_Domain::getDomainsByClient($domain->getClient()) as $other) {
+                if ((int)$other->getId() !== (int)$domain->getId()) {
+                    $domains[] = $other;
+                }
+            }
+        } catch (Exception $e) {
+            Modules_Runway_Log::debug('Domains of the subscription of ' . $domain->getName() . ' unknown: ' . $e->getMessage());
+        }
+        $roots = [];
+        foreach ($domains as $item) {
+            try {
+                if (!$item->hasHosting() || (string)$item->getSysUserLogin() !== $sysuser
+                    || rtrim((string)$item->getHomePath(), '/') !== $home) {
+                    continue;
+                }
+                $root = rtrim((string)$item->getDocumentRoot(), '/');
+            } catch (Exception $e) {
+                continue;
+            }
+            if ($home === '' || strpos($root, $home . '/') !== 0) {
+                continue;
+            }
+            $roots[] = [
+                'domain' => (string)$item->getDisplayName(),
+                'path' => substr($root, strlen($home) + 1),
+                'own' => (int)$item->getId() === (int)$domain->getId(),
+            ];
+        }
+        return $roots;
+    }
+
+    /**
+     * The document root an application root lies in (the same directory or below it), compared
+     * as text.
+     *
+     * @param array[] $roots documentRoots()
+     * @param string $appRoot Relative to the subscription home directory
+     * @return array|null The entry of $roots, or null
+     */
+    public static function documentRootOf(array $roots, $appRoot)
+    {
+        $appRoot = trim(str_replace('\\', '/', (string)$appRoot), " /");
+        if ($appRoot === '') {
+            return null;
+        }
+        foreach ($roots as $root) {
+            if ($appRoot === $root['path'] || strpos($appRoot, $root['path'] . '/') === 0) {
+                return $root;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The entry of documentRoots() that the helper named ("document_root" of app-inspect and
+     * app-page: the document root the application root lies in once symbolic links are resolved).
+     *
+     * @param array[] $roots documentRoots()
+     * @param mixed $path Relative path from the helper, null when none
+     * @return array|null
+     */
+    public static function documentRootByPath(array $roots, $path)
+    {
+        if (!is_string($path) || $path === '') {
+            return null;
+        }
+        foreach ($roots as $root) {
+            if ($root['path'] === $path) {
+                return $root;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The document root the configured application root lies in: compared as text, else with
+     * symbolic links resolved by the helper as the system user (app-inspect), so that a link such
+     * as apps/api -> ../httpdocs/api or httpdocs -> releases/current counts as well.
+     *
+     * @return array|null An entry of documentRoots(), or null
+     */
+    public function appRootDocumentRoot()
+    {
+        $roots = self::documentRoots($this->domain);
+        $found = self::documentRootOf($roots, $this->data['appRoot']);
+        if ($found !== null || !$roots) {
+            return $found;
+        }
+        try {
+            $inspect = $this->inspect(null, $roots);
+        } catch (Exception $e) {
+            Modules_Runway_Log::debug('app-inspect for the document roots failed: ' . $e->getMessage());
+            return null;
+        }
+        return self::documentRootByPath($roots, isset($inspect['document_root']) ? $inspect['document_root'] : null);
+    }
+
+    /**
      * @param pm_Domain $domain
      * @return string Path relative to the subscription home directory
      */
@@ -1150,16 +1267,19 @@ class Modules_Runway_App
      * stored variables, service status, project inspection, default commands) and primes
      * the environment variable cache.
      *
+     * @param array[] $documentRoots documentRoots(): the inspection names the one the
+     *                               application root lies in with symbolic links resolved
      * @return array
      * @throws Modules_Runway_Exception
      */
-    public function loadPage()
+    public function loadPage(array $documentRoots = [])
     {
         $result = Modules_Runway_Helper::call('app-page', [
             'domain_id' => (int)$this->domain->getId(),
             'sysuser' => (string)$this->domain->getSysUserLogin(),
             'app_root' => (string)$this->data['appRoot'],
             'runtime' => (string)$this->data['runtime'],
+            'document_roots' => array_column($documentRoots, 'path'),
         ]);
         if ($this->env === null) {
             $this->env = isset($result['config']['env']) && is_array($result['config']['env'])
@@ -1306,13 +1426,16 @@ class Modules_Runway_App
      * Inspects the application root as the subscription's system user.
      *
      * @param string|null $appRoot Relative path, defaults to the configured one
+     * @param array[] $documentRoots documentRoots(): "document_root" of the result names the one
+     *                               the application root lies in with symbolic links resolved
      * @return array
      */
-    public function inspect($appRoot = null)
+    public function inspect($appRoot = null, array $documentRoots = [])
     {
         return Modules_Runway_Helper::call('app-inspect', [
             'sysuser' => (string)$this->domain->getSysUserLogin(),
             'app_root' => (string)($appRoot !== null ? $appRoot : $this->data['appRoot']),
+            'document_roots' => array_column($documentRoots, 'path'),
         ]);
     }
 }

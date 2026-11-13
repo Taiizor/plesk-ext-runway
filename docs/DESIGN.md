@@ -47,7 +47,7 @@ Runway/
     runtime-e2e.sh               # sample app per runtime and listen mode, features, through the API and nginx
     check_locales.py
   scripts/plesk-dev.sh, scripts/plesk-dev.ps1   # local Plesk test server in Docker (wraps plesk-e2e.sh)
-  scripts/render-assets.ts  assets/{logo.svg,logo-tile.svg}   # "bun run assets": icons, nav logo, social preview
+  scripts/render-assets.ts  assets/{logo.svg,logo-tile.svg}   # "bun run assets": icons, nav logo, domain row icon (header.svg), social preview
   docs/DESIGN.md (this file)  docs/PLAN.md (status)  docs/runtimes/*.md (per-runtime notes)  docs/RELEASING.md
   .github/workflows/{ci.yml,codeql.yml,labeler.yml,release.yml}  .github/scripts/plesk-e2e.sh (e2e driver, also usable locally)
   .github/{dependabot.yml,labeler.yml,release.yml,CODEOWNERS,PULL_REQUEST_TEMPLATE.md,ISSUE_TEMPLATE/}
@@ -191,7 +191,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | Action | Method | Who | Data |
 |---|---|---|---|
 | `api/context` | GET | all | `{isAdmin, locale, runtimes:[meta...], urls:{api,...}, limits:{maxStaticPaths}}` |
-| `api/overview` | GET | all | `{server:{os,arch,systemd,python,build_deps,helperVersion,selinux (enforcing\|permissive\|null)} (null for customers), apps:[{domainId, domain, displayName, configured, runtime, toolchain, listen, mode, port (tcp only), enabled, state, memoryBytes, url, appUrl}], errors:[...]}` (customers: only domains with hosting they may manage); `state` ∈ `notConfigured\|disabled\|suspended\|tampered\|running\|starting\|stopping\|failed\|stopped`; `url` = site root, `appUrl` = site URL plus the mount path, null for workers (the overview links it); both `https://` when the domain's hosting has SSL/TLS support (`pm_Domain::hasSsl()`), else `http://` |
+| `api/overview` | GET | all | `{server:{os,arch,systemd,python,build_deps,helperVersion,selinux (enforcing\|permissive\|null)} (null for customers), apps:[{domainId, domain, displayName, configured, runtime, toolchain, listen, mode, port (tcp only), enabled, state, memoryBytes, memoryUsedBytes, memoryCacheBytes, url, appUrl}], errors:[...]}` (customers: only domains with hosting they may manage); `memoryBytes` = helper `memory_bytes` (MemoryCurrent), `memoryUsedBytes` = `memory_used_bytes` (falls back to `memoryBytes`), `memoryCacheBytes` = `memory_cache_bytes` (§7); `state` ∈ `notConfigured\|disabled\|suspended\|tampered\|running\|starting\|stopping\|failed\|stopped`; `url` = site root, `appUrl` = site URL plus the mount path, null for workers (the overview links it); both `https://` when the domain's hosting has SSL/TLS support (`pm_Domain::hasSsl()`), else `http://` |
 | `api/toolchains` | GET | admin | `[?runtime=<key>][&available=0][&force=1]` → `{runtimes:{<key>:{installed:[{id,label,path,version?,kind?}], available:[{id,label}], availableError, inUse:{ver:[domains]}, toolchainKind}}, buildDeps:{cc:bool,...}, job:{...}}` |
 | `api/toolchain` | POST | admin | body `{runtime, op: install\|remove\|update, version}` → `{job}` or `{removed}` |
 | `api/build-deps` | POST | admin | → `{job}` |
@@ -200,7 +200,7 @@ customer with permission and access). Admin-only actions check `Access::requireA
 | `api/update` | GET | admin | built-in updater, no network: `{installed: "X.Y.Z-R", latest: {version, release, full, tag, htmlUrl, publishedAt} \| null, available, checkedAt, error, updateSource, lastFailedVersion, job: {admin job status}, updateCheck, updateAuto}` (helper `update-status` plus the two settings) |
 | `api/update/check` | POST | admin | forced check (helper `update-check {force: true}`; within 60 s of the previous check the cache answers) → `api/update` shape plus `checked`; a failed check is `error`, not an API error; HTTP 404 of GitHub (nothing published) is `latest: null` |
 | `api/update/install` | POST | admin | `{version: "X.Y.Z-R"}` (the version the administrator saw; field error `version` when malformed) → helper `update-install` → `{job, version, message}`; refused unless it is the cached available update, newer than the installed one, and no admin job runs |
-| `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active}, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}` |
+| `api/app` | GET | domain | `{domain:{id,name,displayName,home,sysuser,active,documentRoot}, documentRoots:[{domain, path, own}], appRootDocumentRoot, defaultAppRoot, configured, config:{...fields}, env:"KEY=value\n..." (null when the stored variables could not be loaded: omit env when saving), limits:{memoryMb,cpuPercent,tasks}, status:{...helper app-status}, inspect:{...}, toolchains:{<runtime>:[installed...]} (usage lists only for admins), defaults:{<runtime>:{build_cmd,start_cmd,unix_supported,listen,variants:{"<tcp\|unix>\|<toolchain>":{build_cmd,start_cmd,unix_supported}}}}, buildDeps, appUrl, isAdmin, pageError}`. `documentRoots`: the document roots (`pm_Domain::getDocumentRoot()`) of the domains with hosting in the same webspace (same home directory and system user, from `pm_Domain::getDomainsByClient()`), relative to the home directory, `own` marking the domain's own (also `domain.documentRoot`; null when unknown). The web server serves every file there whenever it does not pass a request to an application (application disabled or removed, worker mode, paths outside the mount path, static paths; a stopped or failed application answers 502), so the settings form warns, without blocking the save, while the typed application root is one of them or lies below one (compared as text), or while it is the stored root and `appRootDocumentRoot` names an entry: the document root the stored root lies in with symbolic links resolved (helper `app-page` `document_root`, §7; null otherwise); `defaultAppRoot` (`apps/<domain>`) is its suggestion. `plesk ext runway --status` warns the same way (`app-inspect` when the text comparison finds nothing) |
 | `api/app/save` | POST | domain | body: config fields (+ `env` text, + limits when admin: the UI sends them only when changed), partial update → field errors or `{config, build:bool, buildError, message}`. `env` must be a string (else field error); a runtime without builds (`supports_build: false`) always stores an empty build command; the encoded configuration must stay ≤ 4500 characters (Plesk's `dom_param.val` is a varchar(5000) that non-strict MariaDB truncates silently): field error `errorConfigTooLarge` on the longest sent field; per-field caps appRoot 255, buildCmd 1500, startCmd 1000, healthPath 255, static paths 1000 in total. A save is an explicit start (helper `resume`) |
 | `api/app/control` | POST | domain | `{op: start\|stop\|restart\|deploy, plain?: bool}` → `{message, job?}`. `stop` persists (the application stays stopped across reboots, deployments, trigger files and reconciles); `start`, `restart`, `deploy` ("Build & restart", helper `start: true`) and saving run it again. Zero-downtime: `restart` of a running switchable application answers with the switch job; `plain: true` restarts in place (§12.10) |
 | `api/app/status` | GET | domain | helper `app-status` |
@@ -226,12 +226,12 @@ their code.
 | `releases` | `{runtime, force}` | `{runtime, toolchain, install_help, available:[{id,label}], error}` (network errors never fail the command; cached 6 h) |
 | `toolchain-install/-update/-remove` | `{runtime, version}` | `{job}` / `{removed}` |
 | `app-apply` | config incl. `listen, mode, mount_path, static_paths, health_path, zero_downtime, ready_timeout, drain_seconds, build_limits, start, restart, resume` | `{port, state, switchable, job}`; the port of the stored state wins over the payload's `port` (the panel's copy, used for a new application; §12.8); keeps `stopped`/`tampered` of the stored state unless `resume: true` (explicit save); a stopped app is rendered and its trigger watcher enabled, but the app unit stays disabled; renders `/etc/tmpfiles.d/runway-<id>.conf` in unix mode (removed otherwise, together with `/run/runway/<id>`); zero-downtime: §12.5 (`job` is the switch job a restart started) |
-| `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
+| `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
 | `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
-| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params`, and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
-| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes}], reconcile_paused}`; `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
+| `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params`, and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
+| `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
 | `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
@@ -239,6 +239,41 @@ their code.
 | `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
 | `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
 | `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
+
+Memory of an application unit (`app-status` `service` and `slots`, `apps-list`):
+
+- `memory_bytes`: systemd's `MemoryCurrent` (the cgroup's `memory.current`, cgroup v1:
+  `memory.usage_in_bytes`), null when systemd does not know it. Unchanged since 1.0. It includes the
+  kernel's page cache of every file the application read or wrote, which the kernel reclaims
+  whenever memory is needed (or the unit reaches its `MemoryMax`, without an OOM kill): an
+  application that serves 1 GB of media files shows about 1 GB more than it uses.
+- `memory_cache_bytes`: the part of that file cache that no process maps,
+  `active_file + inactive_file - file_mapped` of the unit's `memory.stat` (`ControlGroup` of
+  `systemctl show`; cgroup v2 `/sys/fs/cgroup<group>/memory.stat`, cgroup v1 and hybrid setups
+  `/sys/fs/cgroup/memory<group>/memory.stat` with `total_active_file + total_inactive_file -
+  total_mapped_file`), at least 0 and capped at `memory_bytes`; null when the file cannot be read
+  (no memory accounting, an unexpected group path). Mapped file pages (program code, libraries,
+  .NET assemblies, files an application maps such as SQLite or bbolt databases) are its working
+  set, not a cache the kernel can drop without cost, so they stay with `memory_used_bytes`. The
+  `shmem` part of `file` lies on the anonymous lists and is not counted either (.NET maps 5–13 MiB
+  of code there); `file_mapped` also counts mapped shared memory, so the value is a lower bound of
+  the unmapped cache. Docker's `usage - inactive_file` would not work: pages read twice move to
+  `active_file`.
+- `memory_used_bytes`: `memory_bytes - memory_cache_bytes`, the application's own memory (anon,
+  shared memory, mapped files, kernel and socket memory); `memory_bytes` when the cache is
+  unknown, null with it.
+- Zero-downtime: every slot of `slots` has the three fields; `apps-list` sums each field over the
+  application's units (a slot without a readable `memory.stat` adds its `memory_bytes` to
+  `memory_used_bytes`).
+
+Document roots (`app-inspect`, `app-page`): `document_roots` lists the document roots of the
+webspace relative to the home directory (the panel's `documentRoots`, §6; invalid entries are
+dropped, at most 50). `document_root` of the inspection is the first of them that the
+application root is or lies in once the child running as the system user has resolved symbolic
+links (`os.path.realpath`), else null. The panel compares the paths as text itself; this adds a
+link that puts the application root into a document root (`apps/api -> ../httpdocs/api`) and a
+document root that is a link to the application root (`httpdocs -> releases/current`), which the
+web server serves because link and target have the same owner.
 
 Codes for translation: `listener_code` ∈ `ok, none, foreign, tampered, socket_symlink,
 socket_not_socket, socket_owner, worker`, `health_code` ∈ `no_path, not_listening, failed, no_http,
@@ -309,7 +344,8 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 `ProgressBar`, `Text`, `Heading`, `Toaster` via `withStatusMessages`, `Translate`). Pages:
 
 - **Overview**: toolbar (Toolchains, Settings for admins), list of apps/domains with status
-  labels and a link to the domain page; empty state explains the 3 steps.
+  labels and a link to the domain page; empty state explains the 3 steps. The memory column shows
+  `memoryUsedBytes` with "+ <size> file cache" below it (from 1 MiB of cache on).
 - **Toolchains**: tabs per runtime; each tab = installed list (version, used by, remove/update)
   + install control (select for managed, instructions for detected); build dependencies card;
   job panel with live log (poll every 2 s while busy).
@@ -331,7 +367,41 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   project card (detection, "Create sample app", "Fetch binary from URL" drawers), settings form
   with progressive disclosure (basic: enabled, runtime, toolchain, app root, listen/mode; "Advanced"
   section: commands, env, mount path, static paths, health path, triggers, limits (admin)),
-  logs card (tabs app/deploy, auto-refresh), help card, danger zone (remove).
+  logs card (tabs app/deploy, auto-refresh), help card, danger zone (remove). The status card's
+  "Memory" fact is `memory_used_bytes` with "+ <size> file cache (the kernel frees it when memory
+  is needed)" (from 1 MiB on); for web and path applications whose cache is at least 256 MiB and at
+  least their own memory, a hint to let the web server serve big files (static paths, from the
+  document root it names). No button of the card is a ghost button: "Restart in place" looks
+  like Start, Stop and Restart ("Build & restart" is the primary one).
+  The app root hint says why the application belongs outside the document roots; while the typed
+  app root is a document root of the webspace or lies below one (`documentRoots`, as text), or is
+  the stored root that `appRootDocumentRoot` places in one (symbolic links resolved), a warning
+  under the field names the domain, a settings file of the runtime (`appsettings.json` for .NET,
+  else `.env`) and suggests `defaultAppRoot` (saving stays possible); the static paths hint has
+  an example (`/assets/app.css` is `assets/app.css` in the document root) and names the domain's
+  document root. Paths and file names reach the texts as `isolate()`d placeholders, never inside a
+  translation, so that they keep their direction in Arabic and Hebrew.
+- **Panel integration** (`hooks/CustomButtons.php`): the navigation entry "Runway" (`nav.png`, the
+  white mark: every view draws its navigation on a dark sidebar) in three places, one per view:
+  `PLACE_ADMIN_NAVIGATION` (Service Provider view, section Server Management),
+  `PLACE_HOSTING_PANEL_NAVIGATION` (the administrator's Power User view; Plesk 18.0.82 renders it
+  nowhere else) and `PLACE_HOSTING_PANEL_TABS` (the customer panel's navigation). Plesk also
+  renders `PLACE_HOSTING_PANEL_TABS` as a tab of every subscription page that an administrator or
+  reseller opens (`navigationTabs`); that tab would lead to the server-wide overview and lose the
+  subscription, so its visibility callback admits customers only (`pm_Client::isClient()`, also
+  when an administrator logged in as the customer) with the permission on one of their
+  subscriptions (`pm_Session::getCurrentDomains(true)`), and the Power User entry's callback
+  administrators only. Both run on every panel request and therefore read only the session and
+  the database. The domain button (`logo.png`) in `PLACE_DOMAIN_PROPERTIES`
+  and the Dev Tools of `PLACE_DOMAIN_PROPERTIES_DYNAMIC`. `PLACE_DOMAIN_HEADER_DYNAMIC` (Plesk
+  18.0.41+): `header.svg` among the icons of a row in Websites & Domains and the administrator's
+  domain list, for domains whose stored configuration is enabled (the callback runs once per row and
+  reads the stored configuration only; its parameters contain the subscription's FTP password, so
+  they are never logged). The row icon is mid grey (#7a7a7a): the dark theme inverts the page
+  (`html { filter: invert(0.9) hue-rotate(180deg) }`) and images back, so images keep their
+  colours and a black mark would vanish there. Its hover text is the button title ("Runway"):
+  Plesk 18.0.82 accepts no callable title, and a per-row `tooltip` or `additionalComments`
+  callable reaches the list data but is not shown.
 - Polling pauses when `document.hidden` except for 2 min after a user action; status updates
   every 6 s (2 s while a job runs). Confirmations use ui-library `Dialog`, never `window.confirm`.
 - Translations: `src/plib/resources/locales/*.php` key `'app' => [...]` nested per component
@@ -357,7 +427,10 @@ error (unknown command, domain or runtime). Admin context.
 
 - Local: `plesk/plesk` container (`scripts/plesk-dev.sh`), `tests/helper-smoke.sh` (root helper,
   fake domain id 999 with the reconcile pause flag), `tests/api-smoke.sh` (login link → cookies →
-  API calls), `tests/customer-smoke.sh` (customer `cust1` with and without the permission),
+  API calls; also the navigation entry of the Service Provider and the Power User view, no Runway
+  tab on a subscription's page and the icon of a domain row, read from the JSON of the panel
+  pages), `tests/customer-smoke.sh`
+  (customer `cust1` with and without the permission, including the customer panel's navigation),
   `tests/runtime-e2e.sh` (sample app per runtime and listen mode through the API and nginx, path
   mode, static paths, triggers, worker, suspension, CLI, WebSockets through nginx and Apache,
   optional Laravel Octane), browser check of each page. helper-smoke's self-update section runs
@@ -824,9 +897,10 @@ may bind only their own port (`SocketBindAllow=tcp:<port_a>` or `tcp:<port_b>`,
   pointing at a port nobody listens on after a reboot, and since the tmpfiles `L` line follows the
   link rename at once, a crash in the unix window never revives a link to the old slot.
 - `apps-list`: the socket check of §12.7 with containment; `active_state`, `sub_state`, `result`
-  and `start_limit_hit` of the live unit; `memory_bytes` is the sum of the application's running
-  units; new fields `zero_downtime`, `switchable`, `slot`, `live_port`, `port_a`, `port_b`,
-  `switching` (`port` stays the 1.0 port).
+  and `start_limit_hit` of the live unit; `memory_bytes` (like `memory_used_bytes` and
+  `memory_cache_bytes`, §7) is the sum of the application's running units; new fields
+  `zero_downtime`, `switchable`, `slot`, `live_port`, `port_a`, `port_b`, `switching` (`port`
+  stays the 1.0 port).
 - Reconcile also re-applies (restart false) when `switchable` of `apps-list` differs from the
   stored configuration, and for applications that are not switchable when `port` differs (a failed
   save after a successful `app-apply`, a restore of the domain settings, a switch back to the 1.0
@@ -892,7 +966,8 @@ API (§6) and helper contract (§7):
   `{op: restart, plain: true}` restarts in place (`messageAction_restartPlain`).
 - `api/app/status` (helper `app-status`) adds `zero_downtime`, `switchable`, `slot`, `switched_at`,
   `restart_plain`, `ready_timeout`, `drain_seconds`, `slots: {"": ..., a, b}` (each `{unit,
-  active_state, sub_state, main_pid, memory_bytes, started_iso, enabled, endpoint, live}` of the
+  active_state, sub_state, main_pid, memory_bytes, memory_used_bytes, memory_cache_bytes, started_iso,
+  enabled, endpoint, live}` of the
   existing units), `proxy_socket` (the root link), `standby_listener` (with `standby_detail`,
   `standby_code`, `standby_params`), `switch` (the intent record) and, in `deploy`, the switch
   fields of §12.4 plus `phase_elapsed`. `service` describes the live unit, `port` the live port,

@@ -231,6 +231,11 @@ class Modules_Runway_Cli
         }
         $facts[] = ['Runtime', $config['runtime'] . ($config['toolchain'] !== '' ? ' ' . $config['toolchain'] : '')];
         $facts[] = ['App root', $config['appRoot']];
+        $documentRoot = $app->appRootDocumentRoot();
+        if ($documentRoot !== null) {
+            $facts[] = ['Warning', 'the app root is inside the document root of ' . $documentRoot['domain'] . ' ('
+                . $documentRoot['path'] . '): its files can be downloaded whenever the web server does not pass a request to the application'];
+        }
         $facts[] = ['Mode', $config['mode'] . ($config['mode'] === Modules_Runway_App::MODE_PATH ? ' ' . $config['mountPath'] : '')];
         if ($config['listen'] === Modules_Runway_App::LISTEN_TCP) {
             $facts[] = ['Listen', 'tcp 127.0.0.1:' . (isset($status['port']) ? (int)$status['port'] : $config['port'])];
@@ -254,7 +259,10 @@ class Modules_Runway_Cli
             $facts[] = ['PID', (string)(int)$service['main_pid']];
         }
         if (isset($service['memory_bytes']) && $service['memory_bytes'] !== null) {
-            $facts[] = ['Memory', self::bytes($service['memory_bytes'])];
+            // The application's own memory, and the kernel's file cache charged to the service apart.
+            $used = isset($service['memory_used_bytes']) ? $service['memory_used_bytes'] : $service['memory_bytes'];
+            $cache = isset($service['memory_cache_bytes']) ? (int)$service['memory_cache_bytes'] : 0;
+            $facts[] = ['Memory', self::bytes($used) . ($cache >= 1048576 ? ' (+ ' . self::bytes($cache) . ' file cache)' : '')];
         }
         if (!empty($service['started_at'])) {
             $facts[] = ['Started', (string)$service['started_at']];

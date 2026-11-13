@@ -92,6 +92,17 @@ if [ "$(echo "$APP" | jexpr "d['data']['configured'] and d['data']['config']['en
     check "app/control start: running again" "d['status'] == 'success' and d['data']['stopped'] is False and d['data'].get('listener') in ('ok', 'worker')" "$(get "app/status?site_id=$SITE_ID")"
 fi
 check "overview: application links come from appUrl" "all('appUrl' in a for a in d['data']['apps'])" "$(get overview)"
+check "app: only the document roots of the customer's webspace" \
+    "d['data']['domain']['documentRoot'] == 'httpdocs' and all(r['domain'] == '$DOMAIN' or r['domain'].endswith('.$DOMAIN') for r in d['data']['documentRoots'])" "$APP"
+# The customer panel's navigation (PLACE_HOSTING_PANEL_TABS) and the icons of a domain row; the
+# page carries both as JSON ("extNavButton_runway_<n>", "extensionButton_<place>_<n>_runway").
+WEB=$(curl -s -L -b "$JAR" "$PANEL/smb/web/view")
+[ "$(echo "$WEB" | grep -o 'extNavButton_runway_[0-9]*' | sort -u | wc -l)" -eq 1 ] && ok "customer panel: Runway in the navigation, once (permission granted)" \
+    || bad "customer panel: Runway entries in the navigation of /smb/web/view: $(echo "$WEB" | grep -o 'extNavButton_runway_[0-9]*' | sort -u | tr '\n' ' ')"
+if [ "$(echo "$APP" | jexpr "d['data']['configured'] and d['data']['config']['enabled']")" = "True" ]; then
+    echo "$WEB" | grep -o '"extensionButton_[0-9]*_[0-9]*_runway"[^}]*' | grep 'header\.svg' | grep -q "site_id=$SITE_ID\"" \
+        && ok "customer panel: Runway's icon in the row of $DOMAIN" || bad "customer panel: no Runway icon for $DOMAIN"
+fi
 check "zero-downtime deployments: not offered to customers while the server setting is off (default)" \
     "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is False" "$(get "app?site_id=$SITE_ID")"
 check "a customer cannot turn zero-downtime deployments on (field error)" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntime']" \
@@ -106,6 +117,15 @@ check "app: access denied without the permission" "d['status'] == 'error' and 'd
 check "app/control: access denied without the permission" "d['status'] == 'error'" \
     "$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"restart\"}")"
 check "overview: the domain is no longer listed" "d['status'] == 'success' and $SITE_ID not in [a['domainId'] for a in d['data']['apps']]" "$(get overview)"
+WEB=$(curl -s -L -b "$JAR" "$PANEL/smb/web/view")
+if ! echo "$WEB" | grep -q '"headerCustomButtons"'; then
+    bad "customer panel: /smb/web/view did not load the domain list"
+else
+    echo "$WEB" | grep -q 'extNavButton_runway_[0-9]' && bad "customer panel: Runway in the navigation without the permission" \
+        || ok "customer panel: no Runway entry in the navigation without the permission"
+    echo "$WEB" | grep -o '"extensionButton_[0-9]*_[0-9]*_runway"[^}]*' | grep -q 'header\.svg' && bad "customer panel: Runway icon without the permission" \
+        || ok "customer panel: no Runway icon in the domain list without the permission"
+fi
 
 echo "== $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

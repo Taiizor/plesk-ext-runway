@@ -10,6 +10,48 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Added
+
+- **Runway** in the navigation of the administrator's Power User view and of the customer panel
+  (customers with the *Runway applications management* permission); the Service Provider view
+  keeps its entry under *Server Management*, and the page of a subscription gets no Runway tab.
+- Runway's mark among the icons of a domain row in *Websites & Domains* (and the administrator's
+  domain list) for domains whose Runway application is enabled, like the Node.js and .NET Toolkit
+  icons (Plesk 18.0.41 and later). The mark is mid grey, so it stays visible in the dark theme.
+- The application's memory without the file cache: `app-status` (`service` and every zero-downtime
+  slot) and `apps-list` report `memory_used_bytes` and `memory_cache_bytes` next to
+  `memory_bytes` (unchanged: systemd's `MemoryCurrent`), read from the service's cgroup
+  (`memory.stat`, cgroup v2 and v1: the file pages no process maps; mapped files such as program
+  code and database files stay with the application's memory); `api/overview` adds
+  `memoryUsedBytes` and `memoryCacheBytes`, `plesk ext runway --status` shows both. The status
+  card and the overview show the application's memory with the file cache below it, and the status
+  card suggests static paths when a web application's file cache is large. README section
+  *Memory*.
+- The domain page warns, without blocking the save, while the application root is a document root
+  of the subscription (`httpdocs`, the folder of a subdomain) or lies inside one, and names the
+  domain's document root at the static paths; `api/app` adds `domain.documentRoot`,
+  `documentRoots`, `appRootDocumentRoot` and `defaultAppRoot`. The stored application root also
+  counts when a symbolic link puts it into a document root (`app-inspect` and `app-page` take
+  `document_roots` and answer `document_root`, resolved as the system user).
+  `plesk ext runway --status` prints the same warning.
+
+### Changed
+
+- The hints of *Application root* and *Static paths* say why the application belongs outside the
+  document root (the web server can serve its files there, whenever it does not pass a request to
+  the application, so sources and settings files with secrets could be downloaded) and that static
+  paths are served from the document root, where their files must be.
+- The *Memory* fact of the status card, the memory column of the overview and the zero-downtime
+  *Versions* row show the application's own memory instead of systemd's `MemoryCurrent`, which
+  includes the page cache of every file the application read (an application serving 1 GB of
+  media showed 1 GB more).
+
+### Fixed
+
+- Runway had no entry in the navigation of the Power User view (only the Service Provider view's
+  `PLACE_ADMIN_NAVIGATION` was used).
+- "Restart in place" looked transparent next to the other buttons of the status card.
+
 ## [1.1.0] - 2026-11-13
 
 Opt-in zero-downtime deployments and restarts, and two fixes. Applications that do not turn the

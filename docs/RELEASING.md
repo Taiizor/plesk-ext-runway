@@ -121,7 +121,8 @@ pushing the tag.
 - `_meta/icons/32x32.png`, `64x64.png` and `128x128.png` are PNGs of the right size (rendered
   by `bun run assets` from `assets/logo-tile.svg`, like `htdocs/images/logo.png`; the
   navigation icon `htdocs/images/nav.png` is the mark of `assets/logo.svg` in white, because
-  Plesk draws it as it is on the dark sidebar; the build fails when they are missing);
+  Plesk draws it as it is on the dark sidebar, and the icon of a domain row
+  `htdocs/images/header.svg` the same mark in mid grey; the build fails when they are missing);
 - Unix modes: `sbin/*` 0755, everything else 0644; LF line endings in text files; no BOM in
   PHP files; the helper has a shebang;
 - no React sources (`frontend/`), source maps, hidden files or Python caches; no unsafe paths;

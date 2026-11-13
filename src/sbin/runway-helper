@@ -899,10 +899,43 @@ def _scan_names(path, keep, count_cap=LIST_COUNT_CAP, skip=()):
     return names, count, more
 
 
-def _user_inspect_app_root(app_root):
-    """Runs as the customer: generic facts plus the detection result of every runtime adapter."""
+def v_document_roots(value, home):
+    """Document roots of a webspace (app-inspect, app-page: relative to the home directory, like
+    an application root) as [(relative, absolute)]; invalid entries are dropped, at most 50."""
+    roots = []
+    for item in value[:50] if isinstance(value, list) else []:
+        try:
+            roots.append(v_app_root(item, home))
+        except HelperError:
+            continue
+    return roots
+
+
+def _user_document_root(app_root, roots):
+    """Runs as the customer: the document root (the relative path of an entry of `roots`) that
+    the application root lies in once symbolic links are resolved, or None. The panel compares the
+    configured paths as text; this also finds an application root that a link puts into a
+    document root (apps/api -> ../httpdocs/api) and a document root that is a link to the
+    application root (httpdocs -> releases/current): the web server follows links of the same
+    owner, so it serves those files as well."""
+    try:
+        real = os.path.realpath(app_root)
+        for rel, absolute in roots:
+            root = os.path.realpath(absolute)
+            if real == root or real.startswith(root.rstrip("/") + "/"):
+                return rel
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _user_inspect_app_root(app_root, document_roots=()):
+    """Runs as the customer: generic facts plus the detection result of every runtime adapter,
+    and the document root (of `document_roots`, see v_document_roots) the application root lies
+    in with symbolic links resolved."""
     info = {"exists": os.path.isdir(app_root), "entries": [],
-            "triggers": {"deploy": False, "restart": False}}
+            "triggers": {"deploy": False, "restart": False},
+            "document_root": _user_document_root(app_root, document_roots) if document_roots else None}
     for key in RUNTIME_KEYS:
         info[key] = None
     if not info["exists"]:
@@ -950,6 +983,62 @@ def unit_show(units, props):
                 values[key] = val
         result[unit] = values
     return result
+
+
+# ControlGroup of a unit as systemctl show prints it ("/system.slice/runway-app-12.service").
+RE_CONTROL_GROUP = re.compile(r"^(/[A-Za-z0-9_.@:-]+)+$")
+
+
+def memory_value(value):
+    """MemoryCurrent of systemctl show as an int, or None ("[not set]", "infinity", empty)."""
+    value = value or ""
+    return int(value) if value.isdigit() and int(value) < 2 ** 63 else None
+
+
+def cgroup_file_cache(group):
+    """Bytes of the kernel's file cache (page cache) charged to a unit's cgroup, or None when
+    unknown. Files an application reads or writes stay cached and are charged to its cgroup, so
+    systemd's MemoryCurrent grows with the files it serves although the kernel frees that cache
+    whenever memory is needed (or the unit reaches its MemoryMax). It is active_file +
+    inactive_file of memory.stat minus file_mapped: the file pages on the kernel's file lists
+    that no process maps. Mapped file pages (program code, libraries, .NET assemblies, files an
+    application maps such as SQLite or bbolt databases) are its working set and stay with its
+    own memory, like shared memory (shmem, on the anonymous lists). file_mapped also counts mapped
+    shared memory, so the result is a lower bound (clipped at 0). cgroup v2:
+    /sys/fs/cgroup<group>; cgroup v1 and hybrid setups: the memory controller's hierarchy, with
+    its hierarchical totals."""
+    if not group or not RE_CONTROL_GROUP.match(group) or any(part in (".", "..") for part in group.split("/")):
+        return None
+    for base, keys, mapped in (("/sys/fs/cgroup", ("active_file", "inactive_file"), "file_mapped"),
+                               ("/sys/fs/cgroup/memory", ("total_active_file", "total_inactive_file"),
+                                "total_mapped_file")):
+        text = _read_text(base + group + "/memory.stat", 65536)
+        if not text:
+            continue
+        values = {}
+        for line in text.splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[1].isdigit():
+                values[parts[0]] = int(parts[1])
+        if all(key in values for key in keys + (mapped,)):
+            return max(0, sum(values[key] for key in keys) - values[mapped])
+    return None
+
+
+def unit_memory(info):
+    """Memory of a unit from a unit_show entry with MemoryCurrent and ControlGroup (docs/DESIGN.md
+    section 7): memory_bytes (MemoryCurrent, as before), memory_cache_bytes (the unmapped file
+    cache in it) and memory_used_bytes (the rest: the application's own memory, mapped files
+    included). Without a readable memory.stat
+    the cache is None and the used memory falls back to MemoryCurrent."""
+    current = memory_value(info.get("MemoryCurrent"))
+    if current is None:
+        return {"memory_bytes": None, "memory_used_bytes": None, "memory_cache_bytes": None}
+    cache = cgroup_file_cache(info.get("ControlGroup", ""))
+    if cache is None:
+        return {"memory_bytes": current, "memory_used_bytes": current, "memory_cache_bytes": None}
+    cache = min(cache, current)
+    return {"memory_bytes": current, "memory_used_bytes": current - cache, "memory_cache_bytes": cache}
 
 
 def unit_running(unit):
@@ -4896,10 +4985,10 @@ def app_status(domain_id, state=None):
     units = [app_unit(domain_id, live), UNIT_DEPLOY % domain_id, UNIT_PATH % domain_id]
     others = [slot for slot in ("",) + SLOTS if slot != live] if slots else []
     props = ["LoadState", "ActiveState", "SubState", "MainPID", "ExecMainStartTimestamp",
-             "NRestarts", "MemoryCurrent", "Result", "UnitFileState", "ActiveEnterTimestamp"]
+             "NRestarts", "MemoryCurrent", "ControlGroup", "Result", "UnitFileState", "ActiveEnterTimestamp"]
     shown = unit_show(units + [app_unit(domain_id, slot) for slot in others], props)
     app = shown.get(units[0], {})
-    memory = app.get("MemoryCurrent", "")
+    memory = unit_memory(app)
     started = app.get("ExecMainStartTimestamp") or None
     status = {
         "configured": state is not None,
@@ -4911,7 +5000,10 @@ def app_status(domain_id, state=None):
             "started_at": started,
             "started_iso": systemd_time_iso(started),
             "restarts": int(app.get("NRestarts") or 0) if (app.get("NRestarts") or "").isdigit() else 0,
-            "memory_bytes": int(memory) if memory.isdigit() and int(memory) < 2 ** 63 else None,
+            # MemoryCurrent; memory_used_bytes and memory_cache_bytes split it (unit_memory).
+            "memory_bytes": memory["memory_bytes"],
+            "memory_used_bytes": memory["memory_used_bytes"],
+            "memory_cache_bytes": memory["memory_cache_bytes"],
             "result": app.get("Result"),
             "enabled": app.get("UnitFileState"),
         },
@@ -4954,7 +5046,7 @@ def app_status(domain_id, state=None):
                 info = shown.get(unit, {})
                 if info.get("LoadState") in (None, "not-found") and slot != live:
                     continue
-                mem = info.get("MemoryCurrent", "")
+                mem = unit_memory(info)
                 start = info.get("ExecMainStartTimestamp") or None
                 if state.get("listen") == "unix":
                     endpoint = slot_socket_path(domain_id, slot)
@@ -4965,7 +5057,8 @@ def app_status(domain_id, state=None):
                 status["slots"][slot] = {
                     "unit": unit, "active_state": info.get("ActiveState"), "sub_state": info.get("SubState"),
                     "main_pid": int(info.get("MainPID") or 0) if (info.get("MainPID") or "").isdigit() else 0,
-                    "memory_bytes": int(mem) if mem.isdigit() and int(mem) < 2 ** 63 else None,
+                    "memory_bytes": mem["memory_bytes"], "memory_used_bytes": mem["memory_used_bytes"],
+                    "memory_cache_bytes": mem["memory_cache_bytes"],
                     "started_iso": systemd_time_iso(start), "enabled": info.get("UnitFileState"),
                     "endpoint": endpoint, "live": slot == live,
                 }
@@ -5731,7 +5824,8 @@ def cmd_app_page(payload):
     try:
         pw = v_sysuser(payload.get("sysuser"))
         _rel, app_dir = v_app_root(payload.get("app_root"), pw.pw_dir)
-        inspect = call_as_user(pw, _user_inspect_app_root, app_dir)
+        inspect = call_as_user(pw, _user_inspect_app_root, app_dir,
+                               v_document_roots(payload.get("document_roots"), pw.pw_dir))
         inspect["path"] = app_dir
         inspect["home"] = pw.pw_dir
         result["inspect"] = inspect
@@ -5869,7 +5963,7 @@ def cmd_app_inspect(payload):
     payload = payload or {}
     pw = v_sysuser(payload.get("sysuser"))
     _rel, app_dir = v_app_root(payload.get("app_root"), pw.pw_dir)
-    result = call_as_user(pw, _user_inspect_app_root, app_dir)
+    result = call_as_user(pw, _user_inspect_app_root, app_dir, v_document_roots(payload.get("document_roots"), pw.pw_dir))
     result["path"] = app_dir
     result["home"] = pw.pw_dir
     return result
@@ -5909,22 +6003,24 @@ def cmd_apps_list(payload):
         units.append(app_unit(int(state["domain_id"]), live))
     extra = [app_unit(int(s["domain_id"]), slot) for s in states if zd_has_slots(helper_fields(s)) or s.get("zero_downtime")
              for slot in ("",) + SLOTS]
-    shown = unit_show(list(dict.fromkeys(units + extra)), ["ActiveState", "SubState", "MemoryCurrent", "Result", "NRestarts"])
+    shown = unit_show(list(dict.fromkeys(units + extra)),
+                      ["ActiveState", "SubState", "MemoryCurrent", "ControlGroup", "Result", "NRestarts"])
     apps = []
     for state, unit in zip(states, units):
         info = shown.get(unit, {})
-        memory = info.get("MemoryCurrent", "")
-        memory_bytes = int(memory) if memory.isdigit() and int(memory) < 2 ** 63 else None
+        memory = unit_memory(info)
         fields = helper_fields(state)
         slots = zd_has_slots(dict(state, **fields))
         if slots:
-            # Both versions run during a switch: the application's memory is their sum.
-            total = 0
+            # Both versions run during a switch: the application's memory is their sum (per field;
+            # a slot without a readable memory.stat adds its MemoryCurrent to the used memory).
+            total = dict.fromkeys(memory)
             for slot in ("",) + SLOTS:
-                mem = shown.get(app_unit(int(state["domain_id"]), slot), {}).get("MemoryCurrent", "")
-                if mem.isdigit() and int(mem) < 2 ** 63:
-                    total += int(mem)
-            memory_bytes = total if total or memory_bytes is not None else None
+                for key, value in unit_memory(shown.get(app_unit(int(state["domain_id"]), slot), {})).items():
+                    if value is not None:
+                        total[key] = (total[key] or 0) + value
+            if total["memory_bytes"] is not None:
+                memory = total
         live_port = state.get("port")
         if slots and state.get("listen") == "tcp":
             view = dict(state, **fields)
@@ -5960,7 +6056,9 @@ def cmd_apps_list(payload):
             "start_limit_hit": info.get("ActiveState") == "failed" and (
                 info.get("Result") == "start-limit-hit"
                 or int(info.get("NRestarts") or 0 if (info.get("NRestarts") or "").isdigit() else 0) >= APP_START_LIMIT_BURST),
-            "memory_bytes": memory_bytes,
+            "memory_bytes": memory["memory_bytes"],
+            "memory_used_bytes": memory["memory_used_bytes"],
+            "memory_cache_bytes": memory["memory_cache_bytes"],
         })
     return {"apps": apps, "reconcile_paused": reconcile_paused()}
 

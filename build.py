@@ -296,7 +296,7 @@ def build(meta):
             add(rel, data, 0o755 if is_exec else 0o644)
 
         # Icons are rendered from assets/logo*.svg by "bun run assets" and committed.
-        for rel in ["_meta/icons/%dx%d.png" % (size, size) for size in ICON_SIZES] + ["htdocs/images/logo.png", "htdocs/images/nav.png"]:
+        for rel in ["_meta/icons/%dx%d.png" % (size, size) for size in ICON_SIZES] + ["htdocs/images/logo.png", "htdocs/images/nav.png", "htdocs/images/header.svg"]:
             if not os.path.isfile(os.path.join(SRC, rel)):
                 raise SystemExit("src/%s is missing: run 'bun run assets' (scripts/render-assets.ts)" % rel)
     return target

@@ -113,11 +113,45 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"syscall"
 )
+
+// Files mapped by /map stay mapped while the application runs.
+var mapped [][]byte
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "smoke %s", os.Getenv("SMOKE"))
+	})
+	// A file served from the application root: its page cache is charged to the service.
+	http.HandleFunc("/blob", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "blob.bin")
+	})
+	// The same file mapped into memory and read (like a database file of bbolt or SQLite): mapped
+	// file pages are the application's working set.
+	http.HandleFunc("/map", func(w http.ResponseWriter, r *http.Request) {
+		f, err := os.Open("blob.bin")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer f.Close()
+		st, err := f.Stat()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data, err := syscall.Mmap(int(f.Fd()), 0, int(st.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		sum := 0
+		for i := 0; i < len(data); i += 4096 {
+			sum += int(data[i])
+		}
+		mapped = append(mapped, data)
+		fmt.Fprintf(w, "mapped %d %d", len(data), sum)
 	})
 	if sock := os.Getenv("RUNWAY_SOCKET"); sock != "" {
 		ln, err := net.Listen("unix", sock)
@@ -142,6 +176,45 @@ call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
 body=$(curl -s "http://127.0.0.1:$PORT/")
 [ "$body" = 'smoke a "b" $HOME %h' ] && ok "env value passed literally" || bad "env value: $body"
 [ "$(ps -o user= -p "$(systemctl show -p MainPID --value runway-app-$ID)")" = "$USER_NAME" ] && ok "runs as $USER_NAME" || bad "service user"
+
+echo "== memory: the application's own memory and the file cache (docs/DESIGN.md section 7)"
+mem_ok() { # mem_ok JSON-OF-A-UNIT: memory_used_bytes + memory_cache_bytes = memory_bytes (MemoryCurrent)
+    jexpr "d['memory_bytes'] is not None and d['memory_used_bytes'] is not None and d['memory_used_bytes'] + (d['memory_cache_bytes'] or 0) == d['memory_bytes']"
+}
+[ "$(call app-status "{\"domain_id\": $ID}" | jexpr "json.dumps(d['service'])" | mem_ok)" = "True" ] \
+    && ok "app-status: memory_used_bytes + memory_cache_bytes = memory_bytes" || bad "app-status memory: $(call app-status "{\"domain_id\": $ID}" | jexpr "d['service']")"
+if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+    # A 48 MiB file written as the user and dropped from the page cache (posix_fadvise), so that
+    # serving it charges its pages to the application's cgroup, not to this shell's.
+    runuser -u "$USER_NAME" -- python3 -c "
+import os
+with open('$APP/blob.bin', 'wb') as fh:
+    fh.write(os.urandom(48 << 20))
+    fh.flush()
+    os.fsync(fh.fileno())
+    os.posix_fadvise(fh.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)"
+    size=$(curl -s -o /dev/null -w '%{size_download}' "http://127.0.0.1:$PORT/blob")
+    st=$(call app-status "{\"domain_id\": $ID}" | jexpr "(lambda s: s['memory_cache_bytes'] >= 40 << 20 and s['memory_used_bytes'] < s['memory_bytes'] - (40 << 20))(d['service'])")
+    [ "$size" = "$((48 << 20))" ] && [ "$st" = "True" ] && ok "a served 48 MiB file counts as file cache, not as the application's memory" \
+        || bad "file cache after serving $size bytes: $(call app-status "{\"domain_id\": $ID}" | jexpr "d['service']")"
+    [ "$(call apps-list '{}' | jexpr "[a['memory_cache_bytes'] >= 40 << 20 and a['memory_used_bytes'] + a['memory_cache_bytes'] == a['memory_bytes'] for a in d['apps'] if a['domain_id'] == $ID][0]")" = "True" ] \
+        && ok "apps-list: memory_used_bytes and memory_cache_bytes" || bad "apps-list memory: $(call apps-list '{}' | jexpr "[a for a in d['apps'] if a['domain_id'] == $ID]")"
+    # Mapping the cached file moves its pages from the file cache to the application's memory
+    # (memory.stat file_mapped). The kernel updates the statistics of a cgroup in batches: retry.
+    before=$(call app-status "{\"domain_id\": $ID}" | jexpr "d['service']['memory_cache_bytes']")
+    mapped=$(curl -s "http://127.0.0.1:$PORT/map")
+    st=False
+    for _ in 1 2 3 4 5; do
+        st=$(call app-status "{\"domain_id\": $ID}" | jexpr "(lambda s: s['memory_used_bytes'] >= 40 << 20 and s['memory_cache_bytes'] <= $before - (40 << 20))(d['service'])")
+        [ "$st" = "True" ] && break
+        sleep 1
+    done
+    [ "$st" = "True" ] && ok "a mapped file counts as the application's memory, not as file cache" \
+        || bad "file cache after mapping ($mapped, cache before: $before): $(call app-status "{\"domain_id\": $ID}" | jexpr "d['service']")"
+    rm -f "$APP/blob.bin"
+else
+    echo "SKIP  file cache of a service (cgroup v1: no /sys/fs/cgroup/cgroup.controllers)"
+fi
 
 echo "== trigger files"
 pid1=$(systemctl show -p MainPID --value runway-app-$ID)
@@ -236,6 +309,21 @@ echo "== symlink safety"
 runuser -u "$USER_NAME" -- ln -sfn /root "$HOME_DIR/apps/evil"
 call app-inspect "{\"sysuser\": \"$USER_NAME\", \"app_root\": \"apps/evil\"}" | grep -q '"ok": false' && ok "cannot inspect /root via symlink" || bad "symlink inspect"
 rm -f "$HOME_DIR/apps/evil"
+
+echo "== document roots with symbolic links resolved (app-inspect and app-page: document_root)"
+runuser -u "$USER_NAME" -- bash -c "mkdir -p '$HOME_DIR/apps/smoke-docroot/api' && ln -sfn smoke-docroot/api '$HOME_DIR/apps/smoke-link' && ln -sfn smoke '$HOME_DIR/apps/smoke-current'"
+inspect_root() { # inspect_root APP_ROOT DOCUMENT_ROOTS_JSON: document_root of app-inspect
+    call app-inspect "{\"sysuser\": \"$USER_NAME\", \"app_root\": \"$1\", \"document_roots\": $2}" | jexpr "d.get('document_root', 'missing')"
+}
+[ "$(inspect_root apps/smoke-link '["apps/smoke-docroot"]')" = "apps/smoke-docroot" ] && ok "an application root behind a link into a document root" \
+    || bad "link into a document root: $(inspect_root apps/smoke-link '["apps/smoke-docroot"]')"
+[ "$(inspect_root apps/smoke '["apps/smoke-docroot", "apps/smoke-current"]')" = "apps/smoke-current" ] && ok "a document root that is a link to the application root" \
+    || bad "document root linked to the application root: $(inspect_root apps/smoke '["apps/smoke-docroot", "apps/smoke-current"]')"
+[ "$(inspect_root apps/smoke '["apps/smoke-docroot", "../etc", 5]')" = "None" ] && ok "outside the document roots (invalid entries are ignored)" \
+    || bad "outside the document roots: $(inspect_root apps/smoke '["apps/smoke-docroot", "../etc", 5]')"
+[ "$(call app-page "{\"domain_id\": $ID, \"sysuser\": \"$USER_NAME\", \"app_root\": \"apps/smoke\", \"runtime\": \"go\", \"document_roots\": [\"apps/smoke-current\"]}" | jexpr "d['inspect']['document_root']")" = "apps/smoke-current" ] \
+    && ok "app-page names the document root as well" || bad "app-page document_root"
+rm -rf "$HOME_DIR/apps/smoke-docroot" "$HOME_DIR/apps/smoke-link" "$HOME_DIR/apps/smoke-current"
 
 echo "== adapter metadata (docs/DESIGN.md section 5.1)"
 [ "$(call runtimes '{}' | jexpr "sorted(r['key'] for r in d['runtimes']) == sorted(['go','rust','bun','java','dotnet','python','ruby','php','binary']) and all(set(['key','label','toolchain','version_re','hint','docs_url','default_listen','supports_build','install_help','detected_only']) <= set(r) for r in d['runtimes'])")" = "True" ] && ok "all runtimes with full metadata" || bad "runtime metadata"
@@ -647,6 +735,9 @@ out=$(call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}")
 [ ! -e /etc/systemd/system/runway-app-$ID.service ] && [ ! -e /etc/runway/env/$ID.env ] && ok "the classic unit was retired" || bad "classic unit left over"
 call app-action "{\"domain_id\": $ID, \"action\": \"restart\"}" >/dev/null
 [ "$(wait_job deploy-$ID)" = "succeeded" ] && [ "$(slot_now)" = "a" ] && ok "restart switches to slot a" || bad "restart: $(job_msg)"
+[ "$(zd_status | jexpr "all(set(['memory_bytes', 'memory_used_bytes', 'memory_cache_bytes']) <= set(s) for s in d['slots'].values()) and d['slots']['a']['memory_used_bytes'] is not None")" = "True" ] \
+    && [ "$(call apps-list '{}' | jexpr "[a['memory_used_bytes'] is not None and 'memory_cache_bytes' in a for a in d['apps'] if a['domain_id'] == $ID][0]")" = "True" ] \
+    && ok "slots and apps-list report the used memory and the file cache per slot" || bad "slot memory: $(zd_status | jexpr "d['slots']")"
 # Turning it off from slot a, which holds the classic unit's port: the classic unit gets a new
 # port. A later apply with the panel's old port and no restart (the Reconcile that follows) keeps
 # the port the classic unit listens on (docs/DESIGN.md section 12.8); then it is turned on again.

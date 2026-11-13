@@ -126,6 +126,49 @@ const switchValue = (translate, deploy, deploying) => {
         : translate('Domain.status.switchProgressNoLimit', { target, phase });
 };
 
+// From this size on, and when it is at least the application's own memory, the file cache gets
+// a hint about static paths (docs/DESIGN.md section 8; the memory fields: section 7).
+const LARGE_CACHE = 256 * 1024 * 1024;
+const MIB = 1024 * 1024;
+
+/** The application's own memory (helper memory_used_bytes), else systemd's MemoryCurrent. */
+const usedMemory = info => (
+    isObject(info) && typeof info.memory_used_bytes === 'number' ? info.memory_used_bytes : (isObject(info) ? info.memory_bytes : null)
+);
+
+/**
+ * "Memory" fact: the application's own memory (mapped files included), the kernel's unmapped
+ * file cache charged to its service as secondary text, and for web applications whose cache is
+ * large a hint to let the web server serve big files (static paths, from the document root).
+ */
+const memoryValue = (service, worker, documentRoot) => {
+    const used = usedMemory(service);
+    const text = formatBytes(used);
+    if (!text) {
+        return null;
+    }
+    const cache = typeof service.memory_cache_bytes === 'number' ? service.memory_cache_bytes : 0;
+    const large = !worker && cache >= LARGE_CACHE && cache >= used;
+    return (
+        <span>
+            {text}
+            {cache >= MIB ? (
+                <Text intent="muted" fontSize="sm">
+                    {' '}
+                    <Translate content="Domain.status.memoryCache" params={{ size: isolate(formatBytes(cache)) }} />
+                </Text>
+            ) : null}
+            {large ? (
+                <div>
+                    <Text intent="muted" fontSize="sm">
+                        <Translate content="Domain.status.memoryCacheHint" params={{ path: isolate(documentRoot || 'httpdocs') }} />
+                    </Text>
+                </div>
+            ) : null}
+        </span>
+    );
+};
+
 /** The instances that run right now (both during a switch), with their state and memory. */
 const versionsValue = current => {
     const slots = isObject(current.slots) ? current.slots : null;
@@ -143,7 +186,7 @@ const versionsValue = current => {
                     {slotName(key)}
                     {': '}
                     {slots[key].active_state}
-                    {slots[key].memory_bytes ? `, ${formatBytes(slots[key].memory_bytes)}` : ''}
+                    {usedMemory(slots[key]) ? `, ${formatBytes(usedMemory(slots[key]))}` : ''}
                     {slots[key].live ? <Text intent="muted" fontSize="sm">{' '}<Translate content="Domain.status.versionLive" /></Text> : null}
                 </div>
             ))}
@@ -214,7 +257,11 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
             value: service.active_state ? `${service.active_state}${service.sub_state ? ` (${service.sub_state})` : ''}` : null,
         },
         { key: 'pid', label: <Translate content="Domain.status.pid" />, value: running && service.main_pid ? String(service.main_pid) : null },
-        { key: 'memory', label: <Translate content="Domain.status.memory" />, value: running ? formatBytes(service.memory_bytes) : null },
+        {
+            key: 'memory',
+            label: <Translate content="Domain.status.memory" />,
+            value: running ? memoryValue(service, worker, isObject(data.domain) ? data.domain.documentRoot : null) : null,
+        },
         { key: 'started', label: <Translate content="Domain.status.started" />, value: running ? formatTime(service.started_iso || service.started_at) : null },
         { key: 'restarts', label: <Translate content="Domain.status.restarts" />, value: service.restarts ? String(service.restarts) : null },
         { key: 'endpoint', label: <Translate content="Domain.status.endpoint" />, value: endpoint },
@@ -285,7 +332,6 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
                     {switchable && (
                         <Button
                             icon="reload"
-                            ghost
                             disabled={!enabled || deploying || Boolean(busyOp)}
                             state={busyOp === 'restartPlain' ? 'loading' : undefined}
                             onClick={() => onControl('restartPlain')}

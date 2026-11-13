@@ -1,6 +1,7 @@
 // Renders the brand assets from the SVG masters in assets/: the extension catalog icons
 // (src/_meta/icons), the Dev Tools icon (src/htdocs/images/logo.png), the navigation icon
-// (src/htdocs/images/nav.png) and the GitHub social preview (docs/social-preview.png). Run it
+// (src/htdocs/images/nav.png), the icon of a domain row in Websites & Domains
+// (src/htdocs/images/header.svg) and the GitHub social preview (docs/social-preview.png). Run it
 // after changing a master:
 //
 //   bun run assets
@@ -38,7 +39,20 @@ const lightGlyph = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128
 
 for (const size of [32, 64, 128]) await write(`src/_meta/icons/${size}x${size}.png`, render(tile, size));
 await write("src/htdocs/images/logo.png", render(tile, 64)); // Dev Tools button, API context
-await write("src/htdocs/images/nav.png", render(lightGlyph, 64)); // administrator navigation
+await write("src/htdocs/images/nav.png", render(lightGlyph, 64)); // navigation (dark sidebar)
+// Icon of a domain row (16 px, next to the grey line icons of the row): the mark in one mid grey.
+// Plesk's dark theme inverts the whole page (html { filter: invert(0.9) hue-rotate(180deg) }) and
+// inverts images back, so an image keeps its colours: #7a7a7a has a contrast of at least 3:1 on
+// the white and light grey rows of the light theme and on the dark rows of the dark theme, where a
+// black mark would vanish. An SVG, so it stays sharp at any pixel density.
+const rowMark = inner(glyph)
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/ fill="#[0-9a-f]{6}"/gi, "")
+    .replace(/>\s+</g, "><")
+    .trim();
+const rowIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="#7a7a7a"><title>Runway</title>${rowMark}</svg>\n`;
+await Bun.write(resolve(ROOT, "src/htdocs/images/header.svg"), rowIcon);
+console.log(`src/htdocs/images/header.svg (${rowIcon.length} bytes)`);
 const FONT = "Segoe UI, Inter, Roboto, Helvetica Neue, Arial, sans-serif";
 const runtimes = ["Go", "Rust", "Bun", "Java", ".NET", "Python", "Ruby", "PHP"]
     .map((name) => `<tspan>${name}</tspan>`)
