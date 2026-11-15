@@ -262,6 +262,8 @@ const Domain = ({ baseUrl, statusMessages }) => {
                 config={config}
                 status={status}
                 configured={configured}
+                appUrl={data.appUrl}
+                runtimes={runtimes}
                 busyOp={busyOp}
                 onControl={control}
                 onStop={() => setConfirm('stop')}
