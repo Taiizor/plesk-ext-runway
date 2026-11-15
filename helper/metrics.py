@@ -435,7 +435,40 @@ def cmd_server_metrics(payload):
         })
         results.sort(key=lambda r: r["time"])
 
-    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest}
+    project_summary = {
+        "cpu_percent": 0.0,
+        "memory_used_bytes": 0,
+        "disk_bytes": 0,
+        "net_rate": 0.0,
+    }
+    try:
+        db = _open_metrics_db()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT
+                ROUND(SUM(m.cpu_percent), 2),
+                CAST(SUM(m.memory_used_bytes) AS INTEGER),
+                CAST(SUM(m.disk_bytes) AS INTEGER),
+                ROUND(SUM(m.net_rate), 2)
+            FROM app_metrics m
+            INNER JOIN (
+                SELECT domain_id, MAX(timestamp) as max_t
+                FROM app_metrics
+                WHERE timestamp >= ?
+                GROUP BY domain_id
+            ) latest ON m.domain_id = latest.domain_id AND m.timestamp = latest.max_t;
+        """, (now - 3600,))
+        row = cursor.fetchone()
+        if row and any(x is not None for x in row):
+            project_summary["cpu_percent"] = row[0] or 0.0
+            project_summary["memory_used_bytes"] = row[1] or 0
+            project_summary["disk_bytes"] = row[2] or 0
+            project_summary["net_rate"] = row[3] or 0.0
+        db.close()
+    except Exception:
+        pass
+
+    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest, "project_summary": project_summary}
 
 
 def cmd_health_ping(payload):

@@ -193,6 +193,11 @@ const Overview = ({ baseUrl }) => {
         return sum + (typeof used === 'number' ? used : 0);
     }, 0);
 
+    const projectSummary = (serverMetrics.data && serverMetrics.data.project_summary) || null;
+    const projectMemory = (projectSummary && typeof projectSummary.memory_used_bytes === 'number' && projectSummary.memory_used_bytes > 0)
+        ? projectSummary.memory_used_bytes
+        : totalMemory;
+
     const runtimeCounts = {};
     apps.forEach(row => {
         if (row.configured && row.runtime) {
@@ -358,19 +363,6 @@ const Overview = ({ baseUrl }) => {
 
                     <div style={kpiCardStyle}>
                         <div style={kpiHeaderStyle}>
-                            <Text intent="muted" fontSize="sm"><Translate content="Domain.status.memory" /></Text>
-                            <Icon name="ram" size="16" intent="info" />
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 600 }}>
-                            {formatBytes(totalMemory) || '0 B'}
-                        </div>
-                        <Text intent="muted" fontSize="sm">
-                            <Translate content="Overview.columnMemory" />
-                        </Text>
-                    </div>
-
-                    <div style={kpiCardStyle}>
-                        <div style={kpiHeaderStyle}>
                             <Text intent="muted" fontSize="sm"><Translate content="Overview.columnRuntime" /></Text>
                             <Icon name="puzzle" size="16" intent="info" />
                         </div>
@@ -387,6 +379,23 @@ const Overview = ({ baseUrl }) => {
                                 })
                             ) : (
                                 <Text intent="muted" fontSize="sm">—</Text>
+                            )}
+                        </div>
+                    </div>
+
+                    <div style={kpiCardStyle}>
+                        <div style={kpiHeaderStyle}>
+                            <Text intent="muted" fontSize="sm">Project Load</Text>
+                            <Icon name="server" size="16" intent="info" />
+                        </div>
+                        <div style={{ fontSize: '18px', fontWeight: 600 }}>
+                            <span>{projectSummary && typeof projectSummary.cpu_percent === 'number' ? `${projectSummary.cpu_percent}% CPU` : (formatBytes(projectMemory) || '0 B')}</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                            <span>RAM: {formatBytes(projectMemory) || '0 B'}</span>
+                            <span>Disk: {projectSummary && projectSummary.disk_bytes ? formatBytes(projectSummary.disk_bytes) : '—'}</span>
+                            {projectSummary && projectSummary.net_rate !== undefined && (
+                                <span>Net: {formatBytes(projectSummary.net_rate)}/s</span>
                             )}
                         </div>
                     </div>
