@@ -297,7 +297,7 @@ const ProjectPanel = ({ data, runtimes, drawer = null, busy = false, error = nul
                 <Button
                     icon="arrow-down-tray"
                     disabled={!configured}
-                    tooltip={configured ? undefined : <Translate content="Domain.project.fetchNeedsSave" />}
+                    tooltip={configured ? undefined : translate('Domain.project.fetchNeedsSave')}
                     onClick={() => onOpen('fetch')}
                 >
                     <Translate content="Domain.project.fetch" />

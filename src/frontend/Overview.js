@@ -3,7 +3,7 @@
 import { createElement, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Icon, Input, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Tooltip, Translate, useTranslate,
+    Alert, Button, Icon, Input, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formatBytes, formatTime, isolate, runtimeName } from './lib/format';
 import { useApi, useApiData, usePolling } from './lib/hooks';
