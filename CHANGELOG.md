@@ -38,6 +38,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Toolchains Hub visual grid with version badges, build tool availability, and manual update checks.
 - Settings page categorized into tabs with 1-click Preset Profiles (Low-RAM VPS, Standard Server,
   High Performance).
+- Automated screenshot capture script (`scripts/capture-screenshots.ts`, `bun run screenshots`)
+  using `puppeteer-core` with headless Chrome to capture and refresh all documentation and catalog
+  screenshots across light and dark themes with trial license banners hidden.
 - `bun run package` builds and verifies the installable zip in the root `dist/` directory
   through `python build.py --strict`, with matching build and release instructions.
 - Independently opt-in deployment history/audit with bounded logs, diagnostics and blocking

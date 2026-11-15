@@ -145,17 +145,11 @@ The Plesk extension catalog shows `_meta/screenshots/*.png` from the package
 (`src/_meta/screenshots/1.png` domain page, `2.png` toolchains, `3.png` overview, 1024x768); the
 README shows `docs/screenshots/admin-overview.png`, `admin-toolchains.png` and
 `admin-domain.png`, and `docs/screenshots/` holds more views (dark theme, customer, drawers).
-`build.py` prints a note when `src/_meta/screenshots/` is empty. To refresh them:
+`build.py` prints a note when `src/_meta/screenshots/` is empty. To refresh them automatically:
 
-1. Use the test container with a few applications in different states (running Go app, a
-   stopped Bun app, a failed build) and at least two toolchains installed. Use neutral domain
-   names (`example.com`, `shop.example.net`) and no real customer data.
-2. Browser window 1440x900, Plesk default theme, English locale. Pages: overview, toolchains
-   (with an install job log), domain page (status + logs), settings.
-3. Save PNGs (at most 1 MB each) as `src/_meta/screenshots/1.png`, `2.png`, `3.png` (catalog
-   order) and replace the files of the same name in `docs/screenshots/` (the README links
-   `admin-overview.png`, `admin-toolchains.png`, `admin-domain.png`). The integration run used
-   headless Chrome through puppeteer-core with the trial-license banner hidden.
+   Run `bun run screenshots` (or `CONTAINER=grt-plesk bun run screenshots`). It uses headless
+   Chrome through `puppeteer-core` to capture all views in light and dark themes (1440x900 for
+   documentation, 1024x768 for the catalog) with the trial-license banner hidden.
 
 ## Plesk extension catalog
 

@@ -11,13 +11,15 @@
     "check:helper": "python scripts/build_helper.py --check",
     "dev": "bun ./node_modules/@plesk/plesk-ext-sdk/bin/cli.js dev",
     "test:frontend": "bun test ./tests/frontend",
-    "assets": "bun scripts/render-assets.ts"
+    "assets": "bun scripts/render-assets.ts",
+    "screenshots": "bun scripts/capture-screenshots.ts"
   },
   "dependencies": {
     "@plesk/plesk-ext-sdk": "^0.9.0"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "jsdom": "31.0.1"
+    "jsdom": "31.0.1",
+    "puppeteer-core": "^25.17.0"
   }
 }
