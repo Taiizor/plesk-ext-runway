@@ -1,5 +1,8 @@
 # Runway — review report (Phase 5)
 
+Historical 1.0 review and verification record; version status, test counts and risks below describe
+that release. For current behavior and development instructions, start with the [documentation index](README.md).
+
 Fixes of the adversarial pre-release review: 44 confirmed findings (`C0`–`C43`), 4 findings added
 by the verifiers (`E0`–`E3`) and 1 undecided finding (`U0`), implemented as decided per finding.
 Test server: Docker container `grt-plesk` (Plesk 18.0.82, Ubuntu 24.04, systemd 255, Apache

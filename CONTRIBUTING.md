@@ -21,14 +21,15 @@ Thanks for helping! Bug reports, runtime notes, fixes and new runtime adapters a
 ```sh
 bun install
 bun run build              # frontend
-python build.py            # package: dist/runway-<version>-<release>.zip
+bun run build:helper       # regenerate the standalone helper after editing helper/
+python build.py            # helper + frontend + dist/runway-<version>-<release>.zip
 ```
 
 ## Code rules
 
 | Area | Rules |
 |---|---|
-| `helper/` → `src/sbin/runway-helper` | Edit the source sections and explicit manifest in `helper/` ([assembly contract](helper/README.md)), then run `python scripts/build_helper.py` and commit the generated standalone script too. Python **3.8+ standard library only**; lint the assembled script with pyflakes. Every privileged action re-validates its input; customer files go through the drop-privileges child (`call_as_user`). Keep the security invariants in DESIGN section 4. |
+| `helper/` → `src/sbin/runway-helper` | Edit the source sections and explicit manifest in `helper/` ([assembly contract](helper/README.md)), then run `bun run build:helper` and commit the generated standalone script too. `bun run check:helper` checks that they match. Python **3.8+ standard library only**; lint the assembled script with pyflakes. Every privileged action re-validates its input; customer files go through the drop-privileges child (`call_as_user`). Keep the security invariants in DESIGN section 4. |
 | `src/plib/` | PHP **7.4 and 8.x** compatible, no Composer dependencies, class prefix `Modules_Runway_`. Files start with `<?php`, have no closing `?>` and no BOM. User-visible strings come from the locale files. |
 | `src/frontend/` | React with plain JavaScript (no TypeScript), components from `@plesk/plesk-ext-sdk` (Plesk UI Library). Files with JSX import `createElement` from `react`. Never `window.confirm`: use the ui-library `Dialog`. Arabic and Hebrew panels are right-to-left: show code (paths, commands, variables, logs) through `Mono`, `dir="ltr"` inputs or `LogOutput`, and runtime names, versions and other mixed-direction values through `isolate()` / `runtimeName()` of `lib/format.js`; use logical CSS properties (`marginInlineStart`) instead of left/right. |
 | Locales | `en-US` is the reference; every Plesk locale (32 locales with three files each: `<locale>.php` loader, `server/<locale>.php`, `app/<locale>.php`) mirrors its en-US file line for line: the same keys and placeholders on the same line numbers, only the string values and line 3 (a comment naming the language) differ. Add a new key at the same line in every file; `python tests/check_locales.py` checks all of it. The translations other than English and Turkish were produced by machine translation with a review pass; corrections from native speakers are welcome (label `locales`). |
@@ -43,7 +44,7 @@ and on every push that changes code (pushes that only change `docs/`, root-level
 locally:
 
 ```sh
-python scripts/build_helper.py --check
+bun run check:helper
 python -m unittest discover -s tests -p 'test_*.py' -v
 python -m pyflakes src/sbin/runway-helper scripts/build_helper.py build.py tests/check_locales.py
 python build.py --check
@@ -102,8 +103,9 @@ panel in the light and the dark theme (no console errors).
   (container, Plesk version, OS); the pull request template asks for both.
 - Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md), or label the pull
   request `skip-changelog` when nothing user-visible changes.
-- Do not commit generated files (`src/htdocs/index.php`, `src/htdocs/dist/`, `dist/`,
-  `node_modules/`).
+- Commit `src/sbin/runway-helper` with changes to its `helper/` sources after running
+  `bun run build:helper`. Generated frontend files and build/dependency directories
+  (`src/htdocs/index.php`, `src/htdocs/dist/`, `dist/`, `node_modules/`) stay uncommitted.
 - Pull requests are squash-merged into `develop` once the Lint, Package and End-to-end checks
   are green, so the title should be a good one-line summary: it becomes the commit subject.
 

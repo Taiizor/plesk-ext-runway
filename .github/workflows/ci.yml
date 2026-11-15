@@ -58,7 +58,7 @@ jobs:
 
       - name: Helper source assembly and regression tests
         run: |
-          python scripts/build_helper.py --check
+          bun run check:helper
           python -m unittest discover -s tests -p 'test_*.py' -v
 
       - name: Helper contracts on the minimum Python version

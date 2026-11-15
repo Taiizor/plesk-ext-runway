@@ -6,6 +6,8 @@
   "license": "MIT",
   "scripts": {
     "build": "plesk-ext-sdk build",
+    "build:helper": "python scripts/build_helper.py",
+    "check:helper": "python scripts/build_helper.py --check",
     "dev": "plesk-ext-sdk dev",
     "test:frontend": "bun test ./tests/frontend",
     "assets": "bun scripts/render-assets.ts"

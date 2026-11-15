@@ -1,14 +1,19 @@
 # Privileged helper sources
 
 Edit the Python source sections in this directory, then regenerate and commit the standalone
-artifact with them:
+artifact with them. Run these commands from the repository root:
 
 ```sh
-python scripts/build_helper.py
-python scripts/build_helper.py --check
+bun run build:helper
+bun run check:helper
 python -m unittest discover -s tests -p 'test_*.py' -v
 python -m pyflakes src/sbin/runway-helper scripts/build_helper.py
 ```
+
+The package scripts invoke `python scripts/build_helper.py` and
+`python scripts/build_helper.py --check`, respectively. The Python entry points also work on their
+own, including in CI jobs and Linux test containers that do not install Bun. `build:helper`
+regenerates the artifact; `check:helper` only validates it and never rewrites it.
 
 `src/sbin/runway-helper` is generated and committed so existing helper tooling, installation
 and systemd's atomic helper replacement keep working. Do not edit it directly. `python build.py`

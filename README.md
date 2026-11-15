@@ -747,9 +747,9 @@ bun install                     # once: @plesk/plesk-ext-sdk (React 18, Plesk UI
 bun run build                   # frontend only -> src/htdocs/index.php + src/htdocs/dist/
 bun run dev                     # frontend watch mode
 bun run assets                  # after editing assets/logo*.svg: icons, nav logo, row icon, docs/social-preview.png
-python scripts/build_helper.py  # after editing helper/: regenerate the standalone root helper
-python build.py                 # frontend build + dist/runway-<version>-<release>.zip (verified)
-python build.py --no-frontend   # package the existing frontend build
+bun run build:helper            # after editing helper/: regenerate the standalone root helper
+python build.py                 # helper + frontend build + dist/runway-<version>-<release>.zip (verified)
+python build.py --no-frontend   # regenerate the helper and package the existing frontend build
 python build.py --check         # validate the source tree (fails on leftover placeholders)
 python build.py --version 1.2.0 # package as another version without editing src/meta.xml
 ```
@@ -765,18 +765,18 @@ Repository layout:
 | `helper/` | root helper source sections: runtime adapters, system operations, deployments and traffic switching; see [helper/README.md](helper/README.md) |
 | `src/sbin/runway-helper` | generated standalone root helper (python3, standard library only, 3.8+); committed with its sources |
 | `tests/` | helper assembly and Linux contract tests, frontend regression tests, Plesk smoke/E2E suites and locale checks |
-| `scripts/` | `plesk-dev.sh` and `plesk-dev.ps1`: the local Plesk test server; `render-assets.ts` (`bun run assets`): icons (catalog, Dev Tools, navigation, domain row) and the social preview from `assets/` |
+| `scripts/` | helper assembly (`bun run build:helper`, `bun run check:helper`) and CodeQL report mapping; `plesk-dev.sh` / `plesk-dev.ps1`: the local Plesk server; `render-assets.ts` (`bun run assets`): icons and social preview |
 | `assets/` | `logo.svg` (the mark) and `logo-tile.svg` (the mark on its tile), the masters of every rendered icon |
 | `examples/` | a minimal application per runtime |
-| `docs/` | [DESIGN.md](docs/DESIGN.md) (decisions and contracts), [runtimes/](docs/runtimes), [RELEASING.md](docs/RELEASING.md) |
+| `docs/` | [Documentation index](docs/README.md): current design, runtime notes, release instructions and historical reports |
 | `.github/` | CI, CodeQL and release workflows, `scripts/plesk-e2e.sh` (the container driver), Dependabot, issue and pull request templates |
 
 ### Tests
 
 ```sh
 python tests/check_locales.py      # every locale mirrors en-US line for line (keys, placeholders)
-python scripts/build_helper.py --check  # helper sources match the committed standalone artifact
-python -m unittest discover -s tests -p 'test_*.py' -v  # assembly + Linux contracts (Linux only)
+bun run check:helper              # helper sources match the committed standalone artifact
+python -m unittest discover -s tests -p 'test_*.py' -v  # assembly; Linux contracts skip on Windows
 bun run test:frontend              # API timeouts, status freshness and polling recovery
 scripts/plesk-dev.sh test          # everything CI runs, against the local container
 bash tests/api-smoke.sh            # JSON API through the panel (RUNWAY_SMOKE_DEPLOY=1 also deploys)

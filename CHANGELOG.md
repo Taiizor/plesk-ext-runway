@@ -12,6 +12,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- `bun run build:helper` and `bun run check:helper` package scripts for regenerating and
+  validating the standalone helper, with matching contributor and release instructions.
 - Static files from a document root inside the application root work without `chmod -R o+rX` in
   the build command: builds and downloads create files that only the subscription can read (umask
   027), so after every successful build or fetch (before the new version starts) and when the

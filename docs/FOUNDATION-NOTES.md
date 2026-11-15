@@ -4,7 +4,9 @@ What Phase 2 built, how the pieces fit together, and what the Phase 3 agents (3a
 3b PHP, 3c frontend, 3d repo hygiene) must know. This is a Phase 2 snapshot: statements about
 missing features (sample, fetch, path/worker modes, customer access) are outdated, see
 [DESIGN.md](DESIGN.md) and [INTEGRATION-REPORT.md](INTEGRATION-REPORT.md). [DESIGN.md](DESIGN.md) stays the source of
-truth for decisions and contracts; this file documents the implementation.
+truth for decisions and contracts; this file records the Phase 2 implementation. For the current
+source layout and helper build commands, use the [documentation index](README.md) and
+[helper source guide](../helper/README.md).
 
 ## 1. What exists
 

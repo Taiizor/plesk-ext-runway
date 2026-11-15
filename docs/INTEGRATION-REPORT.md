@@ -1,5 +1,8 @@
 # Runway — integration report (Phase 4)
 
+Historical 1.0 test record: commands, server state and counts below describe that run. Current
+development, helper generation and release instructions are in the [documentation index](README.md).
+
 Integration of the four Phase 3 work packages (3a helper, 3b PHP, 3c frontend, 3d repository
 hygiene) into one consistent, packaged and verified extension. Test server: Docker container
 `grt-plesk` (`plesk/plesk`, Plesk 18.0.82, Ubuntu 24.04.5, systemd 255, Python 3.12.3), panel on

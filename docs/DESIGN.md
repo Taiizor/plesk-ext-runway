@@ -116,7 +116,9 @@ namespace and execute in the explicit `helper/manifest.json` order; they are not
 comments/whitespace added. Commit the sources and generated `src/sbin/runway-helper` together.
 Normal package builds regenerate it, while `build.py --check` and CI reject a stale artifact.
 Installation, the isolated interpreter, atomic stable helper replacement and all contracts stay
-unchanged. Details and editing commands: [helper/README.md](../helper/README.md).
+unchanged. The package scripts expose generation as `bun run build:helper` and validation as
+`bun run check:helper`; both invoke `python scripts/build_helper.py`, with `--check` for validation.
+Details and editing commands: [helper/README.md](../helper/README.md).
 
 Each runtime is a class with a common interface; the registry is `RUNTIMES = {"go": GoRuntime(), ...}`.
 
@@ -759,7 +761,7 @@ does).
 
 ## 10. Testing and release
 
-- Helper source/build regressions: `python scripts/build_helper.py --check` and
+- Helper source/build regressions: `bun run check:helper` and
   `python -m unittest discover -s tests -p 'test_*.py' -v`. Assembly checks run on Windows and Linux;
   Linux contracts cover runtime metadata, project defaults, sample templates, unit/environment
   rendering, validation and standalone CLI execution (root only for the CLI protocol). CI also runs
@@ -785,12 +787,13 @@ does).
   against a mock release server; with `RUNWAY_SMOKE_SELF_UPDATE=1` (CI's helper job only: it
   cannot be undone) it repackages the installed extension as release+1 and upgrades to it through
   the updater.
-- CI (`.github/workflows/ci.yml`): lint (pyflakes, Python 3.8 grammar check of the helper,
-  locales, bun build, `build.py --check`, `php -l` in `php:7.4-cli` and `php:8.2-cli`), build
+- CI (`.github/workflows/ci.yml`): lint (helper assembly and Python regressions, also on Python
+  3.8 in Docker; pyflakes, helper grammar, locales, frontend regressions and build,
+  `build.py --check`, `php -l` in `php:7.4-cli` and `php:8.2-cli`), build
   (bun + `build.py --strict`, zip artifact), e2e in the Plesk container through
   `.github/scripts/plesk-e2e.sh` (install zip, subscription, customer `cust1` when the license
   allows it, install Go, then helper-smoke, api-smoke, customer-smoke (skipped without the customer)
-  and the Go part of runtime-e2e, `RUNWAY_E2E_RUNTIMES=go`, about 2 minutes); the full runtime
+  and the Go part of runtime-e2e, `RUNWAY_E2E_RUNTIMES=go`); the full runtime
   matrix runs locally. Pushes that only change documentation skip CI; pull requests always run
   it (the required checks of `develop` must start). CodeQL (`codeql.yml`) analyses the helper,
   the frontend and the workflows. Release (`release.yml`): tag `v*` → version gate (tag =
@@ -798,15 +801,18 @@ does).
   fixed name behind `releases/latest/download/runway.zip`), SHA256SUMS of both and generated notes
   (CHANGELOG section + install + checksums + "What's Changed" from the labelled pull requests,
   docs/RELEASING.md); "Run workflow" rehearses it without publishing.
-- Packaging: `build.py` runs `bun run build` (= `plesk-ext-sdk build`) unless `--no-frontend`,
-  then zips `src/` without `frontend/`; LF normalization and Unix modes as in the base. The
+- Packaging: `build.py` first regenerates the helper from `helper/`, including with
+  `--no-frontend`, then runs `bun run build` (= `plesk-ext-sdk build`) unless `--no-frontend`.
+  It zips `src/` without `frontend/`; the source-only `helper/` directory is outside `src/` and
+  is not packaged. LF normalization and Unix modes stay as in the base. The
   packaged `htdocs/index.php` loads `dist/main.js?v=<version>-<release>.<sha256 prefix>` (cache
   buster: Plesk serves the bundle without cache headers); `--verify` checks it.
 
 ## 11. Non-goals for 1.0
 
 Windows, zero-downtime deploys, multiple processes per app, resource graphs, automatic restart on
-failed health checks, Plesk catalog submission. Zero-downtime deployments followed in 1.1 (§12).
+failed health checks, Plesk catalog submission. Zero-downtime deployments followed in 1.1 (§12);
+the opt-in health watch followed in 1.2 (§7 and §8).
 
 ## 12. Zero-downtime deployments (1.1)
 

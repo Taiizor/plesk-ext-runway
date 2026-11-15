@@ -23,7 +23,7 @@ end-to-end job installed and tested. Title and notes of the release page are gen
 1. Make sure CI is green on `develop` (the default branch; releases are tagged on it).
 2. Bump `<version>` / `<release>` in `src/meta.xml`, `version` in `package.json` and
    `VERSION = "X.Y.Z"` in `helper/bootstrap.py` (shown as the helper version and sent as the
-   User-Agent of downloads), then run `python scripts/build_helper.py` and commit the generated
+   User-Agent of downloads), then run `bun run build:helper` and commit the generated
    `src/sbin/runway-helper`; `build.py --check` verifies the assembly and that the three agree.
 3. Changelogs, both are required by `build.py` (it fails when the version has no entry):
    - `CHANGELOG.md`: move the `## [Unreleased]` items to `## [X.Y.Z] - YYYY-MM-DD`, update
@@ -34,8 +34,11 @@ end-to-end job installed and tested. Title and notes of the release page are gen
 
    ```sh
    bun install --frozen-lockfile
+   bun run check:helper               # committed helper matches helper/ sources
+   python -m unittest discover -s tests -p 'test_*.py' -v
+   bun run test:frontend
    python build.py --check            # structure, changelogs, no leftover placeholders
-   python build.py --strict           # frontend build + zip + package verification
+   python build.py --strict           # helper + frontend build + zip + package verification
    python tests/check_locales.py
    ```
 
@@ -130,9 +133,11 @@ pushing the tag.
 - with `--version`: the packaged id, version and release.
 
 `python build.py --check` (and `--strict` for builds) fails on leftover placeholders in the
-packaged files and in `src/frontend/`: `TODO`, `FIXME`, `TBD`, `XXX`, `CHANGEME`,
-`REPLACE_ME`, `PLACEHOLDER`, *lorem ipsum*, `{{ variable }}` and `@@VARIABLE@@`. The generated
-bundle `src/htdocs/dist/` is not scanned.
+packaged files, `src/frontend/` and the original `helper/` Python sources: `TODO`, `FIXME`, `TBD`,
+`XXX`, `CHANGEME`, `REPLACE_ME`, `PLACEHOLDER`, *lorem ipsum*, `{{ variable }}` and `@@VARIABLE@@`. The generated
+bundle `src/htdocs/dist/` is not scanned; the helper's source sections are scanned instead of
+its generated copy. `bun run check:helper` (also part of `build.py --check`) rejects a missing or
+stale standalone helper. Normal package builds regenerate it, including with `--no-frontend`.
 
 ## Screenshots
 

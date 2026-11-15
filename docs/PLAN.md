@@ -1,5 +1,8 @@
 # Runway — work plan and status
 
+Historical record of the original 1.0 implementation. The phases and test-server state below are
+not the current development checklist; use the [documentation index](README.md) for current guides.
+
 Phases are executed by agents; each agent updates its line here when done (one line, factual).
 
 | # | Phase | Scope | Status |
