@@ -37,5 +37,11 @@
   "switching/connections.py",
   "switching/convergence.py",
   "switching/switch.py",
+  "operations/config.py",
+  "operations/history.py",
+  "operations/releases.py",
+  "operations/diagnostics.py",
+  "operations/notifications.py",
+  "operations/backup.py",
   "entrypoint.py"
 ]

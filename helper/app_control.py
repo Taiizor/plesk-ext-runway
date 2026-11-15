@@ -47,7 +47,7 @@ def _app_apply(payload):
                     zd_converge_locked(current, current_pw)
                 except HelperError:
                     pass
-            return _zd_app_apply(state, pw, restart, start, resume)
+            return _zd_app_apply(state, pw, restart, start, resume, actor=ops_actor(payload.get("actor")))
         finally:
             lock.release()
     if not start and state["enabled"] and not state["suspended"] and unit_is_active(UNIT_DEPLOY % domain_id):
@@ -97,7 +97,7 @@ def _app_apply(payload):
     return {"port": state["port"], "state": state, "switchable": False, "job": None}
 
 
-def _zd_app_apply(state, pw, restart, start, resume):
+def _zd_app_apply(state, pw, restart, start, resume, actor="system"):
     """app-apply of an application that has, gets or had zero-downtime slots (the deploy lock is
     held): renders both slots, keeps the live instance running, writes the pointer, and starts
     the switch job for a restart (docs/DESIGN.md section 12.5)."""
@@ -180,7 +180,7 @@ def _zd_app_apply(state, pw, restart, start, resume):
             systemctl("enable", live_unit, check=True)
             running = unit_is_active(live_unit)
             if start and restart and running and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
-                job = start_deploy_job(domain_id, "restart", False)["job"]
+                job = start_deploy_job(domain_id, "restart", False, actor=actor)["job"]
             elif start and (restart or not running):
                 state = zd_plain_restart(state, pw)[0]
     else:
@@ -215,6 +215,7 @@ def remove_app(domain_id):
     for path in job_paths("deploy-%d" % domain_id):
         remove_quietly(path)
     remove_quietly(health_watch_path(domain_id))
+    ops_remove_metadata(domain_id)
     systemctl("daemon-reload")
     systemctl("reset-failed", *units)
     sync_health_units()
@@ -229,7 +230,9 @@ def cmd_app_action(payload):
     action = (payload or {}).get("action")
     state, pw = load_app_state(domain_id)
     if zd_has_slots(state):
-        return _zd_app_action(state, pw, action, bool((payload or {}).get("plain")))
+        result = _zd_app_action(state, pw, action, bool((payload or {}).get("plain")), actor=ops_actor(payload.get("actor")))
+        ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": ops_actor(payload.get("actor"))})
+        return result
     unit = UNIT_APP % domain_id
     if action in ("start", "restart", "recover"):
         if not state["enabled"]:
@@ -251,10 +254,11 @@ def cmd_app_action(payload):
         systemctl("disable", "--now", unit, check=True, timeout=120)
     else:
         raise HelperError("Invalid action")
+    ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": ops_actor(payload.get("actor"))})
     return {"action": action}
 
 
-def _zd_app_action(state, pw, action, plain):
+def _zd_app_action(state, pw, action, plain, actor="system"):
     """app-action of an application with zero-downtime slots (docs/DESIGN.md section 12.5):
     restart of a running application starts the switch job ({action, job}); plain (Restart in
     place), start and recover act on the live unit; stop stops every app unit."""
@@ -290,7 +294,7 @@ def _zd_app_action(state, pw, action, plain):
                 update_state_flags(domain_id, **CLEARED_FLAGS)
                 state.update(CLEARED_FLAGS)
             if not plain and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
-                return {"action": action, "job": start_deploy_job(domain_id, "restart", False)["job"]}
+                return {"action": action, "job": start_deploy_job(domain_id, "restart", False, actor=actor)["job"]}
             zd_plain_restart(state, pw)
             return {"action": action}
         if action != "recover" and (state["stopped"] or state["tampered"]):
@@ -316,13 +320,13 @@ def _zd_app_action(state, pw, action, plain):
             lock.release()
 
 
-DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart"}
+DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart", "rollback": "Roll back release"}
 # Titles of deployments of a stopped application (Stop persists): they build or fetch, but never start.
 DEPLOY_TITLES_STOPPED = {"build": "Build (application stopped)",
                          "restart": "Restart skipped (application stopped)",
-                         "fetch": "Fetch (application stopped)"}
+                         "fetch": "Fetch (application stopped)", "rollback": "Select release (application stopped)"}
 DEPLOY_TITLE_KEYS_STOPPED = {"build": "deploy_build_only", "restart": "deploy_restart_skipped",
-                             "fetch": "deploy_fetch_only"}
+                             "fetch": "deploy_fetch_only", "rollback": "deploy_rollback_only"}
 
 
 def deploy_title(mode, stopped):
@@ -356,12 +360,12 @@ def cmd_app_deploy(payload):
             update_state_flags(domain_id, **CLEARED_FLAGS)
             systemctl("enable", app_unit(domain_id, state["slot"]))
             stopped = False
-        return start_deploy_job(domain_id, mode, stopped, fetch)
+        return start_deploy_job(domain_id, mode, stopped, fetch, actor=ops_actor(payload.get("actor")))
     finally:
         lock.release()
 
 
-def start_deploy_job(domain_id, mode, stopped, fetch=None):
+def start_deploy_job(domain_id, mode, stopped, fetch=None, release=None, actor="system"):
     """Queues a request for the deploy unit and starts it (the caller holds the deploy lock)."""
     job = "deploy-%d" % domain_id
     unit = UNIT_DEPLOY % domain_id
@@ -369,7 +373,9 @@ def start_deploy_job(domain_id, mode, stopped, fetch=None):
     ensure_helper_copy()
     _status_path, _log, request_path = job_paths(job)
     ensure_dir(JOBS_DIR, 0o700)
-    request = {"mode": mode, "source": "panel"}
+    request = {"mode": mode, "source": "panel", "actor": ops_actor(actor)}
+    if release:
+        request["release"] = ops_valid_release(release)
     if fetch:
         request["fetch"] = fetch
     write_json(request_path, request)

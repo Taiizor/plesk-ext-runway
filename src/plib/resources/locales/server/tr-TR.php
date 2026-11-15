@@ -7,6 +7,14 @@
 // Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
 
 return [
+    'errorInvalidOperation' => 'Geçersiz işlem.',
+    'errorPlanRuntime' => 'Bu çalışma ortamına abonelik hizmet planında izin verilmiyor.',
+    'planLimitApps' => 'Runway: etkin uygulamalar',
+    'planLimitMemory' => 'Runway: uygulama başına bellek (MiB)',
+    'planLimitCpu' => 'Runway: uygulama başına CPU (%)',
+    'planLimitTasks' => 'Runway: uygulama başına görev',
+    'permissionRuntime' => 'Runway: %%runtime%% kullanımı',
+    'permissionRuntimeDescription' => 'Hizmet planı kuralları açıkken yeni veya yeniden etkinleştirilen Runway uygulamalarında bu çalışma ortamına izin ver.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Araç zincirlerini kurun ve uygulamaları Docker olmadan servis olarak çalıştırın.',

@@ -100,7 +100,7 @@ def retire_legacy(state):
         systemctl("reset-failed", unit)
 
 
-def retire_slots(state, pw):
+def retire_slots(state, pw, preserve_release=False):
     """The setting is off and the 1.0 unit is live (or nothing runs): removes the slot units and
     environment files, frees the slot ports and their sockets, and sets slot "". The pointer keeps
     naming the 1.0 instance until the snippet no longer uses it (convergence). Returns the
@@ -113,6 +113,7 @@ def retire_slots(state, pw):
         remove_quietly(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))
         remove_quietly(env_file_path(domain_id, slot))
         unlink_socket_entry(domain_id, socket_name(slot))
+    ops_retire_slots(state, preserve_release)
     zd_update_state(domain_id, slot="", port_a=0, port_b=0, switch=None)
     state.update({"slot": "", "port_a": 0, "port_b": 0, "switch": None})
     if units:
@@ -266,14 +267,14 @@ def internal_converge():
 
 # --- plain restart ----------------------------------------------------------------------------
 
-def zd_plain_restart(state, pw, block=False):
+def zd_plain_restart(state, pw, block=False, release_staged=False):
     """Restarts the live instance in place (short interruption; the caller holds the deploy
     lock): stops every other app unit, makes the 1.0 unit live when the setting is off, points
     the web server at the live instance and restarts it. Returns (state, unit)."""
     domain_id = state["domain_id"]
     if not state.get("zero_downtime") and (state.get("slot") or slot_files_left(domain_id)):
         # Turned off (or a worker now): the 1.0 unit becomes the live instance, the slots go.
-        state = retire_slots(state, pw)
+        state = retire_slots(state, pw, preserve_release=True) if release_staged else retire_slots(state, pw)
         write_slot_units(state, pw, "")
         systemctl("daemon-reload")
     live = state.get("slot") or ""

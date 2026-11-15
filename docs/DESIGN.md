@@ -1422,3 +1422,30 @@ on the application including `RUNWAY_SOCKET` instead of a fixed path, safe build
 versus unix, turning it on and off, Restart in place, failure behaviour), SECURITY.md (the root link,
 the residual window of the slot socket it points to, the standby port), §3, §6, §7 and §9 of this
 file, CHANGELOG `[Unreleased]`.
+
+## 13. Optional application operations
+
+The delivered contract for opt-in history/audit, diagnostics/preflight, isolated releases and
+shared paths, HTTPS notifications, Plesk recovery and service-plan policies is
+[Optional application operations](OPERATIONS.md). Each addition defaults off. Release paths are
+selected only at execution boundaries; logical source state and trigger paths remain unchanged.
+The root parent computes execution paths independently of customer-child return values.
+
+`GET api/app/operations` returns per-domain options and bounded records. Its domain-authorized
+POST actions are `save`, `history`, `diagnostics`, `rollback`, `export`, `import`, `clear-releases`.
+They use the root helper's `operations` command. Credentials/environment stay root-only; the
+signing secret is never returned. Recovery resolves the destination identity and regenerates
+services/ports; content uses normal Plesk backups. See the operations guide for exact bounds,
+rollback limitations, storage layout and validation coverage.
+
+`api/app` additionally returns `planPolicy` (null while disabled). `apps-list` includes helper
+resource `limits` for Reconcile. Plesk permissions `runtime_<key>` and limits `app_count`,
+`app_memory_mb`, `app_cpu_percent`, `app_tasks` are ignored until server setting `planPolicies`
+is enabled. Effective caps reach the helper without overwriting requested admin limits.
+Reconcile reapplies/restarts when managed resource limits differ; runtime permission revocation
+alone does not stop existing applications.
+
+The document-root form now starts with **Change the Plesk document root** unchecked. Only an
+explicit opt-in plus a changed value sends `documentRoot`; backend validation/hosting permissions
+stay the same. An API with no static assets can retain Plesk's current root without creating
+`wwwroot`. Optional release mode does not change Plesk static-path routing.

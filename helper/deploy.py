@@ -201,6 +201,9 @@ def _deploy_once(domain_id, job):
     request = read_json(request_path)
     remove_quietly(request_path)
     state, pw = load_app_state(domain_id)
+    if state.get("switch"):
+        zd_converge_locked(state, pw)
+        state, pw = load_app_state(domain_id)
     triggers_now = trigger_mtimes(pw, state["app_dir"])
     fetch = None
     if isinstance(request, dict):
@@ -230,18 +233,44 @@ def _deploy_once(domain_id, job):
     log = JobLog(job)
     ok = False
     message = None
+    options = ops_options(domain_id)
+    record = ops_begin(state, mode, "request" if source == "panel" else source,
+                       request.get("actor") if isinstance(request, dict) else "trigger file")
+    release = None
+    created = False
+    release_context = {"previous": None, "switch": False}
+    # In-place builds always use the logical source, even while a previous isolated release runs.
+    build_state = dict(state, _release_dir=state["app_dir"])
     try:
         log.line("Deployment started (%s, triggered from %s)" % (mode, source))
         log.line("Application root: %s" % state["app_dir"])
         if not call_as_user(pw, os.path.isdir, state["app_dir"]):
             raise HelperError("Application root %s does not exist or is not accessible" % state["app_dir"])
+        ops_preflight(state, pw, options)
+        if mode == "rollback":
+            if not options["releases"]:
+                raise HelperError("Release management is disabled")
+            release = ops_valid_release(request.get("release"))
+            entry = ops_require_release(domain_id, release)
+            if entry["runtime"] != state["runtime"] or entry["toolchain"] != state["toolchain"] \
+                    or entry.get("start_hash") != hashlib.sha256(state["start_cmd"].encode()).hexdigest():
+                raise HelperError("Restore the release's runtime, toolchain and start command before rolling back")
+            build_state = dict(state, _release_dir=ops_release_path(pw, domain_id, release))
+        elif options["releases"] and mode in ("build", "fetch"):
+            release = record["id"]
+            created = True
+            build_state, copied = ops_prepare_release(state, pw, options, release)
+            log.line("Prepared isolated release %s (%d bytes); shared paths were not copied." % (release, copied["bytes"]))
+        elif mode == "restart":
+            data = ops_release_state(domain_id)
+            release = (data.get("slots") or {}).get(state.get("slot") or "")
         build = mode == "build"
         if mode == "fetch":
             spec = v_fetch(fetch)
             build = spec["build"]
-            fetch_into_app(state, pw, spec, log)
+            fetch_into_app(ops_execution_state(build_state), pw, spec, log)
         if build and state["build_cmd"]:
-            env = merged_env(state, pw)
+            env = merged_env(build_state, pw)
             env.update({"HOME": pw.pw_dir, "USER": pw.pw_name, "LOGNAME": pw.pw_name,
                         "LANG": "C.UTF-8", "SHELL": "/bin/bash", "TMPDIR": "/tmp"})
             if state["toolchain"] and not toolchain_installed(state["runtime"], state["toolchain"]):
@@ -250,7 +279,7 @@ def _deploy_once(domain_id, job):
             log.line("$ " + state["build_cmd"].replace("\n", "\n$ "))
             started = time.time()
             code = stream_process(["/bin/bash", "-e", "-c", state["build_cmd"]], log, state["build_timeout"],
-                                  env, preexec=_build_preexec(pw, state["app_dir"]))
+                                  env, preexec=_build_preexec(pw, ops_execution_state(build_state)["app_dir"]))
             log.line("Build finished in %.1fs with exit code %d" % (time.time() - started, code))
             if code != 0:
                 raise HelperError("Build failed with exit code %d; the running application was left untouched." % code)
@@ -259,6 +288,13 @@ def _deploy_once(domain_id, job):
         # The build may have taken long: never start an app that was disabled or whose
         # domain was suspended in the meantime.
         fresh, fresh_pw = load_app_state(domain_id)
+        if any(fresh.get(key) != state.get(key) for key in ("app_dir", "sysuser", "runtime", "toolchain", "start_cmd")):
+            raise HelperError("Application identity or commands changed during deployment; retry with the current configuration")
+        if created:
+            call_as_user(pw, _user_release_walk, build_state["_release_dir"], options["shared_paths"],
+                         options["release_max_mb"] * 1024 * 1024, time.monotonic() + 60, None, True, timeout=65)
+            call_as_user(pw, _user_shared_links, state["app_dir"], build_state["_release_dir"],
+                         options["shared_paths"], state["runtime"], timeout=30)
         if mode in ("build", "fetch"):
             # Files the build or fetch wrote into a document root inside the application root
             # become readable for the web server, before the new version starts (also for a
@@ -267,6 +303,12 @@ def _deploy_once(domain_id, job):
         if not fresh["enabled"] or fresh["suspended"]:
             raise HelperError("The application was disabled or the domain suspended during the build; "
                               "it was not restarted.")
+        release_context["selected"] = release
+        if fresh["stopped"] or not zd_has_slots(fresh):
+            release_context["previous"] = ops_stage_release(fresh, release, target=fresh.get("slot") or "")
+            if release_context["previous"] is not None:
+                write_units(fresh, fresh_pw)
+                systemctl("daemon-reload", check=True)
         unit = UNIT_APP % domain_id
         if fresh["stopped"]:
             # Stop persists: only Start, Restart, Build & restart in the panel or saving starts it again.
@@ -278,14 +320,34 @@ def _deploy_once(domain_id, job):
             # Zero-downtime slots (docs/DESIGN.md section 12.4): a switch, or a plain restart (also
             # of an application that became a worker while a slot runs: the 1.0 unit does not exist
             # then, zd_restart() retires the slots first).
-            ok, message = zd_restart(fresh, pw, job, log)
+            ok, message = zd_restart(fresh, pw, job, log, release_context=release_context)
             return
         ok, message = restart_and_check(fresh, pw, unit, log)
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         log.line("ERROR: %s" % exc)
     finally:
+        try:
+            restore_units = ops_release_result(state, pw, options, release, release_context["previous"], ok, created,
+                                               switched=release_context["switch"])
+            if created and not ok and release_context["previous"] is None:
+                call_as_user(pw, _user_remove_release, pw.pw_dir, domain_id, release, timeout=120)
+            if not ok and restore_units:
+                restored, restored_pw = load_app_state(domain_id)
+                write_units(restored, restored_pw)
+                systemctl("daemon-reload")
+                if not release_context["switch"] and restored["enabled"] and not restored["stopped"] and not restored["suspended"]:
+                    prepare_start(live_view(restored), restored_pw)
+                    systemctl("restart", app_unit(domain_id, restored.get("slot") or ""), timeout=120)
+        except Exception as exc:
+            log.line("WARNING: release cleanup/recovery could not finish: %s" % exc)
+            if not ok:
+                message = (message or "Deployment failed") + "; release cleanup/recovery needs attention"
         log.line("Deployment %s." % ("succeeded" if ok else "failed"))
         log.close()
+        try:
+            ops_finish(state, record, ok, message, job, release)
+        except Exception:
+            pass
         job_set_status(job, state="succeeded" if ok else "failed", finished_at=now_iso(),
                        exit_code=0 if ok else 1, message=message)

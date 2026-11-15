@@ -200,6 +200,7 @@ def _health_watch_locked(state, pw, watch, now_mode):
     watch["restarts"] = restarts
     if len(restarts) >= HEALTH_WATCH_MAX_RESTARTS:
         if not watch.get("paused"):
+            ops_event(state, "health_paused", {"restarts_last_hour": len(restarts)})
             journal_note(domain_id, "health watch: %d failed health checks in a row (last: %s), but no restart: it "
                                     "restarted the application %d times within the last hour and restarts it again once "
                                     "the oldest of them is an hour ago." % (watch["failures"], detail, len(restarts)))
@@ -220,6 +221,7 @@ def _health_watch_locked(state, pw, watch, now_mode):
     watch.update({"restarts": restarts, "restarted_epoch": now, "restart_detail": detail, "restart_code": code,
                   "restart_params": params, "failures": 0, "paused": False, "instance": None})
     write_json(path, watch)
+    ops_event(state, "health_restart", {"restarts_last_hour": len(restarts)})
     return "#%d: %s" % (domain_id, message)
 
 

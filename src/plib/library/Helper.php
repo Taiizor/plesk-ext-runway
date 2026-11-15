@@ -20,6 +20,7 @@ class Modules_Runway_Helper
      */
     public static function call($command, array $payload = [])
     {
+        $payload['actor'] = self::actor();
         $stdin = json_encode((object)$payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($stdin === false) {
             throw new Modules_Runway_Exception('Could not encode the request for the helper.');
@@ -57,5 +58,18 @@ class Modules_Runway_Helper
 
         unset($data['ok']);
         return $data;
+    }
+
+    private static function actor()
+    {
+        if (PHP_SAPI === 'cli') {
+            return 'cli';
+        }
+        try {
+            $client = pm_Session::getClient();
+            return method_exists($client, 'getLogin') ? (string)$client->getLogin() : 'panel';
+        } catch (Exception $e) {
+            return 'panel';
+        }
     }
 }

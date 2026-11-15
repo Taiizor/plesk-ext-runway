@@ -9,7 +9,7 @@ class Modules_Runway_Permissions extends pm_Hook_Permissions
 {
     public function getPermissions()
     {
-        return [
+        $permissions = [
             Modules_Runway_Access::PERMISSION => [
                 'default' => false,
                 'place' => self::PLACE_MAIN,
@@ -17,5 +17,11 @@ class Modules_Runway_Permissions extends pm_Hook_Permissions
                 'description' => pm_Locale::lmsg('permissionDescription'),
             ],
         ];
+        foreach (Modules_Runway_Policies::RUNTIMES as $runtime) {
+            $permissions['runtime_' . $runtime] = ['default' => true, 'place' => self::PLACE_ADDITIONAL,
+                'name' => pm_Locale::lmsg('permissionRuntime', ['runtime' => $runtime]),
+                'description' => pm_Locale::lmsg('permissionRuntimeDescription')];
+        }
+        return $permissions;
     }
 }

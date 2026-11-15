@@ -329,6 +329,9 @@ class ApiController extends pm_Controller_Action
                     return $this->appSample();
                 case 'fetch':
                     return $this->appFetch();
+                case 'operations':
+                    $body = $this->getRequest()->isPost() ? $this->body() : ['action' => 'status'];
+                    return Modules_Runway_Operations::call($this->appModel(), $body);
                 default:
                     throw new Modules_Runway_Exception(pm_Locale::lmsg('errorInvalidOperation'));
             }
@@ -394,6 +397,7 @@ class ApiController extends pm_Controller_Action
             // The document root (domain.documentRoot) is Plesk's setting: whether this user may change
             // it here, and the candidate directories of the inspected application root per runtime.
             'documentRootAllowed' => Modules_Runway_Access::canChangeDocumentRoot($domain),
+            'planPolicy' => Modules_Runway_Policies::describe($domain),
             'documentRootSuggestions' => (object)Modules_Runway_App::documentRootSuggestions(
                 (string)$app->get('appRoot'),
                 isset($page['inspect']) ? $page['inspect'] : null
@@ -484,6 +488,9 @@ class ApiController extends pm_Controller_Action
             ? $body['runtime'] : (string)$app->get('runtime');
         if (!in_array($runtime, Modules_Runway_Runtime::keys(), true)) {
             throw new Modules_Runway_ValidationException(['runtime' => [pm_Locale::lmsg('errorRuntime')]]);
+        }
+        if (!Modules_Runway_Access::isAdmin() && !Modules_Runway_Policies::allows($app->getDomain(), $runtime)) {
+            throw new Modules_Runway_ValidationException(['runtime' => [pm_Locale::lmsg('errorPlanRuntime')]]);
         }
         $listen = isset($body['listen']) && is_string($body['listen']) && $body['listen'] !== ''
             ? $body['listen'] : Modules_Runway_App::defaultListen($runtime);

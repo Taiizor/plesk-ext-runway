@@ -287,6 +287,7 @@ def cmd_apps_list(payload):
             "domain": state.get("domain"),
             "runtime": state.get("runtime"),
             "toolchain": state.get("toolchain"),
+            "limits": state.get("limits") or {},
             "port": state.get("port"),
             "live_port": live_port,
             "zero_downtime": bool(state.get("zero_downtime")),

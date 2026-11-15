@@ -35,6 +35,7 @@ COMMANDS = {
     "web-reconfigure": cmd_web_reconfigure,
     "install": cmd_install,
     "uninstall": cmd_uninstall,
+    "operations": cmd_operations,
 }
 
 

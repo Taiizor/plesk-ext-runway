@@ -28,6 +28,7 @@ import base64
 import datetime
 import fcntl
 import hashlib
+import hmac
 import http.client
 import ipaddress
 import json
@@ -52,6 +53,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ElementTree
 import zipfile
+from types import SimpleNamespace
 
 VERSION = "1.2.0"
 
@@ -1718,6 +1720,7 @@ def prepare_start(state, pw):
     """Everything a start of the application unit needs that the unit cannot do itself (it runs
     no root lines): the socket directory in unix mode, and files that Runway manages inside the
     application root (as the user). Called by every path that starts or restarts the unit."""
+    state = ops_execution_state(state)
     if state.get("listen") == "unix":
         ensure_socket_dir(state["domain_id"], pw)
         # e.g. the socket of the previous system user after a subscription change; only the
@@ -1780,6 +1783,7 @@ def forced_env(state):
 
 def merged_env(state, pw):
     """Toolchain env + user-defined variables + Runway-managed variables (in that precedence order)."""
+    state = ops_execution_state(state)
     env = toolchain_env(state, pw)
     for key, val in state["env"].items():
         if key == "PATH":
@@ -1802,6 +1806,7 @@ def render_env_file(state, pw):
 
 def render_app_unit(state, pw):
     """The unit of the 1.0 instance, or of a zero-downtime slot for a slot view (slot_view())."""
+    state = ops_execution_state(state)
     domain_id = state["domain_id"]
     slot = state.get("_slot") or ""
     group = grp.getgrgid(pw.pw_gid).gr_name
@@ -1889,7 +1894,8 @@ def deploy_timeout(state):
     build itself, and 300 s for the restart and the listener check (plus the switch allowance
     with zero-downtime slots). The helper enforces its own deadlines for each step;
     TimeoutStartSec only catches a hung job."""
-    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300 + switch_allowance(state)
+    release_allowance = 600 if ops_options(state["domain_id"])["releases"] or ops_release_state(state["domain_id"]) else 0
+    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300 + switch_allowance(state) + release_allowance
 
 
 def render_deploy_service(state):
@@ -5966,6 +5972,7 @@ def _health_watch_locked(state, pw, watch, now_mode):
     watch["restarts"] = restarts
     if len(restarts) >= HEALTH_WATCH_MAX_RESTARTS:
         if not watch.get("paused"):
+            ops_event(state, "health_paused", {"restarts_last_hour": len(restarts)})
             journal_note(domain_id, "health watch: %d failed health checks in a row (last: %s), but no restart: it "
                                     "restarted the application %d times within the last hour and restarts it again once "
                                     "the oldest of them is an hour ago." % (watch["failures"], detail, len(restarts)))
@@ -5986,6 +5993,7 @@ def _health_watch_locked(state, pw, watch, now_mode):
     watch.update({"restarts": restarts, "restarted_epoch": now, "restart_detail": detail, "restart_code": code,
                   "restart_params": params, "failures": 0, "paused": False, "instance": None})
     write_json(path, watch)
+    ops_event(state, "health_restart", {"restarts_last_hour": len(restarts)})
     return "#%d: %s" % (domain_id, message)
 
 
@@ -6042,7 +6050,7 @@ def _app_apply(payload):
                     zd_converge_locked(current, current_pw)
                 except HelperError:
                     pass
-            return _zd_app_apply(state, pw, restart, start, resume)
+            return _zd_app_apply(state, pw, restart, start, resume, actor=ops_actor(payload.get("actor")))
         finally:
             lock.release()
     if not start and state["enabled"] and not state["suspended"] and unit_is_active(UNIT_DEPLOY % domain_id):
@@ -6092,7 +6100,7 @@ def _app_apply(payload):
     return {"port": state["port"], "state": state, "switchable": False, "job": None}
 
 
-def _zd_app_apply(state, pw, restart, start, resume):
+def _zd_app_apply(state, pw, restart, start, resume, actor="system"):
     """app-apply of an application that has, gets or had zero-downtime slots (the deploy lock is
     held): renders both slots, keeps the live instance running, writes the pointer, and starts
     the switch job for a restart (docs/DESIGN.md section 12.5)."""
@@ -6175,7 +6183,7 @@ def _zd_app_apply(state, pw, restart, start, resume):
             systemctl("enable", live_unit, check=True)
             running = unit_is_active(live_unit)
             if start and restart and running and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
-                job = start_deploy_job(domain_id, "restart", False)["job"]
+                job = start_deploy_job(domain_id, "restart", False, actor=actor)["job"]
             elif start and (restart or not running):
                 state = zd_plain_restart(state, pw)[0]
     else:
@@ -6210,6 +6218,7 @@ def remove_app(domain_id):
     for path in job_paths("deploy-%d" % domain_id):
         remove_quietly(path)
     remove_quietly(health_watch_path(domain_id))
+    ops_remove_metadata(domain_id)
     systemctl("daemon-reload")
     systemctl("reset-failed", *units)
     sync_health_units()
@@ -6224,7 +6233,9 @@ def cmd_app_action(payload):
     action = (payload or {}).get("action")
     state, pw = load_app_state(domain_id)
     if zd_has_slots(state):
-        return _zd_app_action(state, pw, action, bool((payload or {}).get("plain")))
+        result = _zd_app_action(state, pw, action, bool((payload or {}).get("plain")), actor=ops_actor(payload.get("actor")))
+        ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": ops_actor(payload.get("actor"))})
+        return result
     unit = UNIT_APP % domain_id
     if action in ("start", "restart", "recover"):
         if not state["enabled"]:
@@ -6246,10 +6257,11 @@ def cmd_app_action(payload):
         systemctl("disable", "--now", unit, check=True, timeout=120)
     else:
         raise HelperError("Invalid action")
+    ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": ops_actor(payload.get("actor"))})
     return {"action": action}
 
 
-def _zd_app_action(state, pw, action, plain):
+def _zd_app_action(state, pw, action, plain, actor="system"):
     """app-action of an application with zero-downtime slots (docs/DESIGN.md section 12.5):
     restart of a running application starts the switch job ({action, job}); plain (Restart in
     place), start and recover act on the live unit; stop stops every app unit."""
@@ -6285,7 +6297,7 @@ def _zd_app_action(state, pw, action, plain):
                 update_state_flags(domain_id, **CLEARED_FLAGS)
                 state.update(CLEARED_FLAGS)
             if not plain and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
-                return {"action": action, "job": start_deploy_job(domain_id, "restart", False)["job"]}
+                return {"action": action, "job": start_deploy_job(domain_id, "restart", False, actor=actor)["job"]}
             zd_plain_restart(state, pw)
             return {"action": action}
         if action != "recover" and (state["stopped"] or state["tampered"]):
@@ -6311,13 +6323,13 @@ def _zd_app_action(state, pw, action, plain):
             lock.release()
 
 
-DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart"}
+DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart", "rollback": "Roll back release"}
 # Titles of deployments of a stopped application (Stop persists): they build or fetch, but never start.
 DEPLOY_TITLES_STOPPED = {"build": "Build (application stopped)",
                          "restart": "Restart skipped (application stopped)",
-                         "fetch": "Fetch (application stopped)"}
+                         "fetch": "Fetch (application stopped)", "rollback": "Select release (application stopped)"}
 DEPLOY_TITLE_KEYS_STOPPED = {"build": "deploy_build_only", "restart": "deploy_restart_skipped",
-                             "fetch": "deploy_fetch_only"}
+                             "fetch": "deploy_fetch_only", "rollback": "deploy_rollback_only"}
 
 
 def deploy_title(mode, stopped):
@@ -6351,12 +6363,12 @@ def cmd_app_deploy(payload):
             update_state_flags(domain_id, **CLEARED_FLAGS)
             systemctl("enable", app_unit(domain_id, state["slot"]))
             stopped = False
-        return start_deploy_job(domain_id, mode, stopped, fetch)
+        return start_deploy_job(domain_id, mode, stopped, fetch, actor=ops_actor(payload.get("actor")))
     finally:
         lock.release()
 
 
-def start_deploy_job(domain_id, mode, stopped, fetch=None):
+def start_deploy_job(domain_id, mode, stopped, fetch=None, release=None, actor="system"):
     """Queues a request for the deploy unit and starts it (the caller holds the deploy lock)."""
     job = "deploy-%d" % domain_id
     unit = UNIT_DEPLOY % domain_id
@@ -6364,7 +6376,9 @@ def start_deploy_job(domain_id, mode, stopped, fetch=None):
     ensure_helper_copy()
     _status_path, _log, request_path = job_paths(job)
     ensure_dir(JOBS_DIR, 0o700)
-    request = {"mode": mode, "source": "panel"}
+    request = {"mode": mode, "source": "panel", "actor": ops_actor(actor)}
+    if release:
+        request["release"] = ops_valid_release(release)
     if fetch:
         request["fetch"] = fetch
     write_json(request_path, request)
@@ -6941,6 +6955,7 @@ def cmd_apps_list(payload):
             "domain": state.get("domain"),
             "runtime": state.get("runtime"),
             "toolchain": state.get("toolchain"),
+            "limits": state.get("limits") or {},
             "port": state.get("port"),
             "live_port": live_port,
             "zero_downtime": bool(state.get("zero_downtime")),
@@ -7343,6 +7358,9 @@ def _deploy_once(domain_id, job):
     request = read_json(request_path)
     remove_quietly(request_path)
     state, pw = load_app_state(domain_id)
+    if state.get("switch"):
+        zd_converge_locked(state, pw)
+        state, pw = load_app_state(domain_id)
     triggers_now = trigger_mtimes(pw, state["app_dir"])
     fetch = None
     if isinstance(request, dict):
@@ -7372,18 +7390,44 @@ def _deploy_once(domain_id, job):
     log = JobLog(job)
     ok = False
     message = None
+    options = ops_options(domain_id)
+    record = ops_begin(state, mode, "request" if source == "panel" else source,
+                       request.get("actor") if isinstance(request, dict) else "trigger file")
+    release = None
+    created = False
+    release_context = {"previous": None, "switch": False}
+    # In-place builds always use the logical source, even while a previous isolated release runs.
+    build_state = dict(state, _release_dir=state["app_dir"])
     try:
         log.line("Deployment started (%s, triggered from %s)" % (mode, source))
         log.line("Application root: %s" % state["app_dir"])
         if not call_as_user(pw, os.path.isdir, state["app_dir"]):
             raise HelperError("Application root %s does not exist or is not accessible" % state["app_dir"])
+        ops_preflight(state, pw, options)
+        if mode == "rollback":
+            if not options["releases"]:
+                raise HelperError("Release management is disabled")
+            release = ops_valid_release(request.get("release"))
+            entry = ops_require_release(domain_id, release)
+            if entry["runtime"] != state["runtime"] or entry["toolchain"] != state["toolchain"] \
+                    or entry.get("start_hash") != hashlib.sha256(state["start_cmd"].encode()).hexdigest():
+                raise HelperError("Restore the release's runtime, toolchain and start command before rolling back")
+            build_state = dict(state, _release_dir=ops_release_path(pw, domain_id, release))
+        elif options["releases"] and mode in ("build", "fetch"):
+            release = record["id"]
+            created = True
+            build_state, copied = ops_prepare_release(state, pw, options, release)
+            log.line("Prepared isolated release %s (%d bytes); shared paths were not copied." % (release, copied["bytes"]))
+        elif mode == "restart":
+            data = ops_release_state(domain_id)
+            release = (data.get("slots") or {}).get(state.get("slot") or "")
         build = mode == "build"
         if mode == "fetch":
             spec = v_fetch(fetch)
             build = spec["build"]
-            fetch_into_app(state, pw, spec, log)
+            fetch_into_app(ops_execution_state(build_state), pw, spec, log)
         if build and state["build_cmd"]:
-            env = merged_env(state, pw)
+            env = merged_env(build_state, pw)
             env.update({"HOME": pw.pw_dir, "USER": pw.pw_name, "LOGNAME": pw.pw_name,
                         "LANG": "C.UTF-8", "SHELL": "/bin/bash", "TMPDIR": "/tmp"})
             if state["toolchain"] and not toolchain_installed(state["runtime"], state["toolchain"]):
@@ -7392,7 +7436,7 @@ def _deploy_once(domain_id, job):
             log.line("$ " + state["build_cmd"].replace("\n", "\n$ "))
             started = time.time()
             code = stream_process(["/bin/bash", "-e", "-c", state["build_cmd"]], log, state["build_timeout"],
-                                  env, preexec=_build_preexec(pw, state["app_dir"]))
+                                  env, preexec=_build_preexec(pw, ops_execution_state(build_state)["app_dir"]))
             log.line("Build finished in %.1fs with exit code %d" % (time.time() - started, code))
             if code != 0:
                 raise HelperError("Build failed with exit code %d; the running application was left untouched." % code)
@@ -7401,6 +7445,13 @@ def _deploy_once(domain_id, job):
         # The build may have taken long: never start an app that was disabled or whose
         # domain was suspended in the meantime.
         fresh, fresh_pw = load_app_state(domain_id)
+        if any(fresh.get(key) != state.get(key) for key in ("app_dir", "sysuser", "runtime", "toolchain", "start_cmd")):
+            raise HelperError("Application identity or commands changed during deployment; retry with the current configuration")
+        if created:
+            call_as_user(pw, _user_release_walk, build_state["_release_dir"], options["shared_paths"],
+                         options["release_max_mb"] * 1024 * 1024, time.monotonic() + 60, None, True, timeout=65)
+            call_as_user(pw, _user_shared_links, state["app_dir"], build_state["_release_dir"],
+                         options["shared_paths"], state["runtime"], timeout=30)
         if mode in ("build", "fetch"):
             # Files the build or fetch wrote into a document root inside the application root
             # become readable for the web server, before the new version starts (also for a
@@ -7409,6 +7460,12 @@ def _deploy_once(domain_id, job):
         if not fresh["enabled"] or fresh["suspended"]:
             raise HelperError("The application was disabled or the domain suspended during the build; "
                               "it was not restarted.")
+        release_context["selected"] = release
+        if fresh["stopped"] or not zd_has_slots(fresh):
+            release_context["previous"] = ops_stage_release(fresh, release, target=fresh.get("slot") or "")
+            if release_context["previous"] is not None:
+                write_units(fresh, fresh_pw)
+                systemctl("daemon-reload", check=True)
         unit = UNIT_APP % domain_id
         if fresh["stopped"]:
             # Stop persists: only Start, Restart, Build & restart in the panel or saving starts it again.
@@ -7420,15 +7477,35 @@ def _deploy_once(domain_id, job):
             # Zero-downtime slots (docs/DESIGN.md section 12.4): a switch, or a plain restart (also
             # of an application that became a worker while a slot runs: the 1.0 unit does not exist
             # then, zd_restart() retires the slots first).
-            ok, message = zd_restart(fresh, pw, job, log)
+            ok, message = zd_restart(fresh, pw, job, log, release_context=release_context)
             return
         ok, message = restart_and_check(fresh, pw, unit, log)
     except Exception as exc:  # noqa: BLE001
         message = str(exc)
         log.line("ERROR: %s" % exc)
     finally:
+        try:
+            restore_units = ops_release_result(state, pw, options, release, release_context["previous"], ok, created,
+                                               switched=release_context["switch"])
+            if created and not ok and release_context["previous"] is None:
+                call_as_user(pw, _user_remove_release, pw.pw_dir, domain_id, release, timeout=120)
+            if not ok and restore_units:
+                restored, restored_pw = load_app_state(domain_id)
+                write_units(restored, restored_pw)
+                systemctl("daemon-reload")
+                if not release_context["switch"] and restored["enabled"] and not restored["stopped"] and not restored["suspended"]:
+                    prepare_start(live_view(restored), restored_pw)
+                    systemctl("restart", app_unit(domain_id, restored.get("slot") or ""), timeout=120)
+        except Exception as exc:
+            log.line("WARNING: release cleanup/recovery could not finish: %s" % exc)
+            if not ok:
+                message = (message or "Deployment failed") + "; release cleanup/recovery needs attention"
         log.line("Deployment %s." % ("succeeded" if ok else "failed"))
         log.close()
+        try:
+            ops_finish(state, record, ok, message, job, release)
+        except Exception:
+            pass
         job_set_status(job, state="succeeded" if ok else "failed", finished_at=now_iso(),
                        exit_code=0 if ok else 1, message=message)
 
@@ -8109,7 +8186,7 @@ def retire_legacy(state):
         systemctl("reset-failed", unit)
 
 
-def retire_slots(state, pw):
+def retire_slots(state, pw, preserve_release=False):
     """The setting is off and the 1.0 unit is live (or nothing runs): removes the slot units and
     environment files, frees the slot ports and their sockets, and sets slot "". The pointer keeps
     naming the 1.0 instance until the snippet no longer uses it (convergence). Returns the
@@ -8122,6 +8199,7 @@ def retire_slots(state, pw):
         remove_quietly(os.path.join(UNIT_DIR, app_unit(domain_id, slot)))
         remove_quietly(env_file_path(domain_id, slot))
         unlink_socket_entry(domain_id, socket_name(slot))
+    ops_retire_slots(state, preserve_release)
     zd_update_state(domain_id, slot="", port_a=0, port_b=0, switch=None)
     state.update({"slot": "", "port_a": 0, "port_b": 0, "switch": None})
     if units:
@@ -8275,14 +8353,14 @@ def internal_converge():
 
 # --- plain restart ----------------------------------------------------------------------------
 
-def zd_plain_restart(state, pw, block=False):
+def zd_plain_restart(state, pw, block=False, release_staged=False):
     """Restarts the live instance in place (short interruption; the caller holds the deploy
     lock): stops every other app unit, makes the 1.0 unit live when the setting is off, points
     the web server at the live instance and restarts it. Returns (state, unit)."""
     domain_id = state["domain_id"]
     if not state.get("zero_downtime") and (state.get("slot") or slot_files_left(domain_id)):
         # Turned off (or a worker now): the 1.0 unit becomes the live instance, the slots go.
-        state = retire_slots(state, pw)
+        state = retire_slots(state, pw, preserve_release=True) if release_staged else retire_slots(state, pw)
         write_slot_units(state, pw, "")
         systemctl("daemon-reload")
     live = state.get("slot") or ""
@@ -8333,7 +8411,7 @@ class SwitchJob(object):
             switch_fault(name)
 
 
-def zd_restart(state, pw, job, log):
+def zd_restart(state, pw, job, log, release_context=None):
     """Deploy job of an application with zero-downtime slots: a switch, or a plain restart when
     the next restart must be plain or nothing runs that could keep serving. Returns
     (ok, message); raises HelperError on failure."""
@@ -8349,9 +8427,21 @@ def zd_restart(state, pw, job, log):
         reason = "zero-downtime deployments are off"
     elif not unit_is_active(app_unit(domain_id, live)):
         reason = "nothing is running"
+    if release_context is not None:
+        # Select the code for the instance this branch actually starts, including first start
+        # and forced in-place restart. A nominal inactive target may never be used by that branch.
+        selected_slot = target if not reason else (live if state.get("zero_downtime") else "")
+        release_context["switch"] = not bool(reason)
+        release_context["previous"] = ops_stage_release(state, release_context["selected"], target=selected_slot)
+        if release_context["previous"] is not None:
+            write_units(state, pw)
+            systemctl("daemon-reload", check=True)
     if reason:
         log.line("Restarting in place (%s)." % reason)
-        state, unit = zd_plain_restart(state, pw, block=True)
+        if release_context is None:
+            state, unit = zd_plain_restart(state, pw, block=True)
+        else:
+            state, unit = zd_plain_restart(state, pw, block=True, release_staged=True)
         return restart_and_check(live_view(state), pw, unit, log, restarted=True)
     return zd_switch(state, pw, job, log, live, target)
 
@@ -8750,6 +8840,788 @@ def zd_rescue_live(state, pw, live, live_file, log):
     prepare_start(slot_view(state, live), pw)
     systemctl("restart", "--no-block", unit)
 
+# Source: helper/operations/config.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+OPS_CONFIG_DIR = CONF_DIR + "/operations"
+OPS_DATA_DIR = STATE_DIR + "/operations"
+OPS_LOG_BYTES = 256 * 1024
+OPS_EVENTS = ("deploy_succeeded", "deploy_failed", "health_restart", "health_paused", "app_start", "app_stop")
+
+
+def ops_defaults():
+    return {"history": False, "history_limit": 20, "diagnostics": False, "preflight": False,
+            "min_free_mb": 256, "releases": False, "release_limit": 3, "release_max_mb": 2048,
+            "shared_paths": [], "exclude_paths": [".git", ".runway"], "notifications": False,
+            "notification_url": "", "notification_secret": "",
+            "notification_events": ["deploy_failed", "health_restart", "health_paused"],
+            "backup": False, "backup_secrets": False, "restore_start": False}
+
+
+def ops_config_path(domain_id):
+    return "%s/%d.json" % (OPS_CONFIG_DIR, v_domain_id(domain_id))
+
+
+def ops_dir(domain_id):
+    return "%s/%d" % (OPS_DATA_DIR, v_domain_id(domain_id))
+
+
+def ops_options(domain_id):
+    result = ops_defaults()
+    stored = read_json(ops_config_path(domain_id), {})
+    if isinstance(stored, dict):
+        result.update({key: value for key, value in stored.items() if key in result})
+    return result
+
+
+def ops_bool(value, name):
+    if not isinstance(value, bool):
+        raise HelperError("%s must be a boolean" % name)
+    return value
+
+
+def ops_paths(value, name):
+    if not isinstance(value, list) or len(value) > 20:
+        raise HelperError("%s must contain at most 20 relative paths" % name)
+    result = []
+    for path in value:
+        if not isinstance(path, str) or len(path) > 255 or not RE_REL_PATH.fullmatch(path) \
+                or any(part in (".", "..") for part in path.split("/")):
+            raise HelperError("Invalid relative path in %s" % name)
+        if path not in result:
+            result.append(path)
+    if sum(map(len, result)) > 1024:
+        raise HelperError("%s paths are too long" % name)
+    return result
+
+
+def ops_validate(values, previous=None):
+    if not isinstance(values, dict):
+        raise HelperError("Invalid operations settings")
+    result = ops_defaults()
+    if isinstance(previous, dict):
+        result.update({key: value for key, value in previous.items() if key in result})
+    unknown = set(values) - set(result) - {"clear_notification_secret"}
+    if unknown:
+        raise HelperError("Unknown operations setting: %s" % sorted(unknown)[0])
+    for key in ("history", "diagnostics", "preflight", "releases", "notifications", "backup", "backup_secrets", "restore_start"):
+        if key in values:
+            result[key] = ops_bool(values[key], key)
+    for key, lo, hi in (("history_limit", 1, 200), ("min_free_mb", 0, 1048576),
+                        ("release_limit", 2, 20), ("release_max_mb", 1, 1048576)):
+        if key in values:
+            if not isinstance(values[key], (int, str)) or isinstance(values[key], bool) \
+                    or not re.fullmatch(r"[0-9]+", str(values[key])):
+                raise HelperError("Invalid %s" % key)
+            result[key] = v_int(values[key], lo, hi, key)
+    for key in ("shared_paths", "exclude_paths"):
+        if key in values:
+            result[key] = ops_paths(values[key], key)
+    for path in result["shared_paths"]:
+        if path.split("/")[0] in (".git", ".runway", "tmp"):
+            raise HelperError("A shared path cannot contain Runway or Git control files")
+        if any(path != other and (path.startswith(other + "/") or other.startswith(path + "/"))
+               for other in result["shared_paths"]):
+            raise HelperError("Shared paths cannot contain one another")
+        if any(path == other or path.startswith(other + "/") or other.startswith(path + "/")
+               for other in result["exclude_paths"]):
+            raise HelperError("Shared and excluded paths cannot overlap")
+    if "notification_url" in values:
+        url = values["notification_url"]
+        if not isinstance(url, str) or len(url) > 2048:
+            raise HelperError("Invalid notification URL")
+        result["notification_url"] = url.strip()
+    if result["notification_url"]:
+        check_fetch_url(result["notification_url"], False, resolve=False)
+        try:
+            address = ipaddress.ip_address(urllib.parse.urlsplit(result["notification_url"]).hostname)
+        except ValueError:
+            address = None
+        if address is not None and not address.is_global:
+            raise HelperError("Notification endpoints must use public addresses")
+    if result["notifications"] and not result["notification_url"]:
+        raise HelperError("Notifications need an HTTPS endpoint")
+    if "clear_notification_secret" in values:
+        ops_bool(values["clear_notification_secret"], "clear_notification_secret")
+    if "notification_secret" in values and not isinstance(values["notification_secret"], str):
+        raise HelperError("Invalid notification secret")
+    if values.get("clear_notification_secret") is True:
+        result["notification_secret"] = ""
+    if values.get("notification_secret"):
+        secret = values["notification_secret"]
+        if not isinstance(secret, str) or not 16 <= len(secret) <= 256 or RE_CTRL_ANY.search(secret):
+            raise HelperError("The notification signing secret must contain 16 to 256 characters")
+        result["notification_secret"] = secret
+    if "notification_events" in values:
+        events = values["notification_events"]
+        if not isinstance(events, list) or any(event not in OPS_EVENTS for event in events):
+            raise HelperError("Invalid notification event selection")
+        result["notification_events"] = list(dict.fromkeys(events))
+    return result
+
+
+def ops_public_options(options):
+    result = dict(options)
+    result["notification_secret"] = ""
+    result["has_notification_secret"] = bool(options.get("notification_secret"))
+    return result
+
+
+def ops_save(domain_id, values):
+    options = ops_validate(values, ops_options(domain_id))
+    ensure_dir(OPS_CONFIG_DIR, 0o700)
+    write_json(ops_config_path(domain_id), options)
+    return ops_public_options(options)
+
+
+def ops_context(payload):
+    domain_id = v_domain_id((payload or {}).get("domain_id"))
+    state, pw = load_app_state(domain_id)
+    return domain_id, state, pw, ops_options(domain_id)
+
+
+def ops_summary(domain_id, options=None):
+    options = options or ops_options(domain_id)
+    return {"options": ops_public_options(options), "history": ops_history(domain_id) if options["history"] else [],
+            "events": read_json(ops_dir(domain_id) + "/events.json", []) if options["history"] else [],
+            "releases": ops_release_list(domain_id) if options["releases"] else [],
+            "notification": read_json(ops_dir(domain_id) + "/notification.json", None)}
+
+
+def cmd_operations(payload):
+    if (payload or {}).get("action") == "validate-import":
+        ops_check_import(payload.get("backup"), payload.get("restore_secrets") is True)
+        return {"valid": True}
+    domain_id, state, pw, options = ops_context(payload)
+    action = payload.get("action", "status")
+    if action == "save":
+        with FileLock("deploy-%d" % domain_id):
+            if unit_is_active(UNIT_DEPLOY % domain_id):
+                raise HelperError("A deployment is already running for this application")
+            ops_save(domain_id, payload.get("options"))
+            write_file_atomic(os.path.join(UNIT_DIR, UNIT_DEPLOY % domain_id), render_deploy_service(state), 0o644)
+            systemctl("daemon-reload", check=True)
+        return ops_summary(domain_id)
+    if action == "status":
+        return ops_summary(domain_id, options)
+    if action == "history":
+        if not options["history"]:
+            raise HelperError("Deployment history is disabled")
+        record = ops_history_record(domain_id, payload.get("id"))
+        record["log"] = tail_file(ops_dir(domain_id) + "/" + record["id"] + ".log", 1000, OPS_LOG_BYTES)
+        return record
+    if action == "diagnostics":
+        if not options["diagnostics"]:
+            raise HelperError("Diagnostics are disabled")
+        return ops_diagnostics(state, pw, options)
+    if action == "rollback":
+        if not options["releases"]:
+            raise HelperError("Release management is disabled")
+        with FileLock("deploy-%d" % domain_id):
+            if unit_is_active(UNIT_DEPLOY % domain_id):
+                raise HelperError("A deployment is already running for this application")
+            release = ops_valid_release(payload.get("id"))
+            ops_require_release(domain_id, release)
+            return start_deploy_job(domain_id, "rollback", state["stopped"], release=release,
+                                    actor=ops_actor(payload.get("actor")))
+    if action == "clear-releases":
+        with FileLock("deploy-%d" % domain_id):
+            if options["releases"] or not state["stopped"] or unit_is_active(UNIT_DEPLOY % domain_id) \
+                    or any(unit_is_active(unit) for unit in existing_app_units(domain_id)):
+                raise HelperError("Turn off release management and stop the application before clearing releases")
+            ops_clear_releases(state, pw)
+            write_units(state, pw)
+            systemctl("daemon-reload", check=True)
+        return ops_summary(domain_id)
+    if action == "export":
+        return ops_export(state, options)
+    if action == "import":
+        return ops_import(state, pw, payload.get("backup"), payload.get("restore_secrets") is True)
+    raise HelperError("Unknown operations action")
+
+
+def ops_remove_metadata(domain_id):
+    """Only root-owned extension metadata is removed; user application/release files are preserved."""
+    remove_quietly(ops_config_path(domain_id))
+    path = ops_dir(domain_id)
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path)
+
+# Source: helper/operations/history.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+def ops_actor(value):
+    text = value if isinstance(value, str) else "system"
+    return RE_CTRL_ANY.sub("", text)[:80] or "system"
+
+
+def ops_valid_release(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{8}T[0-9]{6}-[0-9a-f]{12}", value):
+        raise HelperError("Invalid deployment identifier")
+    return value
+
+
+def ops_new_id():
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S-") + os.urandom(6).hex()
+
+
+def ops_history(domain_id):
+    index = read_json(ops_dir(domain_id) + "/history.json", [])
+    return index if isinstance(index, list) else []
+
+
+def ops_history_record(domain_id, record_id):
+    record_id = ops_valid_release(record_id)
+    record = next((entry for entry in ops_history(domain_id) if entry.get("id") == record_id), None)
+    if record is None:
+        raise HelperError("Deployment record not found")
+    return dict(record)
+
+
+def ops_begin(state, mode, source, actor):
+    options = ops_options(state["domain_id"])
+    if not options["history"] and not options["releases"] and not options["notifications"]:
+        return None
+    return {"id": ops_new_id(), "mode": mode, "source": source, "actor": ops_actor(actor),
+            "runtime": state["runtime"], "toolchain": state["toolchain"], "started_at": now_iso(),
+            "started_epoch": time.time()}
+
+
+def ops_finish(state, record, ok, message, job, release=None):
+    if record is None:
+        return
+    domain_id = state["domain_id"]
+    options = ops_options(domain_id)
+    record = dict(record)
+    record.update(state="succeeded" if ok else "failed", finished_at=now_iso(),
+                  duration_seconds=round(time.time() - record.pop("started_epoch"), 2),
+                  message=(message or "")[:1000], release=release)
+    for value in (state.get("env") or {}).values():
+        if isinstance(value, str) and len(value) >= 4:
+            record["message"] = record["message"].replace(value, "[redacted]")
+    if options["history"]:
+        path = ops_dir(domain_id)
+        ensure_dir(path, 0o700)
+        log = tail_file(job_paths(job)[1], 2000, OPS_LOG_BYTES)
+        for value in (state.get("env") or {}).values():
+            if isinstance(value, str) and len(value) >= 4:
+                log = log.replace(value, "[redacted]")
+        log = log.encode("utf-8")[-OPS_LOG_BYTES:].decode("utf-8", "ignore")
+        write_file_atomic(path + "/" + record["id"] + ".log", log, 0o600)
+        index = [record] + ops_history(domain_id)
+        for old in index[options["history_limit"]:]:
+            remove_quietly(path + "/" + ops_valid_release(old["id"]) + ".log")
+        write_json(path + "/history.json", index[:options["history_limit"]])
+    ops_event(state, "deploy_succeeded" if ok else "deploy_failed", {"deployment": record["id"],
+              "mode": record["mode"], "actor": record["actor"], "duration_seconds": record["duration_seconds"]})
+
+
+def ops_event(state, event, detail=None):
+    """Optional metadata-only audit and notifications; failures cannot break application control."""
+    try:
+        domain_id = state["domain_id"]
+        options = ops_options(domain_id)
+        if not options["history"] and not options["notifications"]:
+            return
+        data = {"id": ops_new_id(), "event": event, "time": now_iso(), "domain": state["domain"],
+                "detail": detail or {}}
+        if options["history"]:
+            ensure_dir(ops_dir(domain_id), 0o700)
+            with FileLock("events-%d" % domain_id):
+                old = read_json(ops_dir(domain_id) + "/events.json", [])
+                write_json(ops_dir(domain_id) + "/events.json", ([data] + (old if isinstance(old, list) else []))[:options["history_limit"] * 5])
+        if options["notifications"] and event in options["notification_events"]:
+            ops_notify(state, options, data)
+    except Exception:
+        pass
+
+# Source: helper/operations/releases.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+def ops_release_state(domain_id):
+    value = read_json(ops_dir(domain_id) + "/releases.json", {})
+    return value if isinstance(value, dict) else {}
+
+
+def ops_release_list(domain_id):
+    data = ops_release_state(domain_id)
+    slots = data.get("slots") or {}
+    state = read_json(app_state_path(domain_id), {}) or {}
+    active = slots.get(state.get("slot") or "")
+    return [dict(entry, active=entry.get("id") == active)
+            for entry in reversed(data.get("records") or []) if entry.get("state") == "ready"]
+
+
+def ops_require_release(domain_id, release):
+    entry = next((item for item in ops_release_list(domain_id) if item.get("id") == release), None)
+    if entry is None:
+        raise HelperError("The selected release is not available")
+    return entry
+
+
+def ops_release_path(pw, domain_id, release):
+    return "%s/.runway/releases/%d/%s" % (pw.pw_dir.rstrip("/"), domain_id, ops_valid_release(release))
+
+
+def ops_execution_state(state):
+    """Select a root-recorded release only at execution boundaries, leaving the source state intact."""
+    if state.get("_release_dir"):
+        return dict(state, app_dir=state["_release_dir"])
+    data = ops_release_state(state["domain_id"])
+    if data.get("source") != state["app_dir"] or data.get("sysuser") != state["sysuser"]:
+        return state
+    release = (data.get("slots") or {}).get(state.get("_slot") or "")
+    if not release:
+        return state
+    pw = v_sysuser(state["sysuser"])
+    return dict(state, app_dir=ops_release_path(pw, state["domain_id"], release))
+
+
+def _user_release_base(home, domain_id, create=False):
+    """Retain a no-follow descriptor through every component of the per-user release directory."""
+    fd = os.open(home, _DIR_FLAGS)
+    try:
+        for name in (".runway", "releases", str(domain_id)):
+            if create:
+                try:
+                    os.mkdir(name, 0o750, dir_fd=fd)
+                except FileExistsError:
+                    pass
+            child = os.open(name, _DIR_FLAGS, dir_fd=fd)
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _ops_skip(path, skipped):
+    return any(path == item or path.startswith(item + "/") for item in skipped)
+
+
+def _ops_walk_frame(source_fd, dest_fd, prefix):
+    try:
+        return (os.scandir(source_fd), source_fd, dest_fd, prefix)
+    except BaseException:
+        os.close(source_fd)
+        if dest_fd is not None:
+            os.close(dest_fd)
+        raise
+
+
+def _ops_close_frame(frame):
+    listing, source_fd, dest_fd, _prefix = frame
+    listing.close()
+    os.close(source_fd)
+    if dest_fd is not None:
+        os.close(dest_fd)
+
+
+def _user_copy_release_file(source_fd, dest_fd, name, st, deadline):
+    src = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source_fd)
+    try:
+        actual = os.fstat(src)
+        if not stat.S_ISREG(actual.st_mode) or (actual.st_dev, actual.st_ino) != (st.st_dev, st.st_ino):
+            raise HelperError("A release source changed during preparation")
+        dst = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                      0o750 if st.st_mode & 0o111 else 0o640, dir_fd=dest_fd)
+        try:
+            copied = 0
+            while True:
+                block = os.read(src, 1024 * 1024)
+                if not block:
+                    break
+                copied += len(block)
+                if copied > st.st_size or time.monotonic() > deadline:
+                    raise HelperError("A release source grew or exceeded its copy deadline")
+                view = memoryview(block)
+                while view:
+                    view = view[os.write(dst, view):]
+            if copied != st.st_size:
+                raise HelperError("A release source changed during preparation")
+        finally:
+            os.close(dst)
+    finally:
+        os.close(src)
+
+
+def _user_release_walk(source, skipped, max_bytes, deadline, copy_to=None, allow_links=False):
+    """Depth-first descriptor walk: shared trees and build-generated symlink targets are never visited."""
+    total, entries = 0, 0
+    source_fd = os.open(source, _DIR_FLAGS)
+    try:
+        dest_fd = os.open(copy_to, _DIR_FLAGS) if copy_to else None
+    except BaseException:
+        os.close(source_fd)
+        raise
+    stack = [_ops_walk_frame(source_fd, dest_fd, "")]
+    try:
+        while stack:
+            listing, source_fd, dest_fd, prefix = stack[-1]
+            try:
+                entry = next(listing)
+            except StopIteration:
+                _ops_close_frame(stack.pop())
+                continue
+            entries += 1
+            if entries > 100000 or time.monotonic() > deadline:
+                raise HelperError("The release tree exceeds its entry or time limit")
+            name, rel = entry.name, prefix + entry.name
+            if _ops_skip(rel, skipped):
+                continue
+            st = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
+            if stat.S_ISDIR(st.st_mode):
+                if len(stack) >= 64:
+                    raise HelperError("The release tree exceeds its directory depth limit")
+                if dest_fd is not None:
+                    os.mkdir(name, 0o750, dir_fd=dest_fd)
+                child = os.open(name, _DIR_FLAGS, dir_fd=source_fd)
+                try:
+                    target = os.open(name, _DIR_FLAGS, dir_fd=dest_fd) if dest_fd is not None else None
+                except BaseException:
+                    os.close(child)
+                    raise
+                stack.append(_ops_walk_frame(child, target, rel + "/"))
+            elif stat.S_ISREG(st.st_mode) or (allow_links and copy_to is None and stat.S_ISLNK(st.st_mode)):
+                total += st.st_size
+                if total > max_bytes:
+                    raise HelperError("Application files exceed the release size limit; configure shared/excluded paths")
+                if dest_fd is not None:
+                    _user_copy_release_file(source_fd, dest_fd, name, st, deadline)
+            elif stat.S_ISLNK(st.st_mode):
+                raise HelperError("Release sources contain a symbolic link: %s; exclude it or declare it shared" % rel)
+            else:
+                raise HelperError("Release sources contain an unsupported file type: %s" % rel)
+    finally:
+        for frame in reversed(stack):
+            _ops_close_frame(frame)
+    return {"bytes": total, "entries": entries}
+
+
+def _user_prepare_release(home, domain_id, app_dir, release, options):
+    base = _user_release_base(home, domain_id, True)
+    try:
+        target = ops_release_path(SimpleNamespace(pw_dir=home), domain_id, release)
+        real_source = os.path.realpath(app_dir)
+        if not real_source.startswith(os.path.realpath(home).rstrip("/") + "/"):
+            raise HelperError("Application sources leave the subscription home")
+        if os.path.commonpath([real_source, os.path.realpath(target)]) == real_source:
+            raise HelperError("Release storage cannot be inside the application source directory")
+        skipped = options["shared_paths"] + options["exclude_paths"] + ["tmp"]
+        deadline = time.monotonic() + 180
+        result = _user_release_walk(app_dir, skipped, options["release_max_mb"] * 1024 * 1024, deadline)
+        available = shutil.disk_usage(home).free
+        if available < result["bytes"] + options["min_free_mb"] * 1024 * 1024:
+            raise HelperError("Insufficient free space for a release and the configured reserve")
+        os.mkdir(release, 0o750, dir_fd=base)
+        _user_release_walk(app_dir, skipped, options["release_max_mb"] * 1024 * 1024, deadline, target)
+        return dict(result, path=target)
+    finally:
+        os.close(base)
+
+
+def _user_shared_links(app_dir, release_dir, paths, runtime):
+    home = os.path.realpath(os.path.expanduser("~"))
+    # call_as_user fixes HOME; real path checks are repeated before each declared shared path.
+    for rel in paths:
+        source = app_dir + "/" + rel
+        if not os.path.realpath(source).startswith(home.rstrip("/") + "/"):
+            raise HelperError("A shared directory leaves the subscription home")
+        if not os.path.exists(source):
+            os.makedirs(source, mode=0o750, exist_ok=True)
+        if not os.path.isdir(source):
+            raise HelperError("A shared path must be a directory: %s" % rel)
+        destinations = [release_dir + "/" + rel]
+        if runtime == "dotnet" and os.path.isdir(release_dir + "/publish"):
+            destinations.append(release_dir + "/publish/" + rel)
+        for target in destinations:
+            parent = os.path.dirname(target)
+            if not os.path.realpath(parent).startswith(os.path.realpath(release_dir).rstrip("/") + "/") \
+                    and os.path.realpath(parent) != os.path.realpath(release_dir):
+                raise HelperError("A release build replaced a shared-path parent with a symbolic link")
+            os.makedirs(parent, mode=0o750, exist_ok=True)
+            if os.path.lexists(target):
+                if os.path.isdir(target) and not os.path.islink(target):
+                    try:
+                        os.rmdir(target)
+                    except OSError:
+                        raise HelperError("The build wrote into a shared path: %s; move those versioned files outside the shared directory" % rel)
+                else:
+                    raise HelperError("The build replaced a shared path: %s" % rel)
+            os.symlink(source, target)
+
+
+def _user_remove_release(home, domain_id, release):
+    try:
+        base = _user_release_base(home, domain_id)
+    except FileNotFoundError:
+        return
+    try:
+        # Python's Linux rmtree uses directory descriptors and never follows a symlink at the leaf.
+        if not shutil.rmtree.avoids_symlink_attacks:
+            raise HelperError("This Python cannot safely remove release directories")
+        fd_path = "/proc/self/fd/%d/%s" % (base, ops_valid_release(release))
+        if os.path.islink(fd_path):
+            raise HelperError("A release directory was replaced with a symbolic link")
+        try:
+            shutil.rmtree(fd_path)
+        except FileNotFoundError:
+            if os.path.lexists(fd_path):
+                raise
+    finally:
+        os.close(base)
+
+
+def ops_prepare_release(state, pw, options, release):
+    copied = call_as_user(pw, _user_prepare_release, pw.pw_dir, state["domain_id"], state["app_dir"], release,
+                          options, timeout=210, fsize=options["release_max_mb"] * 1024 * 1024)
+    # A customer can interfere with its unprivileged child. Never use a child-returned path in
+    # root-rendered unit files: the parent computes the only permitted execution path itself.
+    path = ops_release_path(pw, state["domain_id"], release)
+    if not isinstance(copied, dict) or any(type(copied.get(key)) is not int for key in ("bytes", "entries")) \
+            or not 0 <= copied["bytes"] <= options["release_max_mb"] * 1024 * 1024 or not 0 <= copied["entries"] <= 100000:
+        raise HelperError("Invalid release preparation result")
+    result = {"path": path, "bytes": copied["bytes"], "entries": copied["entries"]}
+    return dict(state, _release_dir=path), result
+
+
+def ops_stage_release(state, release, target=None):
+    domain_id = state["domain_id"]
+    data = ops_release_state(domain_id)
+    if not data and not release:
+        return None
+    if data.get("source") not in (None, state["app_dir"]) or data.get("sysuser") not in (None, state["sysuser"]):
+        raise HelperError("Application identity changed; disable release mode and remove the old release records first")
+    previous = json.loads(json.dumps(data))
+    data.update(source=state["app_dir"], sysuser=state["sysuser"])
+    if target is None:
+        target = (state.get("slot") or "") if state["stopped"] else (zd_target(state) if zd_has_slots(state) else "")
+    target = target if target is not None else ""
+    slots = data.setdefault("slots", {})
+    if release:
+        slots[target] = ops_valid_release(release)
+    else:
+        slots.pop(target, None)
+    ensure_dir(ops_dir(domain_id), 0o700)
+    write_json(ops_dir(domain_id) + "/releases.json", data)
+    return previous
+
+
+def ops_release_result(state, pw, options, release, previous, ok, created, switched=False):
+    if previous is None:
+        return
+    path = ops_dir(state["domain_id"]) + "/releases.json"
+    data = ops_release_state(state["domain_id"])
+    if not ok:
+        # After an ambiguous reload both slots can still carry traffic. Retain the candidate and
+        # its mapping until convergence; never delete code from underneath a running process.
+        slots, old_slots = data.get("slots") or {}, previous.get("slots") or {}
+        changed = [slot for slot in set(slots) | set(old_slots) if slots.get(slot) != old_slots.get(slot)]
+        current = read_json(app_state_path(state["domain_id"]), {}) or {}
+        if switched and (any(unit_is_active(app_unit(state["domain_id"], slot)) for slot in changed)
+                         or (current.get("slot") or "") in changed or read_pointer_slot(state) in changed):
+            if created and release:
+                data.setdefault("records", []).append(ops_release_record(state, release))
+                write_json(path, data)
+            return False
+        for slot in changed:
+            if unit_is_active(app_unit(state["domain_id"], slot)):
+                systemctl("stop", app_unit(state["domain_id"], slot), check=True, timeout=120)
+        if not switched and state.get("slot") and not current.get("slot"):
+            # A plain restart retired the slots: restore the old code in the classic unit.
+            active = (previous.get("slots") or {}).get(state["slot"])
+            previous = dict(previous, slots={"": active} if active else {})
+        write_json(path, previous)
+        if created and release:
+            try:
+                call_as_user(pw, _user_remove_release, pw.pw_dir, state["domain_id"], release, timeout=120)
+            except Exception:
+                pass
+        return True
+    if release and created:
+        records = data.setdefault("records", [])
+        records.append(ops_release_record(state, release))
+    protected = set((data.get("slots") or {}).values())
+    records = data.get("records") or []
+    keep = set(item["id"] for item in records[-options["release_limit"]:]) | protected
+    retained = []
+    for item in records:
+        if item["id"] in keep:
+            retained.append(item)
+        else:
+            try:
+                call_as_user(pw, _user_remove_release, pw.pw_dir, state["domain_id"], item["id"], timeout=120)
+            except Exception:
+                retained.append(item)
+    data["records"] = retained
+    write_json(path, data)
+    return False
+
+
+def ops_release_record(state, release):
+    return {"id": release, "state": "ready", "created_at": now_iso(),
+            "runtime": state["runtime"], "toolchain": state["toolchain"],
+            "start_hash": hashlib.sha256(state["start_cmd"].encode()).hexdigest()}
+
+
+def ops_retire_slots(state, preserve_classic=False):
+    data = ops_release_state(state["domain_id"])
+    if not data or data.get("source") != state["app_dir"] or data.get("sysuser") != state["sysuser"]:
+        return
+    slots = data.setdefault("slots", {})
+    if state.get("slot") and not preserve_classic:
+        active = slots.get(state["slot"])
+        if active:
+            slots[""] = active
+        else:
+            slots.pop("", None)
+    for slot in SLOTS:
+        slots.pop(slot, None)
+    write_json(ops_dir(state["domain_id"]) + "/releases.json", data)
+
+
+def ops_clear_releases(state, pw):
+    data = ops_release_state(state["domain_id"])
+    if data.get("sysuser") not in (None, pw.pw_name):
+        raise HelperError("The release records belong to a different system user; remove that user's files separately")
+    identifiers = set((data.get("slots") or {}).values()) | {item["id"] for item in data.get("records") or []}
+    for release in identifiers:
+        call_as_user(pw, _user_remove_release, pw.pw_dir, state["domain_id"], ops_valid_release(release), timeout=120)
+    remove_quietly(ops_dir(state["domain_id"]) + "/releases.json")
+
+# Source: helper/operations/diagnostics.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+def _user_source_checks(app_dir, home):
+    real = os.path.realpath(app_dir)
+    return {"exists": os.path.isdir(app_dir), "writable": os.access(app_dir, os.W_OK),
+            "inside_home": real.startswith(os.path.realpath(home).rstrip("/") + "/")}
+
+
+def ops_diagnostics(state, pw, options):
+    source = call_as_user(pw, _user_source_checks, state["app_dir"], pw.pw_dir)
+    checks = [{"key": "source", "ok": source["exists"] and source["inside_home"]},
+              {"key": "writable", "ok": source["writable"]}]
+    installed = not state["toolchain"] or toolchain_installed(state["runtime"], state["toolchain"])
+    checks.append({"key": "toolchain", "ok": installed})
+    free = shutil.disk_usage(pw.pw_dir).free
+    checks.append({"key": "disk", "ok": free >= options["min_free_mb"] * 1024 * 1024,
+                   "free_mb": free // (1024 * 1024), "required_mb": options["min_free_mb"]})
+    if options["releases"]:
+        checks.append({"key": "release_size", "ok": None, "limit_mb": options["release_max_mb"],
+                       "shared_paths": options["shared_paths"]})
+    status = app_status(state["domain_id"], state)
+    service = status.get("service") or {}
+    return {"schema": 1, "checked_at": now_iso(), "runtime": state["runtime"], "toolchain": state["toolchain"],
+            "checks": checks, "ready": all(item["ok"] is not False for item in checks),
+            "service": {key: service.get(key) for key in ("active_state", "sub_state", "result", "restarts", "memory_used_bytes")},
+            "listener": status.get("listener"), "health": status.get("health"),
+            "stopped": state["stopped"], "suspended": state["suspended"]}
+
+
+def ops_preflight(state, pw, options):
+    if not options["diagnostics"] or not options["preflight"]:
+        return
+    result = ops_diagnostics(state, pw, options)
+    failed = [item["key"] for item in result["checks"] if item["ok"] is False]
+    if failed:
+        raise HelperError("Preflight checks failed: %s" % ", ".join(failed))
+
+# Source: helper/operations/notifications.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+class _OpsNoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _user_send_notification(options, event):
+    url = options["notification_url"]
+    check_fetch_url(url, False, resolve=False)
+    body = json.dumps(event, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if len(body) > 8192:
+        raise HelperError("Notification payload is too large")
+    headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT, "X-Runway-Event": event["event"]}
+    if options["notification_secret"]:
+        headers["X-Runway-Signature"] = "sha256=" + hmac.new(options["notification_secret"].encode("utf-8"), body,
+                                                           hashlib.sha256).hexdigest()
+    # No ambient proxies, redirects or repeat DNS lookup after public-address validation.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _PinnedHTTPSHandler(False), _OpsNoRedirect())
+    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    with opener.open(request, timeout=5) as response:
+        code = response.getcode()
+        if not 200 <= code < 300:
+            raise HelperError("Notification endpoint rejected the event")
+    return {"state": "succeeded", "status": code}
+
+
+def ops_notify(state, options, event):
+    # A repeated paused-health event sends at most once every ten minutes.
+    path = ops_dir(state["domain_id"]) + "/notification.json"
+    previous = read_json(path, {}) or {}
+    if event["event"] == "health_paused" and previous.get("event") == "health_paused" \
+            and time.time() - float(previous.get("epoch") or 0) < 600:
+        return
+    try:
+        pw = v_sysuser(state["sysuser"])
+        result = call_as_user(pw, _user_send_notification, options, event, timeout=10)
+    except Exception as exc:
+        # HTTP exceptions include credential-bearing URLs; retain only the exception class.
+        result = {"state": "failed", "error": type(exc).__name__}
+    ensure_dir(ops_dir(state["domain_id"]), 0o700)
+    write_json(path, dict(result, event=event["event"], time=now_iso(), epoch=time.time()))
+
+# Source: helper/operations/backup.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+def ops_export(state, options):
+    if not options["backup"]:
+        raise HelperError("Recovery backup is disabled")
+    config = dict(options)
+    if not options["backup_secrets"]:
+        config.update(notification_url="", notification_secret="", notifications=False)
+    bundle = {"schema": 1, "created_at": now_iso(), "operations": config,
+              "environment_included": options["backup_secrets"]}
+    if options["backup_secrets"]:
+        bundle["environment"] = state.get("env") or {}
+    if len(json.dumps(bundle, ensure_ascii=False).encode("utf-8")) > 480 * 1024:
+        raise HelperError("Recovery data exceeds its size limit; omit secrets or reduce environment values")
+    return {"bundle": bundle}
+
+
+def ops_check_import(bundle, restore_secrets=False):
+    if not isinstance(bundle, dict) or bundle.get("schema") != 1:
+        raise HelperError("Unsupported recovery bundle")
+    config = bundle.get("operations")
+    if not isinstance(config, dict):
+        raise HelperError("Recovery settings are missing")
+    config = dict(config)
+    if not restore_secrets:
+        config.update(notification_url="", notification_secret="", notifications=False)
+    config = ops_validate(config)
+    environment = v_env(bundle["environment"]) if restore_secrets and "environment" in bundle else None
+    return config, environment
+
+
+def ops_import(state, pw, bundle, restore_secrets=False):
+    if not ops_options(state["domain_id"])["backup"]:
+        raise HelperError("Recovery backup is disabled")
+    config, environment = ops_check_import(bundle, restore_secrets)
+    with FileLock("deploy-%d" % state["domain_id"]):
+        if unit_is_active(UNIT_DEPLOY % state["domain_id"]) or any(unit_is_active(unit) for unit in existing_app_units(state["domain_id"])):
+            raise HelperError("Stop the application and wait for deployments to finish before restoring settings")
+        if environment is not None:
+            with FileLock("ports"):
+                current = read_json(app_state_path(state["domain_id"]))
+                if not isinstance(current, dict):
+                    raise HelperError("Application configuration disappeared during restore")
+                current["env"] = environment
+                write_json(app_state_path(state["domain_id"]), current)
+        ensure_dir(OPS_CONFIG_DIR, 0o700)
+        write_json(ops_config_path(state["domain_id"]), config)
+    return {"restored": True, "environment_restored": environment is not None}
+
 # Source: helper/entrypoint.py
 # Copyright 2026 Taiizor. Licensed under the MIT License.
 
@@ -8788,6 +9660,7 @@ COMMANDS = {
     "web-reconfigure": cmd_web_reconfigure,
     "install": cmd_install,
     "uninstall": cmd_uninstall,
+    "operations": cmd_operations,
 }
 
 

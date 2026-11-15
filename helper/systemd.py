@@ -431,6 +431,7 @@ def prepare_start(state, pw):
     """Everything a start of the application unit needs that the unit cannot do itself (it runs
     no root lines): the socket directory in unix mode, and files that Runway manages inside the
     application root (as the user). Called by every path that starts or restarts the unit."""
+    state = ops_execution_state(state)
     if state.get("listen") == "unix":
         ensure_socket_dir(state["domain_id"], pw)
         # e.g. the socket of the previous system user after a subscription change; only the
@@ -493,6 +494,7 @@ def forced_env(state):
 
 def merged_env(state, pw):
     """Toolchain env + user-defined variables + Runway-managed variables (in that precedence order)."""
+    state = ops_execution_state(state)
     env = toolchain_env(state, pw)
     for key, val in state["env"].items():
         if key == "PATH":
@@ -515,6 +517,7 @@ def render_env_file(state, pw):
 
 def render_app_unit(state, pw):
     """The unit of the 1.0 instance, or of a zero-downtime slot for a slot view (slot_view())."""
+    state = ops_execution_state(state)
     domain_id = state["domain_id"]
     slot = state.get("_slot") or ""
     group = grp.getgrgid(pw.pw_gid).gr_name
@@ -602,7 +605,8 @@ def deploy_timeout(state):
     build itself, and 300 s for the restart and the listener check (plus the switch allowance
     with zero-downtime slots). The helper enforces its own deadlines for each step;
     TimeoutStartSec only catches a hung job."""
-    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300 + switch_allowance(state)
+    release_allowance = 600 if ops_options(state["domain_id"])["releases"] or ops_release_state(state["domain_id"]) else 0
+    return min(FETCH_TIMEOUT, state["build_timeout"]) + state["build_timeout"] + 300 + switch_allowance(state) + release_allowance
 
 
 def render_deploy_service(state):

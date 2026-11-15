@@ -12,7 +12,7 @@ import ErrorAlert from './components/ErrorAlert';
 const FIELDS = ['portMin', 'portMax', 'buildTimeout', 'memoryMb', 'cpuPercent', 'tasks',
     'buildMemoryMb', 'buildCpuPercent', 'buildTasks', 'maxAppsPerSubscription', 'zeroDowntimeMaxReady', 'zeroDowntimeMaxDrain'];
 /** Switches (booleans): the built-in updater, zero-downtime deployments for customers. */
-const SWITCHES = ['updateCheck', 'updateAuto', 'zeroDowntimeCustomers'];
+const SWITCHES = ['updateCheck', 'updateAuto', 'zeroDowntimeCustomers', 'planPolicies'];
 
 /** Numeric strings become numbers, switches booleans; anything else is sent as typed (the server validates). */
 const toBody = values => {
@@ -112,6 +112,11 @@ const Settings = ({ baseUrl, statusMessages }) => {
                     <NumberField name="buildTasks" label={<Translate content="Settings.buildTasks" />} description={<Translate content="Settings.buildTasksHint" />} />
                 </Section>
                 <Section title={<Translate content="Settings.sectionSubscriptions" />}>
+                    <FormFieldCheckbox
+                        name="planPolicies"
+                        label={<Translate content="Settings.planPolicies" />}
+                        description={<Translate content="Settings.planPoliciesHint" />}
+                    />
                     <NumberField
                         name="maxAppsPerSubscription"
                         label={<Translate content="Settings.maxAppsPerSubscription" />}

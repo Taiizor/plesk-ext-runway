@@ -13,6 +13,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
 import HelpPanel from './domain/HelpPanel';
 import LogsPanel from './domain/LogsPanel';
+import OperationsPanel from './domain/OperationsPanel';
 import ProjectPanel from './domain/ProjectPanel';
 import SettingsForm from './domain/SettingsForm';
 import StatusPanel from './domain/StatusPanel';
@@ -281,6 +282,24 @@ const Domain = ({ baseUrl, statusMessages }) => {
                 error={saveError}
                 onSave={save}
             />
+
+            {configured && (
+                <OperationsPanel
+                    api={api}
+                    siteId={siteId}
+                    deploying={deploying}
+                    stopped={Boolean(status && status.stopped)}
+                    onChanged={action => {
+                        refreshStatus();
+                        if (action === 'rollback') {
+                            showDeployLog();
+                        }
+                        if (action === 'import') {
+                            page.reload().then(() => setFormVersion(version => version + 1));
+                        }
+                    }}
+                />
+            )}
 
             {configured && (
                 <LogsPanel

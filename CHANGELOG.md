@@ -12,6 +12,13 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- Independently opt-in deployment history/audit with bounded logs, diagnostics and blocking
+  preflight, isolated releases/rollback with explicit shared directories, signed HTTPS webhook
+  events, Plesk recovery metadata/JSON import/export and service-plan runtime/resource policies.
+  All additions default off; shared directories are skipped before release scans and copies,
+  including .NET publish attachment after building. See `docs/OPERATIONS.md`.
+- Regression tests for release failures, stopped deployments, shared storage, recovery secrets,
+  webhook signing, plan enforcement and explicit document-root changes.
 - `bun run build:helper` and `bun run check:helper` package scripts for regenerating and
   validating the standalone helper, with matching contributor and release instructions.
 - Static files from a document root inside the application root work without `chmod -R o+rX` in
@@ -33,6 +40,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Changed
 
+- The domain form keeps Plesk's document root unless the user enables its change checkbox.
+  API projects do not need an artificial `wwwroot` directory.
 - Maintain the privileged helper in source sections under `helper/` (one adapter per runtime,
   separate validation, customer file access, systemd, health, deployment and traffic switching),
   assembled deterministically by `scripts/build_helper.py` into the committed standalone

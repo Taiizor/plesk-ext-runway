@@ -7,9 +7,10 @@ import {
     Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
+import { documentRootChange, normalDocumentRoot } from '../lib/documentRoot';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
-const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'documentRoot', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch',
+const ADVANCED = ['buildCmd', 'startCmd', 'env', 'mountPath', 'changeDocumentRoot', 'documentRoot', 'staticPaths', 'healthPath', 'healthMatch', 'healthWatch',
     'healthWatchInterval', 'healthWatchFailures', 'autoDeploy', 'memoryMb', 'cpuPercent', 'tasks',
     'zeroDowntime', 'readyTimeout', 'drainSeconds'];
 const LIMITS = ['memoryMb', 'cpuPercent', 'tasks'];
@@ -28,9 +29,6 @@ const text = value => (value === null || value === undefined ? '' : String(value
 
 /** An application root as the helper stores it: forward slashes, no leading or trailing slash. */
 const normalRoot = value => String(value || '').split('\\').join('/').replace(/^[ /]+|[ /]+$/g, '');
-
-/** A typed document root as the server compares it: surrounding blanks and slashes removed (nothing else). */
-const normalDocumentRoot = value => String(value || '').replace(/^[ /]+|[ /]+$/g, '');
 
 /**
  * The domain's document root from api/app (Plesk's setting, relative to the home directory like
@@ -84,6 +82,7 @@ export const formValues = data => {
         mountPath: text(config.mountPath),
         // Plesk's setting, not part of the configuration: the current value of the domain.
         documentRoot: currentDocumentRoot(data),
+        changeDocumentRoot: false,
         staticPaths: Array.isArray(config.staticPaths) ? config.staticPaths.join('\n') : text(config.staticPaths),
         healthPath: text(config.healthPath),
         // Expected response content of the health check ("" = only the status counts).
@@ -156,8 +155,7 @@ const requestBody = (values, data, isAdmin, supportsBuild, openedRoot) => {
     // The document root (Plesk's setting): only when this user may change it, the field is shown (not
     // for workers) and it differs from the value the form was opened with, so that a change made in
     // Plesk meanwhile is never undone by saving other settings.
-    if (values.mode !== 'worker' && data.documentRootAllowed === true
-        && normalDocumentRoot(values.documentRoot) !== normalDocumentRoot(openedRoot)) {
+    if (documentRootChange(values, data.documentRootAllowed === true, openedRoot)) {
         body.documentRoot = values.documentRoot.trim();
     }
     if (isAdmin) {
@@ -217,7 +215,7 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
     const documentRootAllowed = data.documentRootAllowed === true;
     const documentRoot = currentDocumentRoot(data);
     const typedValue = normalDocumentRoot(values.documentRoot);
-    const rootSent = !worker && documentRootAllowed && typedValue !== normalDocumentRoot(opened.documentRoot);
+    const rootSent = documentRootChange(values, documentRootAllowed, opened.documentRoot);
     const typedRoot = rootSent ? typedValue : documentRoot;
     const rootChanged = typedRoot !== documentRoot;
     const plannedRoots = (Array.isArray(data.documentRoots) ? data.documentRoots : [])
@@ -396,7 +394,13 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                     description={meta && meta.hint ? helperText(translate, meta.hint_key, null, meta.hint) : <Translate content="Domain.form.runtimeHint" />}
                     required
                 >
-                    {runtimes.map(item => <SelectOption key={item.key} value={item.key}>{runtimeName(translate, item)}</SelectOption>)}
+                    {runtimes.map(item => (
+                        <SelectOption
+                            key={item.key}
+                            value={item.key}
+                            disabled={!data.isAdmin && data.planPolicy && !data.planPolicy.allowedRuntimes.includes(item.key) && item.key !== values.runtime}
+                        >{runtimeName(translate, item)}</SelectOption>
+                    ))}
                     {values.runtime && !meta ? <SelectOption value={values.runtime}>{values.runtime}</SelectOption> : null}
                 </FormFieldSelect>
                 {kind !== 'none' && (
@@ -520,6 +524,14 @@ const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
                         inputProps={codeInput}
                     />
                     {!worker && (
+                        <FormFieldCheckbox
+                            name="changeDocumentRoot"
+                            label={<Translate content="Domain.form.changeDocumentRoot" />}
+                            description={<Translate content="Domain.form.keepDocumentRoot" />}
+                            disabled={!documentRootAllowed}
+                        />
+                    )}
+                    {!worker && values.changeDocumentRoot && (
                         <FormFieldText
                             name="documentRoot"
                             label={<Translate content="Domain.form.documentRoot" />}

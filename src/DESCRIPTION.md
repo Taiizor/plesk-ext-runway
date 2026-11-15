@@ -11,6 +11,7 @@ PHP (Plesk PHP handlers and FrankenPHP) and any prebuilt Linux binary.
 - Install, update and remove toolchain versions from official sources; checksums are verified.
 - Install common build dependencies (C compiler, pkg-config, OpenSSL headers) with one click.
 - Server-wide port range, build timeout and resource limits for applications and builds.
+- Optional service-plan runtime permissions and application/resource ceilings (off by default).
 - Grant the feature to customers with the **Runway applications management** permission.
 
 **For every domain**
@@ -25,6 +26,11 @@ PHP (Plesk PHP handlers and FrankenPHP) and any prebuilt Linux binary.
 - Deploy from Git: touching `tmp/deploy.txt` in the application directory rebuilds and restarts
   the app, `tmp/restart.txt` restarts it.
 - Create a minimal sample application for the chosen runtime to try everything in a minute.
+- Independently opt-in history, diagnostics/preflight, isolated releases with rollback and shared
+  directories, HTTPS notifications and Plesk recovery settings. Large shared directories stay in
+  place; recovery metadata creates no second content archive.
+- Keep Plesk's document root, or explicitly choose a public folder when needed. An API without
+  static files does not require `wwwroot`.
 
 **Security model:** a root helper re-validates every request, everything that touches customer
 files runs as the customer with resource limits, unit files never contain customer text and no

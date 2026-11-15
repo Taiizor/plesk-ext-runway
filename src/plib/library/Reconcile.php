@@ -78,7 +78,19 @@ class Modules_Runway_Reconcile
                 $running = in_array((string)$app['active_state'], ['active', 'activating', 'reloading'], true);
                 $stored = Modules_Runway_App::storedConfig($domain);
                 $switchable = isset($app['switchable']) ? (bool)$app['switchable'] : false;
+                $policyChanged = false;
+                $managed = Modules_Runway_Policies::enabled() || (string)$domain->getSetting('runwayPolicyApplied', '0') === '1';
+                if ($managed && isset($app['limits']) && is_array($app['limits'])) {
+                    $effective = $model->limits();
+                    foreach (['memoryMb' => 'memory_mb', 'cpuPercent' => 'cpu_percent', 'tasks' => 'tasks'] as $field => $key) {
+                        $policyChanged = $policyChanged || (int)$effective[$field] !== (int)(isset($app['limits'][$key]) ? $app['limits'][$key] : 0);
+                    }
+                    if (!$policyChanged && !Modules_Runway_Policies::enabled()) {
+                        $domain->setSetting('runwayPolicyApplied', '0');
+                    }
+                }
                 $changed = $identityChanged
+                    || $policyChanged
                     || (string)$app['domain'] !== (string)$domain->getName()
                     || (bool)$app['suspended'] !== $suspended
                     // e.g. an earlier suspension that did not complete: the stored flag says
@@ -96,7 +108,7 @@ class Modules_Runway_Reconcile
                     Modules_Runway_App::syncDocumentRoot($domain, $model->documentRootPayload(), false);
                 }
                 if ($changed) {
-                    $model->apply($identityChanged);
+                    $model->apply($identityChanged || $policyChanged);
                     $summary['reapplied'][] = $id;
                     Modules_Runway_Log::info('Re-applied the application of ' . $domain->getName() . ' after a domain change');
                 } elseif (!$suspended && $model->isEnabled() && !empty($app['enabled']) && empty($app['stopped'])

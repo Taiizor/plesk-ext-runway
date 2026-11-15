@@ -940,13 +940,14 @@ class Modules_Runway_App
     /**
      * @return array memoryMb, cpuPercent, tasks
      */
-    public function limits()
+    public function limits($effective = true)
     {
-        return [
+        $limits = [
             'memoryMb' => (int)$this->data['memoryMb'],
             'cpuPercent' => (int)$this->data['cpuPercent'],
             'tasks' => (int)$this->data['tasks'],
         ];
+        return $effective ? Modules_Runway_Policies::clamp($this->domain, $limits) : $limits;
     }
 
     /**
@@ -1247,9 +1248,21 @@ class Modules_Runway_App
         // the limit never blocks saving applications that already run.
         if (!$errors && !empty($data['enabled']) && !$this->isEnabled()) {
             $max = Modules_Runway_Settings::get('maxAppsPerSubscription');
+            $planMax = Modules_Runway_Policies::limit($this->domain, 'app_count');
+            if ($planMax === 0) {
+                $errors['enabled'][] = pm_Locale::lmsg('errorMaxApps', ['max' => 0]);
+            } elseif ($planMax > 0) {
+                $max = $max > 0 ? min($max, $planMax) : $planMax;
+            }
             if ($max > 0 && self::countOtherEnabledApps($this->domain) >= $max) {
                 $errors['enabled'][] = pm_Locale::lmsg('errorMaxApps', ['max' => $max]);
             }
+        }
+
+        if (!$isAdmin && (!$this->configured || $data['runtime'] !== $this->data['runtime']
+                || (!empty($data['enabled']) && !$this->isEnabled()))
+            && !Modules_Runway_Policies::allows($this->domain, $data['runtime'])) {
+            $errors['runtime'][] = pm_Locale::lmsg('errorPlanRuntime');
         }
 
         if (!$errors) {
@@ -1400,6 +1413,7 @@ class Modules_Runway_App
     public function payload($restart = true)
     {
         list($portMin, $portMax) = Modules_Runway_Settings::portRange();
+        $limits = $this->limits();
         $payload = [
             'domain_id' => (int)$this->domain->getId(),
             'domain' => (string)$this->domain->getName(),
@@ -1440,9 +1454,9 @@ class Modules_Runway_App
                 self::HEALTH_WATCH_FAILURES_MAX, self::HEALTH_WATCH_FAILURES_DEFAULT),
             'build_timeout' => Modules_Runway_Settings::get('buildTimeout'),
             'limits' => [
-                'memory_mb' => (int)$this->data['memoryMb'],
-                'cpu_percent' => (int)$this->data['cpuPercent'],
-                'tasks' => (int)$this->data['tasks'],
+                'memory_mb' => $limits['memoryMb'],
+                'cpu_percent' => $limits['cpuPercent'],
+                'tasks' => $limits['tasks'],
             ],
             'build_limits' => [
                 'memory_mb' => Modules_Runway_Settings::get('buildMemoryMb'),
@@ -1530,6 +1544,7 @@ class Modules_Runway_App
         // The web server snippet follows the helper: the zero-downtime pointer while a slot runs.
         $this->data['switchable'] = !empty($result['switchable']);
         $this->configured = true;
+        $this->domain->setSetting('runwayPolicyApplied', Modules_Runway_Policies::enabled() ? '1' : '0');
         $this->save();
         Modules_Runway_WebConfig::reconfigure($this->domain);
         return $result;
@@ -1575,6 +1590,7 @@ class Modules_Runway_App
     public function remove()
     {
         $this->domain->setSetting(self::SETTING_KEY, '');
+        $this->domain->setSetting('runwayRecoveryBackup', '0');
         Modules_Runway_WebConfig::reconfigure($this->domain);
         Modules_Runway_Helper::call('app-remove', ['domain_id' => (int)$this->domain->getId()]);
         $this->configured = false;
@@ -1589,8 +1605,16 @@ class Modules_Runway_App
     {
         $this->domain->setSetting(self::SETTING_KEY, json_encode($this->data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         if ($this->limitsChanged) {
-            $this->domain->setSetting(self::LIMITS_KEY, json_encode($this->limits()));
+            $this->domain->setSetting(self::LIMITS_KEY, json_encode($this->limits(false)));
         }
+    }
+
+    /** Recovery always allocates destination ports and rebuilds helper-owned service state. */
+    public function prepareRecovery()
+    {
+        Modules_Runway_Helper::call('app-remove', ['domain_id' => (int)$this->domain->getId()]);
+        $this->data['port'] = 0;
+        $this->data['switchable'] = false;
     }
 
     /**

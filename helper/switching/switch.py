@@ -18,7 +18,7 @@ class SwitchJob(object):
             switch_fault(name)
 
 
-def zd_restart(state, pw, job, log):
+def zd_restart(state, pw, job, log, release_context=None):
     """Deploy job of an application with zero-downtime slots: a switch, or a plain restart when
     the next restart must be plain or nothing runs that could keep serving. Returns
     (ok, message); raises HelperError on failure."""
@@ -34,9 +34,21 @@ def zd_restart(state, pw, job, log):
         reason = "zero-downtime deployments are off"
     elif not unit_is_active(app_unit(domain_id, live)):
         reason = "nothing is running"
+    if release_context is not None:
+        # Select the code for the instance this branch actually starts, including first start
+        # and forced in-place restart. A nominal inactive target may never be used by that branch.
+        selected_slot = target if not reason else (live if state.get("zero_downtime") else "")
+        release_context["switch"] = not bool(reason)
+        release_context["previous"] = ops_stage_release(state, release_context["selected"], target=selected_slot)
+        if release_context["previous"] is not None:
+            write_units(state, pw)
+            systemctl("daemon-reload", check=True)
     if reason:
         log.line("Restarting in place (%s)." % reason)
-        state, unit = zd_plain_restart(state, pw, block=True)
+        if release_context is None:
+            state, unit = zd_plain_restart(state, pw, block=True)
+        else:
+            state, unit = zd_plain_restart(state, pw, block=True, release_staged=True)
         return restart_and_check(live_view(state), pw, unit, log, restarted=True)
     return zd_switch(state, pw, job, log, live, target)
 

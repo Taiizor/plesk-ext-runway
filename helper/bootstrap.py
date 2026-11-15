@@ -26,6 +26,7 @@ import base64
 import datetime
 import fcntl
 import hashlib
+import hmac
 import http.client
 import ipaddress
 import json
@@ -50,6 +51,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ElementTree
 import zipfile
+from types import SimpleNamespace
 
 VERSION = "1.2.0"
 

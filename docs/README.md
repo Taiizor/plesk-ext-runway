@@ -6,6 +6,7 @@
 |---|---|
 | [Project README](../README.md) | Features, installation, configuration, CLI and local development |
 | [Design and contracts](DESIGN.md) | Current architecture, API, helper protocol, runtime adapters and deployments |
+| [Optional operations](OPERATIONS.md) | History, diagnostics, releases/shared storage, notifications, recovery and plan policies |
 | [Helper sources](../helper/README.md) | Source sections, manifest order, standalone generation and validation |
 | [Contributing](../CONTRIBUTING.md) | Tooling, code rules, tests and adding a runtime |
 | [Releasing](RELEASING.md) | Version changes, generated helper, validation, packaging and publishing |

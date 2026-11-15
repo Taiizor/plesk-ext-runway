@@ -51,6 +51,7 @@ class Modules_Runway_Settings
         'updateCheck' => true,
         'updateAuto' => false,
         'zeroDowntimeCustomers' => false,
+        'planPolicies' => false,
     ];
 
     /**

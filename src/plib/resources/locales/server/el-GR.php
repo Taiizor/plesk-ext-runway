@@ -7,6 +7,14 @@
 // Placeholders use %%name%%. One entry per line (tests/check_locales.py parses this file).
 
 return [
+    'errorInvalidOperation' => 'Invalid operation.',
+    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
+    'planLimitApps' => 'Runway: enabled applications',
+    'planLimitMemory' => 'Runway: memory per application (MiB)',
+    'planLimitCpu' => 'Runway: CPU per application (%)',
+    'planLimitTasks' => 'Runway: tasks per application',
+    'permissionRuntime' => 'Runway: use %%runtime%%',
+    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Εγκαταστήστε αλυσίδες εργαλείων και εκτελέστε εφαρμογές ως υπηρεσίες, χωρίς Docker.',

@@ -55,7 +55,7 @@ const buildUrl = (baseUrl, path, query) => {
 const POLL_TIMEOUT_MS = 30000;
 const READ_TIMEOUT_MS = 120000;
 const WRITE_TIMEOUT_MS = 300000;
-const POLL_PATHS = ['app/status', 'app/logs', 'job', 'update'];
+const POLL_PATHS = ['app/status', 'app/logs', 'app/operations', 'job', 'update'];
 
 // i18n-keys: Common.requestFailed Common.unexpectedResponse Common.requestTimeout
 /** Translated message of the client, English when no translate function is available. */

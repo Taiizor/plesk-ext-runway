@@ -36,6 +36,7 @@ artifact without changing any file. Change the version in `bootstrap.py`, then r
 | `health.py`, `health_watch.py` | Response matching and periodic health checks |
 | `fetch.py`, `deploy.py` | Application downloads, builds and restarts |
 | `switching/` | Zero-downtime pointers, web server reloads, connections, convergence and traffic switching |
+| `operations/` | Opt-in history, diagnostics, isolated releases, HTTPS notifications and recovery metadata |
 | `entrypoint.py` | Public command dispatch, internal systemd entry points and JSON protocol |
 
 ## Assembly contract

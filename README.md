@@ -76,10 +76,16 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
   takes over when it is ready; a version that does not become ready never gets traffic.
 - Optional **health watch**: requests the health check path regularly and restarts an application
   that hangs without crashing (a crashed one is restarted by systemd anyway).
+- Optional **deployment history, diagnostics, isolated releases and rollback, HTTPS notifications,
+  recovery backups and service-plan policies**. Each addition starts off; configure it in the
+  domain's Optional operations panel or the administrator's Settings page. Shared paths such as
+  a large `wwwroot` stay in place. See [the operations guide](docs/OPERATIONS.md).
 
 **Languages**: the interface follows the panel language, in all 32 languages of Plesk. English and
 Turkish are written by hand; the other 30 were machine-translated and reviewed, and corrections
 from native speakers are welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+New optional-operation labels currently have English and Turkish values, with English in the
+other locales until translations are contributed.
 
 ## Requirements
 
@@ -284,7 +290,7 @@ use the application's memory (see [Memory](#memory)). Let's Encrypt
 The web server serves static paths from the domain's **document root**, a Plesk hosting setting
 (`httpdocs` for a new subscription, the folder of a subdomain). To keep the application's files
 and its static files apart, point the document root at the folder that holds only the static
-files: *Advanced > Document root* on the domain's Runway page, right above the static paths. For
+files: enable *Advanced > Change the Plesk document root* on the Runway page, above the static paths. For
 example, with the application directory `apps/example.com`, the document root
 `apps/example.com/wwwroot` and the static path `/media`, the web server serves
 `apps/example.com/wwwroot/media/...` itself and passes every other request to the application;
@@ -301,6 +307,8 @@ the document root, for example `public` with `STATIC_ROOT` set to `public/static
   -www-root`), which checks the path itself and regenerates the web server configuration. A
   change made in Plesk shows up on the Runway page. Runway keeps a copy only to know where to make
   the files of a build readable for the web server (see below).
+- The change checkbox starts off. Leave it off for an API without static files: Plesk's current
+  root stays in place and there is no need to create an empty `wwwroot`.
 - The path is relative to the subscription's home directory: letters, digits and `. _ - @ + /`,
   no `.` or `..` segment, no folder name that starts with `-`, at most 255 characters, and inside
   the subscription also when symbolic links are followed. A missing folder is created by Plesk
@@ -361,7 +369,7 @@ the document root, for example `public` with `STATIC_ROOT` set to `public/static
 - Administrators can always change it. Customers (and resellers, through the same checks) need,
   besides **Runway applications management**, Plesk's own permission **Hosting settings
   management** (`manage_phosting`) of the subscription; without it the field is read-only.
-- The page sends the document root only when you changed the field, so a change made in Plesk
+- The page sends the document root only when you opted in and changed the field, so a change made in Plesk
   meanwhile is never undone by saving other settings. When only the document root changed, the
   save changes it and leaves the application alone (no build, no restart). Otherwise the save
   changes the document root first and then applies the application settings (which restarts the
@@ -410,7 +418,9 @@ Things to know before turning it on:
 - **Listen where Runway tells you.** The application must use `RUNWAY_SOCKET` or `PORT`, not a
   fixed path or port: a configuration that hardcodes `/run/runway/<id>/app.sock` (for example in
   `gunicorn.conf.py`, `config/puma.rb` or a Caddyfile) or a port makes the switch fail.
-- **Builds happen in place**, as before: the old version keeps serving while the build replaces
+- **Builds happen in place by default**. Opt into [isolated releases](docs/OPERATIONS.md#isolated-releases-and-large-shared-directories)
+  to build separate snapshots, with explicit shared paths for large/mutable data. Without release
+  mode, the old version keeps serving while the build replaces
   files under it. Builds that replace files by renaming them are safe (`go build`, `cargo build`).
   Builds that overwrite files a running process uses can disturb the old version until it stops:
   publish .NET applications into a new directory and rename it
