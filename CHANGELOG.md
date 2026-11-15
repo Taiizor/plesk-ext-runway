@@ -40,7 +40,11 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   High Performance).
 - Automated screenshot capture script (`scripts/capture-screenshots.ts`, `bun run screenshots`)
   using `puppeteer-core` with headless Chrome to capture and refresh all documentation and catalog
-  screenshots across light and dark themes with trial license banners hidden.
+  screenshots across light and dark themes with trial license and cookie banners hidden, dynamic
+  height viewport scaling for full content coverage without inner scroll clipping, and complete
+  tab/drawer coverage (Status, Settings with expanded Advanced controls and visual EnvEditor,
+  Project with sample and binary drawers, Operations, Logs, Help, all Toolchain runtimes, and
+  Customer views).
 - `bun run package` builds and verifies the installable zip in the root `dist/` directory
   through `python build.py --strict`, with matching build and release instructions.
 - Independently opt-in deployment history/audit with bounded logs, diagnostics and blocking

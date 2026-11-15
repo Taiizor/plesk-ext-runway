@@ -1,14 +1,14 @@
 // Copyright 2026 Taiizor. Licensed under the MIT License.
 
 /**
- * Automates capturing clean, production-ready screenshots of Runway in Plesk.
+ * Automates capturing clean, comprehensive, production-ready screenshots of Runway in Plesk.
  * Captures both documentation screenshots (docs/screenshots/) and
  * extension catalog screenshots (src/_meta/screenshots/).
  *
  * Usage:
- *   bun scripts/capture-screenshots.ts
+ *   bun run screenshots
  *   or:
- *   CONTAINER=grt-plesk PANEL_PORT=18880 bun scripts/capture-screenshots.ts
+ *   CONTAINER=grt-plesk PANEL_PORT=18880 bun run screenshots
  */
 
 import { execSync } from 'node:child_process';
@@ -49,17 +49,25 @@ const getLoginUrl = (user = 'admin'): string => {
 
 const hideTrialAndNoise = async (page: Page) => {
     await page.evaluate(() => {
-        // Hide trial status and license banners
-        const style = document.createElement('style');
+        const styleId = 'runway-shot-cleaner';
+        let style = document.getElementById(styleId);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            document.head.appendChild(style);
+        }
         style.textContent = `
             .pul-layout__header-addon,
             .license-status,
             [data-type="license-status"],
-            .license-status-alert {
+            .license-status-alert,
+            [class*="trial-banner"],
+            .cookie-policy-info,
+            [class*="cookie-policy"],
+            .cookie-banner {
                 display: none !important;
             }
         `;
-        document.head.appendChild(style);
     });
 };
 
@@ -80,10 +88,25 @@ const capture = async (
     page: Page,
     destRelPath: string,
     width = 1440,
-    height = 900,
+    explicitHeight?: number,
 ) => {
     const dest = resolve(ROOT, destRelPath);
     mkdirSync(resolve(dest, '..'), { recursive: true });
+
+    await hideTrialAndNoise(page);
+
+    let height = explicitHeight;
+    if (!height) {
+        // Reset viewport to small height first so content shrinks and scrollHeight is strictly measured
+        await page.setViewport({ width, height: 600, deviceScaleFactor: 1 });
+        await new Promise(r => setTimeout(r, 200));
+
+        const scrollH = await page.evaluate(() => {
+            const content = document.querySelector('.pul-layout__content') as HTMLElement | null;
+            return content ? content.scrollHeight : document.body.scrollHeight;
+        });
+        height = Math.max(900, scrollH + 320);
+    }
 
     await page.setViewport({ width, height, deviceScaleFactor: 1 });
     await hideTrialAndNoise(page);
@@ -91,6 +114,23 @@ const capture = async (
 
     await page.screenshot({ path: dest, fullPage: false });
     console.log(`Saved ${destRelPath} (${width}x${height})`);
+};
+
+const clickTabByText = async (page: Page, text: string): Promise<boolean> => {
+    const found = await page.evaluate((targetText) => {
+        const links = Array.from(document.querySelectorAll('a.pul-tabs__link')) as HTMLElement[];
+        const match = links.find(a => a.innerText && a.innerText.toLowerCase().includes(targetText.toLowerCase()));
+        if (match) {
+            match.click();
+            return true;
+        }
+        return false;
+    }, text);
+    if (found) {
+        await new Promise(r => setTimeout(r, 900));
+        await hideTrialAndNoise(page);
+    }
+    return found;
 };
 
 async function main() {
@@ -111,89 +151,179 @@ async function main() {
     try {
         const page = await browser.newPage();
 
-        // 1. Log in as admin
+        // 1. Log in as administrator
+        console.log('\n--- Administrator Session ---');
         console.log('Logging in as Administrator...');
         const adminLoginUrl = getLoginUrl('admin');
         await page.goto(adminLoginUrl, { waitUntil: 'networkidle2' });
 
-        // --- ADMIN OVERVIEW ---
-        console.log('Capturing Overview...');
+        // ==========================================
+        // 1. OVERVIEW
+        // ==========================================
+        console.log('\n[1/4] Capturing Overview views...');
         await page.goto(`${BASE_URL}/modules/runway/index.php/overview`, { waitUntil: 'networkidle2' });
         await new Promise(r => setTimeout(r, 1200));
 
         await setDarkMode(page, false);
-        await capture(page, 'docs/screenshots/admin-overview.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-overview.png', 1440);
         await capture(page, 'src/_meta/screenshots/3.png', 1024, 768);
 
         await setDarkMode(page, true);
-        await capture(page, 'docs/screenshots/admin-overview-dark.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-overview-dark.png', 1440);
         await setDarkMode(page, false);
 
-        // --- ADMIN DOMAIN (gotest.local / site_id=1) ---
-        console.log('Capturing Domain page...');
+        // ==========================================
+        // 2. DOMAIN PAGE (gotest.local / site_id=1)
+        // ==========================================
+        console.log('\n[2/4] Capturing Domain views (gotest.local)...');
         await page.goto(`${BASE_URL}/modules/runway/index.php/domain?site_id=1`, { waitUntil: 'networkidle2' });
         await new Promise(r => setTimeout(r, 1500));
 
+        // Tab 1: Status & Metrics (Comprehensive height covers HeroHeader, 4 metric charts, full Status Panel)
         await setDarkMode(page, false);
-        await capture(page, 'docs/screenshots/admin-domain.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-domain.png', 1440);
         await capture(page, 'src/_meta/screenshots/1.png', 1024, 768);
 
         await setDarkMode(page, true);
-        await capture(page, 'docs/screenshots/admin-domain-dark.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-domain-dark.png', 1440);
         await setDarkMode(page, false);
 
-        // Domain Settings Tab
+        // Tab 2: Settings (Expand collapsible Advanced section to show full form, commands, limits, triggers, and visual EnvEditor)
+        console.log('Switching to Settings tab...');
+        await clickTabByText(page, 'Settings');
         await page.evaluate(() => {
-            const tabs = Array.from(document.querySelectorAll('.pul-tabs__tab, [role="tab"]')) as HTMLElement[];
-            const settingsTab = tabs.find(t => t.innerText && t.innerText.includes('Settings'));
-            settingsTab?.click();
+            const collapsedBtn = document.querySelector('.pul-section--collapsed .pul-section__control-button') as HTMLElement | null;
+            if (collapsedBtn) collapsedBtn.click();
         });
         await new Promise(r => setTimeout(r, 800));
-        await capture(page, 'docs/screenshots/admin-domain-advanced.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-domain-advanced.png', 1440);
 
-        // --- ADMIN TOOLCHAINS ---
-        console.log('Capturing Toolchains...');
+        // Tab 3: Project & Files
+        console.log('Switching to Project tab...');
+        await clickTabByText(page, 'Project');
+        await capture(page, 'docs/screenshots/admin-domain-project.png', 1440);
+
+        // Drawer 1: Create sample app
+        console.log('Opening sample app drawer...');
+        const sampleOpened = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button')) as HTMLElement[];
+            const btn = btns.find(b => b.innerText && b.innerText.includes('Create sample app'));
+            if (btn) {
+                btn.click();
+                return true;
+            }
+            return false;
+        });
+        if (sampleOpened) {
+            await new Promise(r => setTimeout(r, 800));
+            await hideTrialAndNoise(page);
+            await capture(page, 'docs/screenshots/admin-domain-sample.png', 1440, 950);
+            await page.keyboard.press('Escape');
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        // Drawer 2: Fetch binary from URL
+        console.log('Opening fetch binary drawer...');
+        const fetchOpened = await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button')) as HTMLElement[];
+            const btn = btns.find(b => b.innerText && b.innerText.includes('Fetch binary from URL'));
+            if (btn) {
+                btn.click();
+                return true;
+            }
+            return false;
+        });
+        if (fetchOpened) {
+            await new Promise(r => setTimeout(r, 800));
+            await hideTrialAndNoise(page);
+            await capture(page, 'docs/screenshots/admin-domain-fetch.png', 1440, 950);
+            await page.keyboard.press('Escape');
+            await new Promise(r => setTimeout(r, 600));
+        }
+
+        // Tab 4: Optional operations
+        console.log('Switching to Optional operations tab...');
+        await clickTabByText(page, 'operations');
+        await capture(page, 'docs/screenshots/admin-domain-operations.png', 1440);
+
+        // Tab 5: Logs
+        console.log('Switching to Logs tab...');
+        await clickTabByText(page, 'Logs');
+        await capture(page, 'docs/screenshots/admin-domain-logs.png', 1440);
+
+        // Tab 6: Help
+        console.log('Switching to Help tab...');
+        await clickTabByText(page, 'Help');
+        await capture(page, 'docs/screenshots/admin-domain-help.png', 1440);
+
+        // ==========================================
+        // 3. TOOLCHAINS
+        // ==========================================
+        console.log('\n[3/4] Capturing Toolchains views...');
         await page.goto(`${BASE_URL}/modules/runway/index.php/toolchains`, { waitUntil: 'networkidle2' });
         await new Promise(r => setTimeout(r, 1200));
 
+        // Go Tab
         await setDarkMode(page, false);
-        await capture(page, 'docs/screenshots/admin-toolchains.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-toolchains.png', 1440);
         await capture(page, 'src/_meta/screenshots/2.png', 1024, 768);
 
         await setDarkMode(page, true);
-        await capture(page, 'docs/screenshots/admin-toolchains-dark.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-toolchains-dark.png', 1440);
         await setDarkMode(page, false);
 
-        // Toolchains PHP & Ruby tabs if available
-        await page.evaluate(() => {
-            const tabs = Array.from(document.querySelectorAll('.pul-tabs__tab, [role="tab"], button')) as HTMLElement[];
-            const phpTab = tabs.find(t => t.innerText && t.innerText.trim().toLowerCase() === 'php');
-            phpTab?.click();
-        });
-        await new Promise(r => setTimeout(r, 500));
-        await capture(page, 'docs/screenshots/admin-toolchains-php.png', 1440, 900);
+        // PHP Tab (FrankenPHP)
+        console.log('Switching to Toolchains PHP tab...');
+        await clickTabByText(page, 'PHP');
+        await capture(page, 'docs/screenshots/admin-toolchains-php.png', 1440);
 
-        await page.evaluate(() => {
-            const tabs = Array.from(document.querySelectorAll('.pul-tabs__tab, [role="tab"], button')) as HTMLElement[];
-            const rubyTab = tabs.find(t => t.innerText && t.innerText.trim().toLowerCase() === 'ruby');
-            rubyTab?.click();
-        });
-        await new Promise(r => setTimeout(r, 500));
-        await capture(page, 'docs/screenshots/admin-toolchains-ruby.png', 1440, 900);
+        // Ruby Tab
+        console.log('Switching to Toolchains Ruby tab...');
+        await clickTabByText(page, 'Ruby');
+        await capture(page, 'docs/screenshots/admin-toolchains-ruby.png', 1440);
 
-        // --- ADMIN SETTINGS ---
-        console.log('Capturing Runway Settings...');
+        // .NET Tab
+        console.log('Switching to Toolchains .NET tab...');
+        await clickTabByText(page, '.NET');
+        await capture(page, 'docs/screenshots/admin-toolchains-dotnet.png', 1440);
+
+        // Rust Tab
+        console.log('Switching to Toolchains Rust tab...');
+        await clickTabByText(page, 'Rust');
+        await capture(page, 'docs/screenshots/admin-toolchains-rust.png', 1440);
+
+        // Bun Tab
+        console.log('Switching to Toolchains Bun tab...');
+        await clickTabByText(page, 'Bun');
+        await capture(page, 'docs/screenshots/admin-toolchains-bun.png', 1440);
+
+        // Java Tab
+        console.log('Switching to Toolchains Java tab...');
+        await clickTabByText(page, 'Java');
+        await capture(page, 'docs/screenshots/admin-toolchains-java.png', 1440);
+
+        // Python Tab
+        console.log('Switching to Toolchains Python tab...');
+        await clickTabByText(page, 'Python');
+        await capture(page, 'docs/screenshots/admin-toolchains-python.png', 1440);
+
+        // ==========================================
+        // 4. RUNWAY SETTINGS
+        // ==========================================
+        console.log('\n[4/4] Capturing Settings views...');
         await page.goto(`${BASE_URL}/modules/runway/index.php/settings`, { waitUntil: 'networkidle2' });
         await new Promise(r => setTimeout(r, 1000));
 
         await setDarkMode(page, false);
-        await capture(page, 'docs/screenshots/admin-settings.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-settings.png', 1440);
 
         await setDarkMode(page, true);
-        await capture(page, 'docs/screenshots/admin-settings-dark.png', 1440, 900);
+        await capture(page, 'docs/screenshots/admin-settings-dark.png', 1440);
         await setDarkMode(page, false);
 
-        // --- CUSTOMER VIEWS (if cust1 exists) ---
+        // ==========================================
+        // 5. CUSTOMER VIEWS
+        // ==========================================
         let hasCust1 = false;
         try {
             getLoginUrl('cust1');
@@ -203,30 +333,41 @@ async function main() {
         }
 
         if (hasCust1) {
+            console.log('\n--- Customer Session (cust1) ---');
             console.log('Logging in as Customer (cust1)...');
             const custLoginUrl = getLoginUrl('cust1');
             await page.goto(custLoginUrl, { waitUntil: 'networkidle2' });
 
-            console.log('Capturing Customer Overview & Domain...');
+            // Customer Overview
+            console.log('Capturing Customer Overview...');
             await page.goto(`${BASE_URL}/modules/runway/index.php/overview`, { waitUntil: 'networkidle2' });
             await new Promise(r => setTimeout(r, 1000));
-            await capture(page, 'docs/screenshots/customer-overview.png', 1440, 900);
+            await capture(page, 'docs/screenshots/customer-overview.png', 1440);
 
+            // Customer Domain Status & Metrics
+            console.log('Capturing Customer Domain Status...');
             await page.goto(`${BASE_URL}/modules/runway/index.php/domain?site_id=1`, { waitUntil: 'networkidle2' });
             await new Promise(r => setTimeout(r, 1200));
-            await capture(page, 'docs/screenshots/customer-domain.png', 1440, 900);
+            await capture(page, 'docs/screenshots/customer-domain.png', 1440);
 
-            // Customer settings tab
+            // Customer Domain Settings (Expand Advanced)
+            console.log('Capturing Customer Domain Settings...');
+            await clickTabByText(page, 'Settings');
             await page.evaluate(() => {
-                const tabs = Array.from(document.querySelectorAll('.pul-tabs__tab, [role="tab"]')) as HTMLElement[];
-                const settingsTab = tabs.find(t => t.innerText && t.innerText.includes('Settings'));
-                settingsTab?.click();
+                const collapsedBtn = document.querySelector('.pul-section--collapsed .pul-section__control-button') as HTMLElement | null;
+                if (collapsedBtn) collapsedBtn.click();
             });
-            await new Promise(r => setTimeout(r, 500));
-            await capture(page, 'docs/screenshots/customer-domain-advanced.png', 1440, 900);
+            await new Promise(r => setTimeout(r, 800));
+            await capture(page, 'docs/screenshots/customer-domain-advanced.png', 1440);
+
+            // Customer Access Denied (visiting settings directly)
+            console.log('Capturing Customer Access Denied...');
+            await page.goto(`${BASE_URL}/modules/runway/index.php/settings`, { waitUntil: 'networkidle2' });
+            await new Promise(r => setTimeout(r, 800));
+            await capture(page, 'docs/screenshots/customer-domain-denied.png', 1440, 900);
         }
 
-        console.log('\nAll screenshots captured successfully!');
+        console.log('\nAll comprehensive screenshots captured successfully!');
     } finally {
         await browser.close();
     }
