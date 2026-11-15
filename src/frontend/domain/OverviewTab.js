@@ -5,7 +5,6 @@ import PropTypes from 'prop-types';
 import { Grid, GridCol } from '@plesk/plesk-ext-sdk';
 import MetricChart from '../components/MetricChart';
 import StatusPanel from './StatusPanel';
-import { formatBytes } from '../lib/format';
 
 const OverviewTab = ({
     api,
@@ -19,7 +18,7 @@ const OverviewTab = ({
     onStop,
 }) => {
     const [range, setRange] = useState('1h');
-    const [metrics, setMetrics] = useState({ cpu: [], mem: [], disk: [] });
+    const [metrics, setMetrics] = useState({ cpu: [], mem: [], disk: [], net: [] });
 
     useEffect(() => {
         if (!siteId || !data || !data.configured) return;
@@ -31,14 +30,16 @@ const OverviewTab = ({
                 const cpu = [];
                 const mem = [];
                 const disk = [];
+                const net = [];
 
                 res.metrics.forEach(m => {
                     cpu.push({ time: m.time, value: m.cpu || 0 });
                     mem.push({ time: m.time, value: (m.memory || 0) / (1024 * 1024) }); // bytes to MiB
-                    disk.push({ time: m.time, value: (m.disk || 0) / (1024 * 1024) });
+                    disk.push({ time: m.time, value: (m.disk || 0) / (1024 * 1024) }); // bytes to MiB
+                    net.push({ time: m.time, value: (m.net_rate || 0) / 1024 }); // bytes/s to KB/s
                 });
 
-                setMetrics({ cpu, mem, disk });
+                setMetrics({ cpu, mem, disk, net });
             }).catch(() => {});
         };
 
@@ -62,7 +63,7 @@ const OverviewTab = ({
                             color="#0070f3"
                             range={range}
                             onRangeChange={setRange}
-                            height={150}
+                            height={140}
                         />
                     </GridCol>
                     <GridCol>
@@ -73,7 +74,29 @@ const OverviewTab = ({
                             color="#10b981"
                             range={range}
                             onRangeChange={setRange}
-                            height={150}
+                            height={140}
+                        />
+                    </GridCol>
+                    <GridCol>
+                        <MetricChart
+                            title="Disk Usage"
+                            data={metrics.disk}
+                            unit="MiB"
+                            color="#8b5cf6"
+                            range={range}
+                            onRangeChange={setRange}
+                            height={140}
+                        />
+                    </GridCol>
+                    <GridCol>
+                        <MetricChart
+                            title="Network Traffic"
+                            data={metrics.net}
+                            unit="KB/s"
+                            color="#f59e0b"
+                            range={range}
+                            onRangeChange={setRange}
+                            height={140}
                         />
                     </GridCol>
                 </Grid>

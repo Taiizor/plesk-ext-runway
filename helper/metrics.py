@@ -1,7 +1,7 @@
 # Copyright 2026 Taiizor. Licensed under the MIT License.
 
 # ---------------------------------------------------------------------------
-# Metrics & Resource Monitoring (SQLite Time-Series)
+# Metrics & Resource Monitoring (SQLite Time-Series: CPU, Memory, Disk, Network)
 # ---------------------------------------------------------------------------
 
 import sqlite3
@@ -25,6 +25,8 @@ def _open_metrics_db():
                 memory_bytes INTEGER NOT NULL,
                 memory_used_bytes INTEGER NOT NULL,
                 disk_bytes INTEGER NOT NULL,
+                net_bytes INTEGER NOT NULL DEFAULT 0,
+                net_rate REAL NOT NULL DEFAULT 0.0,
                 restarts INTEGER NOT NULL,
                 PRIMARY KEY (domain_id, timestamp)
             );
@@ -37,10 +39,23 @@ def _open_metrics_db():
                 memory_used_bytes INTEGER NOT NULL,
                 memory_total_bytes INTEGER NOT NULL,
                 disk_used_bytes INTEGER NOT NULL,
-                disk_total_bytes INTEGER NOT NULL
+                disk_total_bytes INTEGER NOT NULL,
+                net_rx_rate REAL NOT NULL DEFAULT 0.0,
+                net_tx_rate REAL NOT NULL DEFAULT 0.0
             );
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_server_metrics_time ON server_metrics (timestamp);")
+    # Safely migrate existing tables if columns are missing
+    for col, col_def in (("net_bytes", "INTEGER NOT NULL DEFAULT 0"), ("net_rate", "REAL NOT NULL DEFAULT 0.0")):
+        try:
+            db.execute("ALTER TABLE app_metrics ADD COLUMN %s %s;" % (col, col_def))
+        except Exception:
+            pass
+    for col, col_def in (("net_rx_rate", "REAL NOT NULL DEFAULT 0.0"), ("net_tx_rate", "REAL NOT NULL DEFAULT 0.0")):
+        try:
+            db.execute("ALTER TABLE server_metrics ADD COLUMN %s %s;" % (col, col_def))
+        except Exception:
+            pass
     return db
 
 
@@ -82,7 +97,7 @@ def record_app_metric_sample(domain_id, state=None):
         return None
 
     unit = app_unit(domain_id, state.get("slot") or "")
-    props = ["ActiveState", "MainPID", "MemoryCurrent", "CPUUsageNSec", "NRestarts", "ControlGroup"]
+    props = ["ActiveState", "MainPID", "MemoryCurrent", "CPUUsageNSec", "NRestarts", "ControlGroup", "IPIngressBytes", "IPEgressBytes"]
     shown = unit_show([unit], props).get(unit, {})
     active = shown.get("ActiveState") == "active"
 
@@ -91,20 +106,31 @@ def record_app_metric_sample(domain_id, state=None):
     restarts = int(shown.get("NRestarts") or 0) if (shown.get("NRestarts") or "").isdigit() else 0
     raw_cpu_nsec = int(shown.get("CPUUsageNSec") or 0) if (shown.get("CPUUsageNSec") or "").isdigit() else 0
 
+    raw_net_in = int(shown.get("IPIngressBytes") or 0) if (shown.get("IPIngressBytes") or "").isdigit() else 0
+    raw_net_out = int(shown.get("IPEgressBytes") or 0) if (shown.get("IPEgressBytes") or "").isdigit() else 0
+    total_net_bytes = raw_net_in + raw_net_out
+
     cpu_prev = _load_cpu_prev()
     prev_key = "app_%d" % domain_id
     prev_entry = cpu_prev.get(prev_key)
     cpu_percent = 0.0
+    net_rate = 0.0
 
-    if active and prev_entry and isinstance(prev_entry, list) and len(prev_entry) == 2:
-        prev_time, prev_nsec = prev_entry
+    if active and prev_entry and isinstance(prev_entry, list) and len(prev_entry) >= 2:
+        prev_time = prev_entry[0]
+        prev_nsec = prev_entry[1]
         dt = now - prev_time
         dnsec = raw_cpu_nsec - prev_nsec
         if dt > 0 and dnsec >= 0:
             cpu_percent = min(100.0 * (os.cpu_count() or 1), max(0.0, (dnsec / (dt * 1e9)) * 100.0))
+        if len(prev_entry) >= 3 and dt > 0:
+            prev_net = prev_entry[2]
+            dnet = total_net_bytes - prev_net
+            if dnet >= 0:
+                net_rate = dnet / dt
 
-    if active and raw_cpu_nsec > 0:
-        cpu_prev[prev_key] = [now, raw_cpu_nsec]
+    if active:
+        cpu_prev[prev_key] = [now, raw_cpu_nsec, total_net_bytes]
         _save_cpu_prev(cpu_prev)
 
     disk_bytes = _fast_dir_size(state.get("app_dir", "")) if active else 0
@@ -114,11 +140,10 @@ def record_app_metric_sample(domain_id, state=None):
         with db:
             db.execute("""
                 INSERT OR REPLACE INTO app_metrics
-                (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes, restarts)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes, net_bytes, net_rate, restarts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (domain_id, now, round(cpu_percent, 2), memory.get("memory_bytes") or 0,
-                  memory.get("memory_used_bytes") or 0, disk_bytes, restarts))
-            # Occasional cleanup: remove data older than 14 days
+                  memory.get("memory_used_bytes") or 0, disk_bytes, total_net_bytes, round(net_rate, 2), restarts))
             if now % 100 == 0:
                 db.execute("DELETE FROM app_metrics WHERE timestamp < ?", (now - 14 * 86400,))
         db.close()
@@ -131,23 +156,25 @@ def record_app_metric_sample(domain_id, state=None):
         "memory_bytes": memory.get("memory_bytes") or 0,
         "memory_used_bytes": memory.get("memory_used_bytes") or 0,
         "disk_bytes": disk_bytes,
+        "net_bytes": total_net_bytes,
+        "net_rate": round(net_rate, 2),
         "restarts": restarts,
     }
 
 
 def record_server_metric_sample():
-    """Records server-wide CPU, memory and disk usage."""
+    """Records server-wide CPU, memory, disk and network usage."""
     now = int(time.time())
     cpu_percent = 0.0
 
     # CPU from /proc/stat
+    cpu_prev = _load_cpu_prev()
     try:
         with open("/proc/stat", "r") as f:
             line = f.readline()
         parts = [float(x) for x in line.split()[1:8]]
         total_time = sum(parts)
         idle_time = parts[3] + (parts[4] if len(parts) > 4 else 0)
-        cpu_prev = _load_cpu_prev()
         prev_entry = cpu_prev.get("server")
         if prev_entry and isinstance(prev_entry, list) and len(prev_entry) == 2:
             prev_total, prev_idle = prev_entry
@@ -156,7 +183,6 @@ def record_server_metric_sample():
             if diff_total > 0:
                 cpu_percent = max(0.0, min(100.0, (1.0 - diff_idle / diff_total) * 100.0))
         cpu_prev["server"] = [total_time, idle_time]
-        _save_cpu_prev(cpu_prev)
     except Exception:
         pass
 
@@ -186,14 +212,43 @@ def record_server_metric_sample():
     except Exception:
         pass
 
+    # Network from /proc/net/dev
+    net_rx_rate = 0.0
+    net_tx_rate = 0.0
+    try:
+        rx_total = 0
+        tx_total = 0
+        with open("/proc/net/dev", "r") as f:
+            for line in f:
+                if ":" in line:
+                    iface, stats = line.split(":", 1)
+                    iface = iface.strip()
+                    if iface != "lo":
+                        parts = stats.split()
+                        if len(parts) >= 9:
+                            rx_total += int(parts[0])
+                            tx_total += int(parts[8])
+        prev_net = cpu_prev.get("server_net")
+        if prev_net and isinstance(prev_net, list) and len(prev_net) == 3:
+            p_time, p_rx, p_tx = prev_net
+            dt = now - p_time
+            if dt > 0:
+                net_rx_rate = max(0.0, (rx_total - p_rx) / dt)
+                net_tx_rate = max(0.0, (tx_total - p_tx) / dt)
+        cpu_prev["server_net"] = [now, rx_total, tx_total]
+    except Exception:
+        pass
+
+    _save_cpu_prev(cpu_prev)
+
     try:
         db = _open_metrics_db()
         with db:
             db.execute("""
                 INSERT OR REPLACE INTO server_metrics
-                (timestamp, cpu_percent, memory_used_bytes, memory_total_bytes, disk_used_bytes, disk_total_bytes)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (now, round(cpu_percent, 2), mem_used, mem_total, disk_used, disk_total))
+                (timestamp, cpu_percent, memory_used_bytes, memory_total_bytes, disk_used_bytes, disk_total_bytes, net_rx_rate, net_tx_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (now, round(cpu_percent, 2), mem_used, mem_total, disk_used, disk_total, round(net_rx_rate, 2), round(net_tx_rate, 2)))
             if now % 100 == 0:
                 db.execute("DELETE FROM server_metrics WHERE timestamp < ?", (now - 14 * 86400,))
         db.close()
@@ -207,6 +262,8 @@ def record_server_metric_sample():
         "memory_total_bytes": mem_total,
         "disk_used_bytes": disk_used,
         "disk_total_bytes": disk_total,
+        "net_rx_rate": round(net_rx_rate, 2),
+        "net_tx_rate": round(net_tx_rate, 2),
     }
 
 
@@ -217,7 +274,6 @@ def cmd_app_metrics(payload):
     if time_range not in ("1h", "24h", "7d"):
         time_range = "1h"
 
-    # Always sample the current point
     latest = record_app_metric_sample(domain_id)
 
     now = int(time.time())
@@ -242,6 +298,8 @@ def cmd_app_metrics(payload):
                 CAST(AVG(memory_bytes) AS INTEGER) AS mem,
                 CAST(AVG(memory_used_bytes) AS INTEGER) AS mem_used,
                 CAST(MAX(disk_bytes) AS INTEGER) AS disk,
+                ROUND(AVG(net_rate), 2) AS net_rate,
+                MAX(net_bytes) AS net_bytes,
                 MAX(restarts) AS restarts
             FROM app_metrics
             WHERE domain_id = ? AND timestamp >= ?
@@ -256,18 +314,20 @@ def cmd_app_metrics(payload):
                 "memory": row[2] or 0,
                 "memory_used": row[3] or 0,
                 "disk": row[4] or 0,
-                "restarts": row[5] or 0,
+                "net_rate": row[5] or 0.0,
+                "net_bytes": row[6] or 0,
+                "restarts": row[7] or 0,
             })
         db.close()
     except Exception:
         pass
 
-    # If results are sparse (e.g. freshly installed app), backfill baseline points
     if len(results) < 2 and latest:
         base_mem = latest.get("memory_bytes") or 0
         base_mem_used = latest.get("memory_used_bytes") or 0
         base_disk = latest.get("disk_bytes") or 0
         base_restarts = latest.get("restarts") or 0
+        base_net = latest.get("net_bytes") or 0
         count = 10 if time_range == "1h" else 12
         for i in range(count, 0, -1):
             t = now - i * step
@@ -277,6 +337,8 @@ def cmd_app_metrics(payload):
                 "memory": base_mem,
                 "memory_used": base_mem_used,
                 "disk": base_disk,
+                "net_rate": 0.0,
+                "net_bytes": base_net,
                 "restarts": base_restarts,
             })
         results.append({
@@ -285,6 +347,8 @@ def cmd_app_metrics(payload):
             "memory": base_mem,
             "memory_used": base_mem_used,
             "disk": base_disk,
+            "net_rate": latest.get("net_rate") or 0.0,
+            "net_bytes": base_net,
             "restarts": base_restarts,
         })
         results.sort(key=lambda r: r["time"])
@@ -321,7 +385,9 @@ def cmd_server_metrics(payload):
                 CAST(AVG(memory_used_bytes) AS INTEGER) AS mem_used,
                 CAST(MAX(memory_total_bytes) AS INTEGER) AS mem_total,
                 CAST(AVG(disk_used_bytes) AS INTEGER) AS disk_used,
-                CAST(MAX(disk_total_bytes) AS INTEGER) AS disk_total
+                CAST(MAX(disk_total_bytes) AS INTEGER) AS disk_total,
+                ROUND(AVG(net_rx_rate), 2) AS net_rx_rate,
+                ROUND(AVG(net_tx_rate), 2) AS net_tx_rate
             FROM server_metrics
             WHERE timestamp >= ?
             GROUP BY t
@@ -336,6 +402,8 @@ def cmd_server_metrics(payload):
                 "memory_total": row[3] or 0,
                 "disk_used": row[4] or 0,
                 "disk_total": row[5] or 0,
+                "net_rx_rate": row[6] or 0.0,
+                "net_tx_rate": row[7] or 0.0,
             })
         db.close()
     except Exception:
@@ -352,6 +420,8 @@ def cmd_server_metrics(payload):
                 "memory_total": latest["memory_total_bytes"],
                 "disk_used": latest["disk_used_bytes"],
                 "disk_total": latest["disk_total_bytes"],
+                "net_rx_rate": latest["net_rx_rate"],
+                "net_tx_rate": latest["net_tx_rate"],
             })
         results.append({
             "time": latest["timestamp"],
@@ -360,6 +430,8 @@ def cmd_server_metrics(payload):
             "memory_total": latest["memory_total_bytes"],
             "disk_used": latest["disk_used_bytes"],
             "disk_total": latest["disk_total_bytes"],
+            "net_rx_rate": latest["net_rx_rate"],
+            "net_tx_rate": latest["net_tx_rate"],
         })
         results.sort(key=lambda r: r["time"])
 

@@ -397,12 +397,16 @@ const Overview = ({ baseUrl }) => {
                                 <Text intent="muted" fontSize="sm">Server Load</Text>
                                 <Icon name="dashboard" size="16" intent="info" />
                             </div>
-                            <div style={{ fontSize: '20px', fontWeight: 600 }}>
+                            <div style={{ fontSize: '18px', fontWeight: 600 }}>
                                 <span>{serverMetrics.data.latest.cpu_percent || 0}% CPU</span>
                             </div>
-                            <Text intent="muted" fontSize="sm">
-                                {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)} RAM
-                            </Text>
+                            <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
+                                <span>RAM: {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)}</span>
+                                <span>Disk: {formatBytes(serverMetrics.data.latest.disk_used_bytes)} / {formatBytes(serverMetrics.data.latest.disk_total_bytes)}</span>
+                                {serverMetrics.data.latest.net_rx_rate !== undefined && (
+                                    <span>Net: ↓ {formatBytes(serverMetrics.data.latest.net_rx_rate)}/s  ↑ {formatBytes(serverMetrics.data.latest.net_tx_rate)}/s</span>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

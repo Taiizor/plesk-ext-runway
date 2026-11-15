@@ -567,6 +567,7 @@ def render_app_unit(state, pw):
         "RestrictSUIDSGID=yes",
         "RestrictRealtime=yes",
         "LockPersonality=yes",
+        "IPAccounting=yes",
     ]
     if cached_systemd_version() >= 249:
         # Applications may only bind their own port, so a Runway app can never squat another
