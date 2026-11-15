@@ -5,10 +5,11 @@
   "description": "Runway Plesk extension frontend (React + Plesk UI Library via @plesk/plesk-ext-sdk)",
   "license": "MIT",
   "scripts": {
-    "build": "plesk-ext-sdk build",
+    "build": "bun ./node_modules/@plesk/plesk-ext-sdk/bin/cli.js build",
+    "package": "python build.py --strict",
     "build:helper": "python scripts/build_helper.py",
     "check:helper": "python scripts/build_helper.py --check",
-    "dev": "plesk-ext-sdk dev",
+    "dev": "bun ./node_modules/@plesk/plesk-ext-sdk/bin/cli.js dev",
     "test:frontend": "bun test ./tests/frontend",
     "assets": "bun scripts/render-assets.ts"
   },

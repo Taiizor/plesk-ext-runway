@@ -150,7 +150,7 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           bun install --frozen-lockfile
-          python build.py --strict ${VERSION:+--version "$VERSION"}
+          bun run package ${VERSION:+--version "$VERSION"}
           package=$(ls dist/*.zip)
           echo "package=$(basename "$package")" >> "$GITHUB_OUTPUT"
           unzip -l "$package"

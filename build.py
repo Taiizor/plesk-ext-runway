@@ -5,6 +5,7 @@
 Packages the Runway Plesk extension into an installable zip.
 
 Usage:
+    bun run package                     # strict helper + frontend build + verified dist/ zip
     python build.py                     # frontend build (bun) + dist/runway-<version>-<release>.zip
     python build.py --no-frontend       # package the already built frontend (src/htdocs/index.php + dist/)
     python build.py --check             # only validate the source tree (no build, no zip)
@@ -12,9 +13,10 @@ Usage:
     python build.py --version 1.2.0-3   # package as version 1.2.0, release 3
     python build.py --verify dist/runway-1.0.0-1.zip   # verify an existing package
 
-The frontend is built with the Plesk Extension SDK through Bun ("bun run build" =
-"plesk-ext-sdk build"). It generates src/htdocs/index.php and src/htdocs/dist/ (both
-git-ignored), which are packaged together with the rest of src/. src/frontend/ (the React
+The frontend is built with the Plesk Extension SDK through "bun run build", which invokes
+the SDK's JavaScript CLI directly with Bun, without requiring Node.js. It generates
+src/htdocs/index.php and src/htdocs/dist/ (both git-ignored), which are packaged together
+with the rest of src/. src/frontend/ (the React
 sources) and source maps are not part of the package.
 
 The privileged helper is assembled from helper/ source sections before every build. The

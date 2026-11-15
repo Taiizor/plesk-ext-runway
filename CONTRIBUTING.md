@@ -22,7 +22,7 @@ Thanks for helping! Bug reports, runtime notes, fixes and new runtime adapters a
 bun install
 bun run build              # frontend
 bun run build:helper       # regenerate the standalone helper after editing helper/
-python build.py            # helper + frontend + dist/runway-<version>-<release>.zip
+bun run package            # strict helper + frontend build + verified dist/runway-<version>-<release>.zip
 ```
 
 ## Code rules
@@ -63,7 +63,7 @@ CI (`.github/workflows/ci.yml`):
    Docker, without Plesk), pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
    frontend regression tests and build, `build.py --check`, `php -l` and optional-operation PHP
    contracts (`php tests/php/operations.php`) with PHP 7.4 and 8.2.
-2. **Package**: `python build.py --strict`, uploads the zip as the `runway-package` artifact.
+2. **Package**: `bun run package` (`python build.py --strict`), uploads the zip as the `runway-package` artifact.
 3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
    the zip, creating the subscription `gotest.local` and (when the license allows customer
    accounts) its owner `cust1` and installing Go through Runway; then *helper* runs

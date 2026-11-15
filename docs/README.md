@@ -14,11 +14,16 @@
 From the repository root:
 
 ```sh
+bun run build             # frontend only: src/htdocs/index.php and src/htdocs/dist/
 bun run build:helper      # regenerate src/sbin/runway-helper after editing helper/
 bun run check:helper      # validate sources and their committed artifact without rewriting it
 python build.py --check   # source structure, versions and leftover markers
-python build.py --strict  # helper + frontend build, package and verification
+bun run package           # helper + frontend build, root dist/ zip and verification
 ```
+
+`bun run package` invokes `python build.py --strict` and requires Python 3.8+ as well as Bun.
+Append build options after the script name, for example `bun run package --no-frontend` to
+package an existing frontend build. The direct Python commands remain available.
 
 Commit helper source changes and the regenerated standalone file together. Generated frontend
 files and the `dist/` directory stay uncommitted. A full package build regenerates the helper

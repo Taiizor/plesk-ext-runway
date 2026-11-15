@@ -758,11 +758,18 @@ bun run build                   # frontend only -> src/htdocs/index.php + src/ht
 bun run dev                     # frontend watch mode
 bun run assets                  # after editing assets/logo*.svg: icons, nav logo, row icon, docs/social-preview.png
 bun run build:helper            # after editing helper/: regenerate the standalone root helper
-python build.py                 # helper + frontend build + dist/runway-<version>-<release>.zip (verified)
+bun run package                 # helper + frontend build + verified dist/runway-<version>-<release>.zip
 python build.py --no-frontend   # regenerate the helper and package the existing frontend build
 python build.py --check         # validate the source tree (fails on leftover placeholders)
-python build.py --version 1.2.0 # package as another version without editing src/meta.xml
+bun run package --version 1.2.0 # package as another version without editing src/meta.xml
 ```
+
+`bun run build` generates only the frontend files under `src/htdocs/`. `bun run package`
+invokes `python build.py --strict`: it assembles the helper, builds the frontend, creates the
+installable zip in the root `dist/` directory and verifies it. Python 3.8+ is still required.
+The build and development scripts explicitly run the installed SDK with Bun; Node.js is not required.
+The Python entry point remains available for advanced options and environments without Bun
+that package an already built frontend (`--no-frontend`).
 
 Repository layout:
 

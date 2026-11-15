@@ -12,6 +12,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- `bun run package` builds and verifies the installable zip in the root `dist/` directory
+  through `python build.py --strict`, with matching build and release instructions.
 - Independently opt-in deployment history/audit with bounded logs, diagnostics and blocking
   preflight, isolated releases/rollback with explicit shared directories, signed HTTPS webhook
   events, Plesk recovery metadata/JSON import/export and service-plan runtime/resource policies.
@@ -52,6 +54,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Run the installed Plesk SDK explicitly with Bun for frontend builds and development,
+  including when packaging invokes the build from Python on a system without Node.js.
 - Replace function-component `defaultProps` with JavaScript default parameters throughout the
   frontend, preserving default values and removing React deprecation warnings.
 - The domain status card reports failed refreshes and the time of its last successful update,

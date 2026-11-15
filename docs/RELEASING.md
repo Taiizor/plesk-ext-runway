@@ -38,7 +38,7 @@ end-to-end job installed and tested. Title and notes of the release page are gen
    python -m unittest discover -s tests -p 'test_*.py' -v
    bun run test:frontend
    python build.py --check            # structure, changelogs, no leftover placeholders
-   python build.py --strict           # helper + frontend build + zip + package verification
+   bun run package                    # helper + frontend build + zip + package verification
    python tests/check_locales.py
    ```
 
