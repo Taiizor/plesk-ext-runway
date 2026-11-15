@@ -268,16 +268,15 @@ const Overview = ({ baseUrl }) => {
             render: row => (
                 <span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                     {row.configured && row.state === 'running' && (
-                        <Tooltip title={translate('Domain.actions.restart')}>
-                            <Button
-                                ghost
-                                icon="reload"
-                                aria-label={translate('Domain.actions.restart')}
-                                state={restartingId === row.domainId ? 'loading' : undefined}
-                                disabled={Boolean(restartingId)}
-                                onClick={() => restartApp(row)}
-                            />
-                        </Tooltip>
+                        <Button
+                            ghost
+                            icon="reload"
+                            tooltip={translate('Domain.actions.restart')}
+                            aria-label={translate('Domain.actions.restart')}
+                            state={restartingId === row.domainId ? 'loading' : undefined}
+                            disabled={Boolean(restartingId)}
+                            onClick={() => restartApp(row)}
+                        />
                     )}
                     <Button component={RouterLink} to={domainLink(row)} ghost icon="gear">
                         {row.configured ? <Translate content="Overview.manage" /> : <Translate content="Overview.setUp" />}
