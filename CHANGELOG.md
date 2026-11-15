@@ -52,6 +52,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Replace function-component `defaultProps` with JavaScript default parameters throughout the
+  frontend, preserving default values and removing React deprecation warnings.
 - The domain status card reports failed refreshes and the time of its last successful update,
   keeping the last known status until a successful poll or page reload clears the warning.
 - Frontend API requests have a deadline covering both the response headers and body: 30 seconds

@@ -52,7 +52,7 @@ export const detectedRuntimes = (inspect, runtimes) => {
         .map(meta => ({ meta, facts: isObject(inspect[meta.key]) ? detectionFacts(inspect[meta.key]) : [] }));
 };
 
-const SampleDrawer = ({ isOpen, runtimes, initial, notEmpty, unixFor, busy, error, onSubmit, onClose }) => {
+const SampleDrawer = ({ isOpen, runtimes, initial, notEmpty = false, unixFor, busy = false, error = null, onSubmit, onClose }) => {
     const [values, setValues] = useState(() => ({
         ...initial,
         listen: initial.listen === 'unix' && !unixFor(initial.runtime) ? 'tcp' : initial.listen,
@@ -128,13 +128,7 @@ SampleDrawer.propTypes = {
     onClose: PropTypes.func.isRequired,
 };
 
-SampleDrawer.defaultProps = {
-    notEmpty: false,
-    busy: false,
-    error: null,
-};
-
-const FetchDrawer = ({ isOpen, busy, error, onSubmit, onClose }) => {
+const FetchDrawer = ({ isOpen, busy = false, error = null, onSubmit, onClose }) => {
     const [values, setValues] = useState({ url: '', sha256: '', extract: false });
     return (
         <Drawer
@@ -194,16 +188,11 @@ FetchDrawer.propTypes = {
     onClose: PropTypes.func.isRequired,
 };
 
-FetchDrawer.defaultProps = {
-    busy: false,
-    error: null,
-};
-
 /**
  * Project card: the application root, what the helper detected in it, and the drawers that
  * create a sample application or download a prebuilt binary.
  */
-const ProjectPanel = ({ data, runtimes, drawer, busy, error, onOpen, onClose, onSample, onFetch }) => {
+const ProjectPanel = ({ data, runtimes, drawer = null, busy = false, error = null, onOpen, onClose, onSample, onFetch }) => {
     const translate = useTranslate();
     // The helper answers {error} when it could not inspect the application root (unreadable for
     // the system user, timeout): that is not an empty directory.
@@ -325,12 +314,6 @@ ProjectPanel.propTypes = {
     onClose: PropTypes.func.isRequired,
     onSample: PropTypes.func.isRequired,
     onFetch: PropTypes.func.isRequired,
-};
-
-ProjectPanel.defaultProps = {
-    drawer: null,
-    busy: false,
-    error: null,
 };
 
 export default ProjectPanel;

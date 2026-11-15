@@ -264,7 +264,7 @@ const deployValue = (translate, deploy, deploying) => {
  * Status card of the domain page: state label, facts about the service, the listener, the
  * health check and the last deployment, and the control buttons.
  */
-const StatusPanel = ({ data, status, error, updatedAt, busyOp, onControl, onStop }) => {
+const StatusPanel = ({ data, status = null, error = null, updatedAt = null, busyOp = null, onControl, onStop }) => {
     const translate = useTranslate();
     const config = isObject(data.config) ? data.config : {};
     const configured = Boolean(data.configured);
@@ -436,13 +436,6 @@ StatusPanel.propTypes = {
     busyOp: PropTypes.string,
     onControl: PropTypes.func.isRequired,
     onStop: PropTypes.func.isRequired,
-};
-
-StatusPanel.defaultProps = {
-    status: null,
-    error: null,
-    updatedAt: null,
-    busyOp: null,
 };
 
 export default StatusPanel;

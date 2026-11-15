@@ -16,7 +16,7 @@ const OVERVIEW_POLL_MS = 15000;
 
 const domainLink = row => `/domain?site_id=${encodeURIComponent(row.domainId)}`;
 
-const Steps = ({ isAdmin }) => (
+const Steps = ({ isAdmin = false }) => (
     <ol style={{ margin: '0 0 0 18px', padding: 0, lineHeight: 1.7 }}>
         <li>{isAdmin ? <Translate content="Overview.emptyStep1" /> : <Translate content="Overview.emptyStep1Customer" />}</li>
         <li><Translate content="Overview.emptyStep2" /></li>
@@ -26,10 +26,6 @@ const Steps = ({ isAdmin }) => (
 
 Steps.propTypes = {
     isAdmin: PropTypes.bool,
-};
-
-Steps.defaultProps = {
-    isAdmin: false,
 };
 
 const endpoint = row => {

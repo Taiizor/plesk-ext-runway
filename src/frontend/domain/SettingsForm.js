@@ -175,7 +175,7 @@ const requestBody = (values, data, isAdmin, supportsBuild, openedRoot) => {
  * visible, commands, environment, URL paths, triggers and limits are in "Advanced".
  * Validation errors of api/app/save appear under the fields.
  */
-const SettingsForm = ({ data, runtimes, isAdmin, saving, error, onSave }) => {
+const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error = null, onSave }) => {
     // The values the form was opened with (the page remounts the form after every save): the save
     // compares against them to send the document root only when it was changed, and only it when
     // nothing else changed.
@@ -732,12 +732,6 @@ SettingsForm.propTypes = {
     saving: PropTypes.bool,
     error: PropTypes.object,
     onSave: PropTypes.func.isRequired,
-};
-
-SettingsForm.defaultProps = {
-    isAdmin: false,
-    saving: false,
-    error: null,
 };
 
 export default SettingsForm;

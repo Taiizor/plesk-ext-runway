@@ -20,7 +20,7 @@ const ENV_ROWS = [
  * Help card: how the application is started and reached, the environment it gets, the
  * trigger files and a link to the runtime's documentation. Starts collapsed when `collapsed`.
  */
-const HelpPanel = ({ meta, collapsed }) => {
+const HelpPanel = ({ meta = null, collapsed = false }) => {
     const translate = useTranslate();
     const [open, setOpen] = useState(!collapsed);
     return (
@@ -48,11 +48,6 @@ const HelpPanel = ({ meta, collapsed }) => {
 HelpPanel.propTypes = {
     meta: PropTypes.object,
     collapsed: PropTypes.bool,
-};
-
-HelpPanel.defaultProps = {
-    meta: null,
-    collapsed: false,
 };
 
 export default HelpPanel;

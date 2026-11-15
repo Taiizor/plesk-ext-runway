@@ -8,7 +8,7 @@ import { Alert } from '@plesk/plesk-ext-sdk';
  * Shows the messages of an ApiError (or any Error) as a danger alert; renders nothing
  * without an error.
  */
-const ErrorAlert = ({ error }) => {
+const ErrorAlert = ({ error = null }) => {
     if (!error) {
         return null;
     }
@@ -25,10 +25,6 @@ const ErrorAlert = ({ error }) => {
 
 ErrorAlert.propTypes = {
     error: PropTypes.object,
-};
-
-ErrorAlert.defaultProps = {
-    error: null,
 };
 
 export default ErrorAlert;

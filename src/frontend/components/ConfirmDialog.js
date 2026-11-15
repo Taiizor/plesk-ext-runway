@@ -8,7 +8,7 @@ import { Button, Dialog, Translate } from '@plesk/plesk-ext-sdk';
  * Confirmation dialog (DESIGN section 8: never window.confirm). The confirm button shows a
  * spinner while `busy`.
  */
-const ConfirmDialog = ({ isOpen, title, children, confirmText, intent, busy, onConfirm, onClose }) => (
+const ConfirmDialog = ({ isOpen, title, children = null, confirmText, intent = 'primary', busy = false, onConfirm, onClose }) => (
     <Dialog
         isOpen={isOpen}
         size="sm"
@@ -34,12 +34,6 @@ ConfirmDialog.propTypes = {
     busy: PropTypes.bool,
     onConfirm: PropTypes.func.isRequired,
     onClose: PropTypes.func.isRequired,
-};
-
-ConfirmDialog.defaultProps = {
-    children: null,
-    intent: 'primary',
-    busy: false,
 };
 
 export default ConfirmDialog;

@@ -25,7 +25,7 @@ let loadedVersion = null;
  * page. `update` is the answer of GET api/update (the overview reloads it with its poll);
  * `onReload` loads it again (after the job finished).
  */
-const UpdateNotice = ({ api, update, onReload }) => {
+const UpdateNotice = ({ api, update = null, onReload }) => {
     const [confirm, setConfirm] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState(null);
@@ -163,10 +163,6 @@ UpdateNotice.propTypes = {
     api: PropTypes.object.isRequired,
     update: PropTypes.object,
     onReload: PropTypes.func.isRequired,
-};
-
-UpdateNotice.defaultProps = {
-    update: null,
 };
 
 export default UpdateNotice;

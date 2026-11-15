@@ -29,7 +29,7 @@ const JOB_TEXT = {
 /**
  * Application state (ApiController::appState values) as a colored label.
  */
-export const StateLabel = ({ state, size }) => (
+export const StateLabel = ({ state = null, size }) => (
     <Label intent={stateIntent(state)} size={size}>
         {STATE_TEXT[state] || state || '?'}
     </Label>
@@ -40,15 +40,10 @@ StateLabel.propTypes = {
     size: PropTypes.oneOf(['sm', 'md', 'lg']),
 };
 
-StateLabel.defaultProps = {
-    state: null,
-    size: undefined,
-};
-
 /**
  * Background job state (queued, running, succeeded, failed, none) as a colored label.
  */
-export const JobLabel = ({ state }) => (
+export const JobLabel = ({ state = null }) => (
     <Label intent={jobIntent(state)} view="light">
         {JOB_TEXT[state] || state || '?'}
     </Label>
@@ -56,8 +51,4 @@ export const JobLabel = ({ state }) => (
 
 JobLabel.propTypes = {
     state: PropTypes.string,
-};
-
-JobLabel.defaultProps = {
-    state: null,
 };

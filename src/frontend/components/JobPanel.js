@@ -13,7 +13,7 @@ import LogOutput from './LogOutput';
  * Background job (toolchain installation, build dependencies): state, times, message and the
  * live log tail.
  */
-const JobPanel = ({ job, log, title, collapsed, onToggle }) => {
+const JobPanel = ({ job = null, log = '', title = null, collapsed = false, onToggle }) => {
     const translate = useTranslate();
     if (!job || !job.state || job.state === 'none') {
         return null;
@@ -54,14 +54,6 @@ JobPanel.propTypes = {
     title: PropTypes.node,
     collapsed: PropTypes.bool,
     onToggle: PropTypes.func,
-};
-
-JobPanel.defaultProps = {
-    job: null,
-    log: '',
-    title: null,
-    collapsed: false,
-    onToggle: undefined,
 };
 
 export default JobPanel;

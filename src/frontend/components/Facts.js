@@ -17,7 +17,7 @@ const valueStyle = { minWidth: 0, overflowWrap: 'anywhere' };
  * Two-column list of facts: [{key, label, value}]. Rows whose value is null, undefined or ''
  * show a dash unless `hideEmpty` is set.
  */
-const Facts = ({ rows, hideEmpty }) => {
+const Facts = ({ rows, hideEmpty = false }) => {
     const visible = rows.filter(row => row && !(hideEmpty && (row.value === null || row.value === undefined || row.value === '')));
     if (!visible.length) {
         return null;
@@ -41,10 +41,6 @@ Facts.propTypes = {
         value: PropTypes.node,
     })).isRequired,
     hideEmpty: PropTypes.bool,
-};
-
-Facts.defaultProps = {
-    hideEmpty: false,
 };
 
 export default Facts;

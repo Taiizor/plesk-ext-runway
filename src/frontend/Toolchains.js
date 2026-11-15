@@ -26,7 +26,7 @@ const DEP_TOOLS_HINT = <Translate content="Toolchains.buildDepsHint" />;
  * (loaded when the tab is opened) plus a free-text field for versions or channels that are
  * not listed.
  */
-const InstallControl = ({ meta, available, installed, busy, disabled, onInstall, onReload }) => {
+const InstallControl = ({ meta, available = null, installed = [], busy = false, disabled = false, onInstall, onReload }) => {
     const [selected, setSelected] = useState('');
     const [custom, setCustom] = useState('');
     const translate = useTranslate();
@@ -94,13 +94,6 @@ InstallControl.propTypes = {
     disabled: PropTypes.bool,
     onInstall: PropTypes.func.isRequired,
     onReload: PropTypes.func.isRequired,
-};
-
-InstallControl.defaultProps = {
-    available: null,
-    installed: [],
-    busy: false,
-    disabled: false,
 };
 
 /**

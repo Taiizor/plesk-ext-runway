@@ -28,7 +28,7 @@ const darkThemeFix = 'html[data-theme="dark"] pre.runway-log { filter: invert(1)
  * Log viewer (dark, monospace, also in Plesk's dark theme). Keeps the view scrolled to the
  * bottom when new output arrives, unless the user scrolled up to read older lines.
  */
-const LogOutput = ({ text, empty }) => {
+const LogOutput = ({ text = '', empty = null }) => {
     const ref = useRef(null);
     const stick = useRef(true);
     useEffect(() => {
@@ -56,11 +56,6 @@ const LogOutput = ({ text, empty }) => {
 LogOutput.propTypes = {
     text: PropTypes.string,
     empty: PropTypes.node,
-};
-
-LogOutput.defaultProps = {
-    text: '',
-    empty: null,
 };
 
 export default LogOutput;
