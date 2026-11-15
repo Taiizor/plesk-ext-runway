@@ -207,9 +207,17 @@ const ProjectPanel = ({ data, runtimes, drawer = null, busy = false, error = nul
     const detected = detectedRuntimes(inspect, runtimes);
     const triggers = inspect && isObject(inspect.triggers) ? inspect.triggers : null;
     const sampleRuntime = config.runtime && runtimes.some(meta => meta.key === config.runtime) ? config.runtime : (runtimes[0] && runtimes[0].key) || '';
+    const worker = config.mode === 'worker' || config.listen === 'none';
 
     const rows = [
         { key: 'path', label: <Translate content="Domain.project.path" />, value: path ? <Mono>{path}</Mono> : null },
+        {
+            key: 'documentRoot',
+            label: <Translate content="Domain.form.documentRoot" />,
+            value: !worker && isObject(data.domain) && data.domain.documentRoot ? (
+                <Mono>{data.domain.documentRoot}</Mono>
+            ) : null,
+        },
         {
             key: 'files',
             label: <Translate content="Domain.project.files" />,

@@ -7,6 +7,7 @@ import {
     Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
+import Mono from '../components/Mono';
 import { documentRootChange, normalDocumentRoot } from '../lib/documentRoot';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
@@ -527,7 +528,14 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                         <FormFieldCheckbox
                             name="changeDocumentRoot"
                             label={<Translate content="Domain.form.changeDocumentRoot" />}
-                            description={<Translate content="Domain.form.keepDocumentRoot" />}
+                            description={(
+                                <span>
+                                    <span style={{ display: 'block', marginBottom: '4px' }}>
+                                        <Translate content="Domain.form.documentRoot" />: <Mono>{documentRoot || 'httpdocs'}</Mono>
+                                    </span>
+                                    <Translate content="Domain.form.keepDocumentRoot" />
+                                </span>
+                            )}
                             disabled={!documentRootAllowed}
                         />
                     )}
@@ -537,6 +545,9 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.documentRoot" />}
                             description={(
                                 <span>
+                                    <span style={{ display: 'block', marginBottom: '4px' }}>
+                                        <Translate content="Domain.form.documentRoot" />: <Mono>{documentRoot || 'httpdocs'}</Mono>
+                                    </span>
                                     <Translate content="Domain.form.documentRootHint" />
                                     {' '}
                                     <Translate
