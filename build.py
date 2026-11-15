@@ -62,7 +62,7 @@ TEXT_EXTENSIONS = {".php", ".phtml", ".xml", ".js", ".css", ".md", ".txt", ".jso
 EXECUTABLE_PREFIXES = ("sbin/",)
 # Source-only directories (relative to src/) that are never packaged.
 EXCLUDED_DIRS = ("frontend",)
-EXCLUDED_SUFFIXES = (".bak", ".swp", "~", ".map")
+EXCLUDED_SUFFIXES = (".bak", ".swp", "~", ".map", ".pyc")
 # Generated files: source sections are scanned instead of the assembled helper, as with the UI.
 GENERATED = ("htdocs/index.php", "htdocs/dist/", "sbin/runway-helper")
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
@@ -145,6 +145,7 @@ def iter_source_files():
     for dirpath, dirnames, filenames in os.walk(SRC):
         rel_dir = os.path.relpath(dirpath, SRC).replace(os.sep, "/")
         dirnames[:] = sorted(d for d in dirnames if not d.startswith(".")
+                             and d != "__pycache__"
                              and not (rel_dir == "." and d in EXCLUDED_DIRS))
         for name in sorted(filenames):
             if name.startswith(".") or name.endswith(EXCLUDED_SUFFIXES):
@@ -158,7 +159,7 @@ def iter_frontend_sources():
     """Text files of src/frontend (not packaged, but compiled into htdocs/dist/main.js)."""
     base = os.path.join(SRC, "frontend")
     for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d != "__pycache__")
         for name in sorted(filenames):
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, SRC).replace(os.sep, "/")
