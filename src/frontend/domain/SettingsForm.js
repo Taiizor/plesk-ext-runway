@@ -8,6 +8,7 @@ import {
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from '../lib/api';
 import Mono from '../components/Mono';
+import EnvEditor from './EnvEditor';
 import { documentRootChange, normalDocumentRoot } from '../lib/documentRoot';
 import { helperText, isObject, isolate, runtimeDefaults, runtimeName, unixSupported } from '../lib/format';
 
@@ -177,7 +178,7 @@ const requestBody = (values, data, isAdmin, supportsBuild, openedRoot) => {
  * visible, commands, environment, URL paths, triggers and limits are in "Advanced".
  * Validation errors of api/app/save appear under the fields.
  */
-const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error = null, onSave }) => {
+const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error = null, onSave, api = null, siteId = null }) => {
     // The values the form was opened with (the page remounts the form after every save): the save
     // compares against them to send the document root only when it was changed, and only it when
     // nothing else changed.
@@ -191,6 +192,25 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
     });
     const [values, setValues] = useState(opened);
     const [advanced, setAdvanced] = useState(false);
+    const [pingBusy, setPingBusy] = useState(false);
+    const [pingResult, setPingResult] = useState(null);
+
+    const testHealthEndpoint = () => {
+        if (!api || !siteId) return;
+        setPingBusy(true);
+        setPingResult(null);
+        api.post('app/health-ping', {
+            site_id: siteId,
+            health_path: values.healthPath,
+            health_match: values.healthMatch,
+        }).then(result => {
+            setPingBusy(false);
+            setPingResult(result);
+        }).catch(err => {
+            setPingBusy(false);
+            setPingResult({ healthy: false, detail: err.message, latency_ms: 0 });
+        });
+    };
     // Visible result of the last click on "Use the default commands" ({ applied }, null: none);
     // every click sets a new object, which restarts the timer that hides it.
     const [defaultsNotice, setDefaultsNotice] = useState(null);
@@ -514,17 +534,16 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             </span>
                         )}
                     </FormField>
-                    <FormFieldText
-                        name="env"
+                    <FormField
                         label={<Translate content="Domain.form.env" />}
                         description={typeof data.env === 'string' ? <Translate content="Domain.form.envHint" /> : <Translate content="Domain.form.envUnavailable" />}
-                        multiline
-                        rows={5}
-                        size="fill"
-                        disabled={typeof data.env !== 'string'}
-                        placeholder="KEY=value"
-                        inputProps={codeInput}
-                    />
+                    >
+                        <EnvEditor
+                            value={values.env}
+                            onChange={v => onFieldChange('env', v)}
+                            disabled={typeof data.env !== 'string'}
+                        />
+                    </FormField>
                     {!worker && (
                         <FormFieldCheckbox
                             name="changeDocumentRoot"
@@ -611,13 +630,35 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                         />
                     )}
                     {!worker && (
-                        <FormFieldText
-                            name="healthPath"
-                            label={<Translate content="Domain.form.healthPath" />}
-                            description={<Translate content="Domain.form.healthPathHint" />}
-                            placeholder="/healthz"
-                            inputProps={pathInput}
-                        />
+                        <div>
+                            <FormFieldText
+                                name="healthPath"
+                                label={<Translate content="Domain.form.healthPath" />}
+                                description={<Translate content="Domain.form.healthPathHint" />}
+                                placeholder="/healthz"
+                                inputProps={pathInput}
+                            />
+                            {api && siteId && (
+                                <div style={{ marginTop: '-8px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <Button
+                                        size="small"
+                                        icon="refresh"
+                                        disabled={pingBusy || !values.healthPath}
+                                        state={pingBusy ? 'loading' : undefined}
+                                        onClick={testHealthEndpoint}
+                                    >
+                                        Test Endpoint
+                                    </Button>
+                                    {pingResult && (
+                                        <Status intent={pingResult.healthy ? 'success' : 'danger'}>
+                                            {pingResult.healthy
+                                                ? `HTTP ${pingResult.status_code || 200} (${pingResult.latency_ms} ms)`
+                                                : `${pingResult.detail || 'Failed'} (${pingResult.latency_ms} ms)`}
+                                        </Status>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
                     {!worker && (
                         <FormFieldText

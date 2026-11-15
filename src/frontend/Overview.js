@@ -136,7 +136,8 @@ const Overview = ({ baseUrl }) => {
     // It is reloaded with the overview (update-status reads only local files), so an admin job
     // that ends, or a self-update started elsewhere, shows up without a page reload.
     const update = useApiData(() => (isAdmin ? api.get('update') : Promise.resolve(null)), [api, isAdmin]);
-    usePolling(() => Promise.all([overview.reload(), isAdmin ? update.reload() : null]), OVERVIEW_POLL_MS, Boolean(overview.data));
+    const serverMetrics = useApiData(() => (isAdmin ? api.get('metrics', { range: '1h' }) : Promise.resolve(null)), [api, isAdmin]);
+    usePolling(() => Promise.all([overview.reload(), isAdmin ? update.reload() : null, isAdmin ? serverMetrics.reload() : null]), OVERVIEW_POLL_MS, Boolean(overview.data));
     const [checking, setChecking] = useState(false);
     const [checkError, setCheckError] = useState(null);
     const checkNow = () => {
@@ -389,6 +390,21 @@ const Overview = ({ baseUrl }) => {
                             )}
                         </div>
                     </div>
+
+                    {isAdmin && serverMetrics.data && serverMetrics.data.latest && (
+                        <div style={kpiCardStyle}>
+                            <div style={kpiHeaderStyle}>
+                                <Text intent="muted" fontSize="sm">Server Load</Text>
+                                <Icon name="dashboard" size="16" intent="info" />
+                            </div>
+                            <div style={{ fontSize: '20px', fontWeight: 600 }}>
+                                <span>{serverMetrics.data.latest.cpu_percent || 0}% CPU</span>
+                            </div>
+                            <Text intent="muted" fontSize="sm">
+                                {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)} RAM
+                            </Text>
+                        </div>
+                    )}
                 </div>
             )}
 

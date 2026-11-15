@@ -27,6 +27,7 @@
   "applications.py",
   "health.py",
   "health_watch.py",
+  "metrics.py",
   "app_control.py",
   "fetch.py",
   "app_queries.py",

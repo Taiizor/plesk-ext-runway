@@ -36,6 +36,9 @@ COMMANDS = {
     "install": cmd_install,
     "uninstall": cmd_uninstall,
     "operations": cmd_operations,
+    "app-metrics": cmd_app_metrics,
+    "server-metrics": cmd_server_metrics,
+    "health-ping": cmd_health_ping,
 }
 
 

@@ -211,6 +211,10 @@ def app_status(domain_id, state=None):
                     status.update({"standby_listener": "foreign",
                                    "standby_detail": "port %d of the next switch is held by uid %s; the switch uses another port" % (standby, others),
                                    "standby_code": "standby_foreign", "standby_params": {"port": standby, "uids": others}})
+    try:
+        record_app_metric_sample(domain_id, state)
+    except Exception:
+        pass
     return status
 
 

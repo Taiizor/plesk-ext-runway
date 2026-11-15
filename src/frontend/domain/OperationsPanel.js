@@ -23,7 +23,7 @@ const actionsStyle = { display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '1
 /** Optional settings are saved separately from application configuration and never restart a service. */
 const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
     const translate = useTranslate();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(true);
     const status = useApiData(() => (open ? api.get('app/operations', { site_id: siteId }) : Promise.resolve(null)), [api, siteId, open]);
     const [edited, setEdited] = useState(null);
     const [error, setError] = useState(null);
@@ -34,6 +34,7 @@ const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
     const [confirm, setConfirm] = useState(null);
     const [importText, setImportText] = useState('');
     const [restoreSecrets, setRestoreSecrets] = useState(false);
+    const [testNotifyResult, setTestNotifyResult] = useState(null);
     const begin = useLatest();
     const data = status.data;
     const options = data && data.options;
@@ -83,6 +84,13 @@ const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
             setConfirm(null);
             setError(new Error(translate('Operations.invalidBackup')));
         }
+    };
+
+    const testNotification = () => {
+        setTestNotifyResult(null);
+        action('test-notification', {}, res => {
+            setTestNotifyResult({ ok: true, status: res && res.result && res.result.status ? res.result.status : 200 });
+        });
     };
 
     const blocked = Boolean(busy || deploying);
@@ -137,6 +145,22 @@ const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
                         {values.notifications && (
                             <div>
                                 {field('notification_url', null, { size: 'xl', placeholder: 'https://example.com/runway' })}
+                                <div style={{ marginTop: '6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Button
+                                        size="small"
+                                        icon="send"
+                                        disabled={blocked || !values.notification_url}
+                                        state={busy === 'test-notification' ? 'loading' : undefined}
+                                        onClick={testNotification}
+                                    >
+                                        Test Webhook
+                                    </Button>
+                                    {testNotifyResult && (
+                                        <Status intent={testNotifyResult.ok ? 'success' : 'danger'}>
+                                            {testNotifyResult.ok ? `Delivered (HTTP ${testNotifyResult.status})` : 'Delivery failed'}
+                                        </Status>
+                                    )}
+                                </div>
                                 {field('notification_secret', options.has_notification_secret ? 'secretKept' : 'secretHint', {
                                     size: 'xl', inputProps: { ...codeInput, type: 'password', autoComplete: 'new-password' },
                                 })}

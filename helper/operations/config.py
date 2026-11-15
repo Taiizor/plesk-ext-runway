@@ -194,6 +194,18 @@ def cmd_operations(payload):
         return ops_export(state, options)
     if action == "import":
         return ops_import(state, pw, payload.get("backup"), payload.get("restore_secrets") is True)
+    if action == "test-notification":
+        if not options.get("notification_url"):
+            raise HelperError("Notification URL is not configured")
+        test_event = {
+            "event": "test",
+            "time": now_iso(),
+            "domain": state.get("domain", ""),
+            "domain_id": domain_id,
+            "message": "Runway notification webhook test",
+        }
+        res = call_as_user(pw, _user_send_notification, options, test_event, timeout=10)
+        return {"ok": True, "result": res}
     raise HelperError("Unknown operations action")
 
 

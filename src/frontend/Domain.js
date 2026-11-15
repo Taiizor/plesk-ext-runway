@@ -3,7 +3,7 @@
 import { createElement, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Grid, GridCol, Panel, Paragraph, RouterLink, Translate, withStatusMessages, useTranslate,
+    Alert, Button, Grid, GridCol, Panel, Paragraph, RouterLink, Tab, Tabs, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { isObject } from './lib/format';
 import {
@@ -11,20 +11,20 @@ import {
 } from './lib/hooks';
 import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
+import HeroHeader from './domain/HeroHeader';
+import OverviewTab from './domain/OverviewTab';
 import HelpPanel from './domain/HelpPanel';
 import LogsPanel from './domain/LogsPanel';
 import OperationsPanel from './domain/OperationsPanel';
 import ProjectPanel from './domain/ProjectPanel';
 import SettingsForm from './domain/SettingsForm';
-import StatusPanel from './domain/StatusPanel';
 
 const LOG_LINES = 300;
 
 /**
- * Application page of one domain (site_id from the query string; the Dev Tools button of the
- * domain passes it): status and controls, project detection with the sample/fetch drawers,
- * the settings form, logs, help and the danger zone. Admins, or customers with the
- * permission (every API call checks access).
+ * Modern cloud-console application management page:
+ * Hero Header with quick actions, Tabbed views for Status & Metrics,
+ * Configuration, Project & Files, Deployments & Operations, Logs, Help & Danger zone.
  */
 const Domain = ({ baseUrl, statusMessages }) => {
     const api = useApi(baseUrl);
@@ -32,6 +32,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
     const siteId = queryParam('site_id') || queryParam('dom_id');
     const context = useApiData(() => api.get('context'), [api]);
     const page = useApiData(() => (siteId ? api.get('app', { site_id: siteId }) : Promise.resolve(null)), [api, siteId]);
+    const [activeTab, setActiveTab] = useState('overview');
     const [formVersion, setFormVersion] = useState(0);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
@@ -93,7 +94,6 @@ const Domain = ({ baseUrl, statusMessages }) => {
             page.reload();
             refreshLog();
             if (state === 'succeeded') {
-                // A stopped application (Stop) is built but stays stopped.
                 toast(status && status.stopped ? 'warning' : 'success',
                     translate(status && status.stopped ? 'Domain.messages.deployBuiltStopped' : 'Domain.messages.deploySucceeded'));
             } else if (state === 'failed') {
@@ -109,6 +109,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
     );
 
     const showDeployLog = () => {
+        setActiveTab('logs');
         if (logKind !== 'deploy') {
             setLogKind('deploy');
         }
@@ -118,12 +119,10 @@ const Domain = ({ baseUrl, statusMessages }) => {
         poke();
         setConfirm(null);
         setBusyOp(op);
-        // "Restart in place" of a zero-downtime application: a restart without a switch.
         const body = op === 'restartPlain' ? { site_id: siteId, op: 'restart', plain: true } : { site_id: siteId, op };
         api.post('app/control', body).then(result => {
             setBusyOp(null);
             toast('success', (result && result.message) || translate('Domain.messages.done'));
-            // A zero-downtime restart runs as a deploy job (the switch) like "Build & restart".
             if (op === 'deploy' || (result && result.job)) {
                 if (result && isObject(result.job)) {
                     setStatus(prev => ({ ...(prev || {}), deploy: result.job }));
@@ -138,7 +137,6 @@ const Domain = ({ baseUrl, statusMessages }) => {
         });
     };
 
-    /** Toast of a save or a sample: a warning when the build could not start; follow a started build. */
     const reportApplied = (result, fallback) => {
         toast(result && result.buildError ? 'warning' : 'success', (result && result.message) || fallback);
         if (result && (result.build || result.job)) {
@@ -240,25 +238,66 @@ const Domain = ({ baseUrl, statusMessages }) => {
     const meta = runtimes.filter(item => item.key === config.runtime)[0] || null;
     const domain = isObject(data.domain) ? data.domain : {};
 
+    const visibleTabs = [
+        { id: 'overview', title: <Translate content="Domain.status.title" /> },
+        { id: 'settings', title: <Translate content="Domain.form.title" /> },
+        { id: 'project', title: <Translate content="Domain.project.title" /> },
+        ...(configured ? [
+            { id: 'operations', title: <Translate content="Operations.title" /> },
+            { id: 'logs', title: <Translate content="Domain.logs.title" /> },
+        ] : []),
+        { id: 'help', title: <Translate content="Domain.help.title" /> },
+    ];
+    const activeIndex = Math.max(0, visibleTabs.findIndex(t => t.id === activeTab));
+
     return (
         <div>
             <ErrorAlert error={page.error} />
             {data.pageError && <Alert intent="warning">{data.pageError}</Alert>}
             {domain.active === false && <Alert intent="warning"><Translate content="Domain.inactive" /></Alert>}
 
-            <Grid xs={1} lg={2} gap="md">
-                <GridCol>
-                    <StatusPanel
+            {/* Hero Header with Badges & Instant Actions */}
+            <HeroHeader
+                domain={domain}
+                config={config}
+                status={status}
+                configured={configured}
+                busyOp={busyOp}
+                onControl={control}
+                onStop={() => setConfirm('stop')}
+            />
+
+            {/* Modern Tabbed Content Navigation */}
+            <Tabs active={activeIndex + 1}>
+                <Tab title={<Translate content="Domain.status.title" />} onActivate={() => setActiveTab('overview')}>
+                    <OverviewTab
+                        api={api}
+                        siteId={siteId}
                         data={data}
                         status={status}
-                        error={statusError}
-                        updatedAt={statusUpdatedAt}
+                        statusError={statusError}
+                        statusUpdatedAt={statusUpdatedAt}
                         busyOp={busyOp}
                         onControl={control}
                         onStop={() => setConfirm('stop')}
                     />
-                </GridCol>
-                <GridCol>
+                </Tab>
+
+                <Tab title={<Translate content="Domain.form.title" />} onActivate={() => setActiveTab('settings')}>
+                    <SettingsForm
+                        key={`${siteId}-${formVersion}`}
+                        data={data}
+                        runtimes={runtimes}
+                        isAdmin={isAdmin}
+                        saving={saving}
+                        error={saveError}
+                        onSave={save}
+                        api={api}
+                        siteId={siteId}
+                    />
+                </Tab>
+
+                <Tab title={<Translate content="Domain.project.title" />} onActivate={() => setActiveTab('project')}>
                     <ProjectPanel
                         data={data}
                         runtimes={runtimes}
@@ -270,70 +309,66 @@ const Domain = ({ baseUrl, statusMessages }) => {
                         onSample={sample}
                         onFetch={fetchBinary}
                     />
-                </GridCol>
-            </Grid>
+                </Tab>
 
-            <SettingsForm
-                key={`${siteId}-${formVersion}`}
-                data={data}
-                runtimes={runtimes}
-                isAdmin={isAdmin}
-                saving={saving}
-                error={saveError}
-                onSave={save}
-            />
+                {configured && (
+                    <Tab title={<Translate content="Operations.title" />} onActivate={() => setActiveTab('operations')}>
+                        <OperationsPanel
+                            api={api}
+                            siteId={siteId}
+                            deploying={deploying}
+                            stopped={Boolean(status && status.stopped)}
+                            onChanged={action => {
+                                refreshStatus();
+                                if (action === 'rollback') {
+                                    showDeployLog();
+                                }
+                                if (action === 'import') {
+                                    page.reload().then(() => setFormVersion(version => version + 1));
+                                }
+                            }}
+                        />
+                    </Tab>
+                )}
 
-            {configured && (
-                <OperationsPanel
-                    api={api}
-                    siteId={siteId}
-                    deploying={deploying}
-                    stopped={Boolean(status && status.stopped)}
-                    onChanged={action => {
-                        refreshStatus();
-                        if (action === 'rollback') {
-                            showDeployLog();
-                        }
-                        if (action === 'import') {
-                            page.reload().then(() => setFormVersion(version => version + 1));
-                        }
-                    }}
-                />
-            )}
+                {configured && (
+                    <Tab title={<Translate content="Domain.logs.title" />} onActivate={() => setActiveTab('logs')}>
+                        <LogsPanel
+                            kind={logKind}
+                            switchable={Boolean(status && status.switchable)}
+                            text={log.text}
+                            error={log.error}
+                            loading={log.loading}
+                            autoRefresh={autoRefresh}
+                            onKind={setLogKind}
+                            onAutoRefresh={value => {
+                                poke();
+                                setAutoRefresh(value);
+                            }}
+                            onRefresh={() => {
+                                poke();
+                                refreshLog();
+                            }}
+                        />
+                    </Tab>
+                )}
 
-            {configured && (
-                <LogsPanel
-                    kind={logKind}
-                    switchable={Boolean(status && status.switchable)}
-                    text={log.text}
-                    error={log.error}
-                    loading={log.loading}
-                    autoRefresh={autoRefresh}
-                    onKind={setLogKind}
-                    onAutoRefresh={value => {
-                        poke();
-                        setAutoRefresh(value);
-                    }}
-                    onRefresh={() => {
-                        poke();
-                        refreshLog();
-                    }}
-                />
-            )}
-
-            <Grid xs={1} lg={2} gap="md">
-                <GridCol>
-                    <HelpPanel meta={meta} collapsed={configured} />
-                </GridCol>
-                <GridCol>
-                    <Panel title={<Translate content="Domain.danger.title" />}>
-                        <Paragraph><Translate content="Domain.danger.removeHint" /></Paragraph>
-                        <Button intent="danger" icon="recycle" disabled={!configured || Boolean(busyOp)} onClick={() => setConfirm('remove')}>
-                            <Translate content="Domain.danger.remove" />
-                        </Button>
-                    </Panel>
-                </GridCol>
-            </Grid>
+                <Tab title={<Translate content="Domain.help.title" />} onActivate={() => setActiveTab('help')}>
+                    <Grid xs={1} lg={2} gap="md" style={{ marginTop: '14px' }}>
+                        <GridCol>
+                            <HelpPanel meta={meta} collapsed={false} />
+                        </GridCol>
+                        <GridCol>
+                            <Panel title={<Translate content="Domain.danger.title" />}>
+                                <Paragraph><Translate content="Domain.danger.removeHint" /></Paragraph>
+                                <Button intent="danger" icon="recycle" disabled={!configured || Boolean(busyOp)} onClick={() => setConfirm('remove')}>
+                                    <Translate content="Domain.danger.remove" />
+                                </Button>
+                            </Panel>
+                        </GridCol>
+                    </Grid>
+                </Tab>
+            </Tabs>
 
             <ConfirmDialog
                 isOpen={confirm === 'stop'}
@@ -347,6 +382,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
                 <Paragraph><Translate content="Domain.confirm.stop" /></Paragraph>
                 <Paragraph><Translate content="Domain.confirm.stopPersists" /></Paragraph>
             </ConfirmDialog>
+
             <ConfirmDialog
                 isOpen={confirm === 'remove'}
                 title={<Translate content="Domain.confirm.removeTitle" />}

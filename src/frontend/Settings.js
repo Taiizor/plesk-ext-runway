@@ -3,7 +3,7 @@
 import { createElement, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Form, FormFieldCheckbox, FormFieldText, RouterLink, Section, Text, Toolbar, Translate, withStatusMessages, useTranslate,
+    Alert, Button, Form, FormFieldCheckbox, FormFieldText, RouterLink, Section, Tab, Tabs, Text, Toolbar, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formErrors } from './lib/api';
 import { useApi, useApiData } from './lib/hooks';
@@ -46,9 +46,8 @@ const NumberField = props => (
 );
 
 /**
- * Server-wide settings (administrators only): port range, default limits of new applications,
- * build limits, the number of applications per subscription, zero-downtime deployments and the
- * built-in updater.
+ * Server-wide settings (administrators only): categorized tabs, preset profiles,
+ * port range, default limits, build limits, zero-downtime and updater.
  */
 const Settings = ({ baseUrl, statusMessages }) => {
     const api = useApi(baseUrl);
@@ -57,6 +56,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
     const [values, setValues] = useState(null);
     const [error, setError] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState(0);
 
     const save = formValues => {
         setSaving(true);
@@ -84,19 +84,95 @@ const Settings = ({ baseUrl, statusMessages }) => {
             .map(key => [].concat(error.fieldErrors[key]).join(' '))
         : [];
 
+    const applyPreset = presetName => {
+        if (presetName === 'vps') {
+            setValues({
+                ...current,
+                memoryMb: 256,
+                cpuPercent: 50,
+                tasks: 128,
+                buildTimeout: 1800,
+                buildMemoryMb: 1024,
+                buildCpuPercent: 50,
+                buildTasks: 1024,
+            });
+            statusMessages.add({ intent: 'info', message: 'Applied "Low-RAM VPS" preset values to form.' });
+        } else if (presetName === 'standard') {
+            setValues({
+                ...current,
+                memoryMb: 512,
+                cpuPercent: 100,
+                tasks: 512,
+                buildTimeout: 3600,
+                buildMemoryMb: 2048,
+                buildCpuPercent: 100,
+                buildTasks: 2048,
+            });
+            statusMessages.add({ intent: 'info', message: 'Applied "Standard Web Server" preset values to form.' });
+        } else if (presetName === 'high') {
+            setValues({
+                ...current,
+                memoryMb: 2048,
+                cpuPercent: 400,
+                tasks: 2048,
+                buildTimeout: 7200,
+                buildMemoryMb: 4096,
+                buildCpuPercent: 200,
+                buildTasks: 4096,
+            });
+            statusMessages.add({ intent: 'info', message: 'Applied "High Performance" preset values to form.' });
+        }
+    };
+
     return (
         <div>
-            <Toolbar style={{ flexWrap: 'wrap', gap: '8px' }}>
+            <Toolbar style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '16px' }}>
                 <Button component={RouterLink} to="/overview" icon="arrow-left" ghost>
                     <Translate content="Common.backToOverview" />
                 </Button>
             </Toolbar>
+
+            {/* Preset Profiles Bar */}
+            <div style={{
+                background: 'var(--pul-color-background-surface, #ffffff)',
+                border: '1px solid var(--pul-color-border-subtle, #e5e7eb)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
+            }}>
+                <div>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--pul-color-text-primary, #111827)' }}>
+                        Quick Presets:
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--pul-color-text-muted, #6b7280)', marginLeft: '8px' }}>
+                        Load recommended defaults for your server profile
+                    </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <Button size="small" onClick={() => applyPreset('vps')}>
+                        Low-RAM VPS
+                    </Button>
+                    <Button size="small" intent="primary" onClick={() => applyPreset('standard')}>
+                        Standard Server
+                    </Button>
+                    <Button size="small" onClick={() => applyPreset('high')}>
+                        High Performance
+                    </Button>
+                </div>
+            </div>
+
             {error && error.fieldErrors && (
                 <Alert intent="danger">
                     <Translate content="Common.fixErrors" />
                     {unknownErrors.map(message => <div key={message}>{message}</div>)}
                 </Alert>
             )}
+
             <Form
                 values={current}
                 errors={formErrors(error)}
@@ -107,64 +183,82 @@ const Settings = ({ baseUrl, statusMessages }) => {
                 applyButton={false}
                 cancelButton={false}
             >
-                <Section title={<Translate content="Settings.sectionPorts" />}>
-                    <NumberField name="portMin" label={<Translate content="Settings.portMin" />} description={<Translate content="Settings.portMinHint" />} />
-                    <NumberField name="portMax" label={<Translate content="Settings.portMax" />} description={<Translate content="Settings.portMaxHint" />} />
-                </Section>
-                <Section title={<Translate content="Settings.sectionDefaults" />}>
-                    <NumberField name="memoryMb" label={<Translate content="Settings.memoryMb" />} description={<Translate content="Settings.memoryMbHint" />} />
-                    <NumberField name="cpuPercent" label={<Translate content="Settings.cpuPercent" />} description={<Translate content="Settings.cpuPercentHint" />} />
-                    <NumberField name="tasks" label={<Translate content="Settings.tasks" />} description={<Translate content="Settings.tasksHint" />} />
-                </Section>
-                <Section title={<Translate content="Settings.sectionBuilds" />}>
-                    <NumberField name="buildTimeout" label={<Translate content="Settings.buildTimeout" />} description={<Translate content="Settings.buildTimeoutHint" />} />
-                    <NumberField name="buildMemoryMb" label={<Translate content="Settings.buildMemoryMb" />} description={<Translate content="Settings.buildMemoryMbHint" />} />
-                    <NumberField name="buildCpuPercent" label={<Translate content="Settings.buildCpuPercent" />} description={<Translate content="Settings.buildCpuPercentHint" />} />
-                    <NumberField name="buildTasks" label={<Translate content="Settings.buildTasks" />} description={<Translate content="Settings.buildTasksHint" />} />
-                </Section>
-                <Section title={<Translate content="Settings.sectionSubscriptions" />}>
-                    <FormFieldCheckbox
-                        name="planPolicies"
-                        label={<Translate content="Settings.planPolicies" />}
-                        description={<Translate content="Settings.planPoliciesHint" />}
-                    />
-                    <NumberField
-                        name="maxAppsPerSubscription"
-                        label={<Translate content="Settings.maxAppsPerSubscription" />}
-                        description={<Translate content="Settings.maxAppsPerSubscriptionHint" />}
-                    />
-                </Section>
-                <Section title={<Translate content="Settings.sectionZeroDowntime" />}>
-                    <FormFieldCheckbox
-                        name="zeroDowntimeCustomers"
-                        label={<Translate content="Settings.zeroDowntimeCustomers" />}
-                        description={<Translate content="Settings.zeroDowntimeCustomersHint" />}
-                    />
-                    <NumberField
-                        name="zeroDowntimeMaxReady"
-                        label={<Translate content="Settings.zeroDowntimeMaxReady" />}
-                        description={<Translate content="Settings.zeroDowntimeMaxReadyHint" />}
-                    />
-                    <NumberField
-                        name="zeroDowntimeMaxDrain"
-                        label={<Translate content="Settings.zeroDowntimeMaxDrain" />}
-                        description={<Translate content="Settings.zeroDowntimeMaxDrainHint" />}
-                    />
-                </Section>
-                <Section title={<Translate content="Settings.sectionUpdates" />}>
-                    <FormFieldCheckbox
-                        name="updateCheck"
-                        label={<Translate content="Settings.updateCheck" />}
-                        description={<Translate content="Settings.updateCheckHint" />}
-                    />
-                    <FormFieldCheckbox
-                        name="updateAuto"
-                        label={<Translate content="Settings.updateAuto" />}
-                        description={<Translate content="Settings.updateAutoHint" />}
-                        disabled={!current.updateCheck}
-                    />
-                    <Text intent="muted" fontSize="sm"><Translate content="Settings.updatePrivacy" /></Text>
-                </Section>
+                <Tabs active={activeTab + 1}>
+                    <Tab title={<Translate content="Settings.sectionDefaults" />} onActivate={() => setActiveTab(0)}>
+                        <div style={{ paddingTop: '12px' }}>
+                            <NumberField name="memoryMb" label={<Translate content="Settings.memoryMb" />} description={<Translate content="Settings.memoryMbHint" />} />
+                            <NumberField name="cpuPercent" label={<Translate content="Settings.cpuPercent" />} description={<Translate content="Settings.cpuPercentHint" />} />
+                            <NumberField name="tasks" label={<Translate content="Settings.tasks" />} description={<Translate content="Settings.tasksHint" />} />
+                        </div>
+                    </Tab>
+
+                    <Tab title={<Translate content="Settings.sectionPorts" />} onActivate={() => setActiveTab(1)}>
+                        <div style={{ paddingTop: '12px' }}>
+                            <NumberField name="portMin" label={<Translate content="Settings.portMin" />} description={<Translate content="Settings.portMinHint" />} />
+                            <NumberField name="portMax" label={<Translate content="Settings.portMax" />} description={<Translate content="Settings.portMaxHint" />} />
+                        </div>
+                    </Tab>
+
+                    <Tab title={<Translate content="Settings.sectionBuilds" />} onActivate={() => setActiveTab(2)}>
+                        <div style={{ paddingTop: '12px' }}>
+                            <NumberField name="buildTimeout" label={<Translate content="Settings.buildTimeout" />} description={<Translate content="Settings.buildTimeoutHint" />} />
+                            <NumberField name="buildMemoryMb" label={<Translate content="Settings.buildMemoryMb" />} description={<Translate content="Settings.buildMemoryMbHint" />} />
+                            <NumberField name="buildCpuPercent" label={<Translate content="Settings.buildCpuPercent" />} description={<Translate content="Settings.buildCpuPercentHint" />} />
+                            <NumberField name="buildTasks" label={<Translate content="Settings.buildTasks" />} description={<Translate content="Settings.buildTasksHint" />} />
+                        </div>
+                    </Tab>
+
+                    <Tab title={<Translate content="Settings.sectionSubscriptions" />} onActivate={() => setActiveTab(3)}>
+                        <div style={{ paddingTop: '12px' }}>
+                            <FormFieldCheckbox
+                                name="planPolicies"
+                                label={<Translate content="Settings.planPolicies" />}
+                                description={<Translate content="Settings.planPoliciesHint" />}
+                            />
+                            <NumberField
+                                name="maxAppsPerSubscription"
+                                label={<Translate content="Settings.maxAppsPerSubscription" />}
+                                description={<Translate content="Settings.maxAppsPerSubscriptionHint" />}
+                            />
+                        </div>
+                    </Tab>
+
+                    <Tab title={<Translate content="Settings.sectionZeroDowntime" />} onActivate={() => setActiveTab(4)}>
+                        <div style={{ paddingTop: '12px' }}>
+                            <FormFieldCheckbox
+                                name="zeroDowntimeCustomers"
+                                label={<Translate content="Settings.zeroDowntimeCustomers" />}
+                                description={<Translate content="Settings.zeroDowntimeCustomersHint" />}
+                            />
+                            <NumberField
+                                name="zeroDowntimeMaxReady"
+                                label={<Translate content="Settings.zeroDowntimeMaxReady" />}
+                                description={<Translate content="Settings.zeroDowntimeMaxReadyHint" />}
+                            />
+                            <NumberField
+                                name="zeroDowntimeMaxDrain"
+                                label={<Translate content="Settings.zeroDowntimeMaxDrain" />}
+                                description={<Translate content="Settings.zeroDowntimeMaxDrainHint" />}
+                            />
+                            <div style={{ marginTop: '20px', borderTop: '1px solid var(--pul-color-border-subtle, #e5e7eb)', paddingTop: '16px' }}>
+                                <Section title={<Translate content="Settings.sectionUpdates" />}>
+                                    <FormFieldCheckbox
+                                        name="updateCheck"
+                                        label={<Translate content="Settings.updateCheck" />}
+                                        description={<Translate content="Settings.updateCheckHint" />}
+                                    />
+                                    <FormFieldCheckbox
+                                        name="updateAuto"
+                                        label={<Translate content="Settings.updateAuto" />}
+                                        description={<Translate content="Settings.updateAutoHint" />}
+                                        disabled={!current.updateCheck}
+                                    />
+                                    <Text intent="muted" fontSize="sm"><Translate content="Settings.updatePrivacy" /></Text>
+                                </Section>
+                            </div>
+                        </div>
+                    </Tab>
+                </Tabs>
             </Form>
         </div>
     );

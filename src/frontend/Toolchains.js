@@ -403,6 +403,66 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 onToggle={collapsed => setJobOpen(!collapsed)}
             />
 
+            {/* Visual Runtime Hub Cards Grid */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                gap: '12px',
+                marginTop: '16px',
+                marginBottom: '20px',
+            }}>
+                {runtimes.map(meta => {
+                    const isSelected = meta.key === activeKey;
+                    const entry = isObject(data.runtimes) && isObject(data.runtimes[meta.key]) ? data.runtimes[meta.key] : {};
+                    const instList = Array.isArray(entry.installed) ? entry.installed : [];
+                    const allDomains = new Set();
+                    instList.forEach(item => {
+                        if (Array.isArray(item.domains)) {
+                            item.domains.forEach(d => allDomains.add(d.name || d));
+                        }
+                    });
+                    const count = instList.length;
+
+                    return (
+                        <div
+                            key={meta.key}
+                            onClick={() => setActive(meta.key)}
+                            style={{
+                                background: 'var(--pul-color-background-surface, #ffffff)',
+                                border: isSelected ? '2px solid var(--pul-color-primary, #0070f3)' : '1px solid var(--pul-color-border-subtle, #e5e7eb)',
+                                borderRadius: '8px',
+                                padding: '14px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: isSelected ? '0 2px 8px rgba(0, 112, 243, 0.12)' : '0 1px 3px rgba(0,0,0,0.03)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                            }}
+                        >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--pul-color-text-primary, #111827)' }}>
+                                    {runtimeName(translate, meta)}
+                                </span>
+                                <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    padding: '2px 6px',
+                                    borderRadius: '12px',
+                                    background: count > 0 ? 'rgba(16, 185, 129, 0.1)' : 'var(--pul-color-background-subtle, #f3f4f6)',
+                                    color: count > 0 ? '#10b981' : 'var(--pul-color-text-muted, #6b7280)',
+                                }}>
+                                    {count > 0 ? `${count} installed` : 'none'}
+                                </span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--pul-color-text-muted, #6b7280)' }}>
+                                {allDomains.size > 0 ? `${allDomains.size} active app${allDomains.size > 1 ? 's' : ''}` : 'No apps using'}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
             <Tabs active={activeIndex + 1}>
                 {runtimes.map(meta => {
                     return (

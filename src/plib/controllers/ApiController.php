@@ -138,6 +138,17 @@ class ApiController extends pm_Controller_Action
     // -----------------------------------------------------------------------
 
     /**
+     * GET api/metrics[?range=1h|24h|7d]: server-wide resource metrics.
+     */
+    public function metricsAction()
+    {
+        $this->respond(function () {
+            $range = (string)$this->_getParam('range', '1h');
+            return Modules_Runway_Helper::call('server-metrics', ['range' => $range]);
+        });
+    }
+
+    /**
      * GET api/toolchains[?runtime=<key>][&available=0][&force=1]: installed and installable
      * toolchains per runtime, build dependencies and the admin job.
      */
@@ -332,6 +343,26 @@ class ApiController extends pm_Controller_Action
                 case 'operations':
                     $body = $this->getRequest()->isPost() ? $this->body() : ['action' => 'status'];
                     return Modules_Runway_Operations::call($this->appModel(), $body);
+                case 'metrics':
+                    $app = $this->appModel();
+                    $range = (string)$this->_getParam('range', '1h');
+                    return Modules_Runway_Helper::call('app-metrics', [
+                        'domain_id' => (int)$app->getDomain()->getId(),
+                        'range' => $range,
+                    ]);
+                case 'health-ping':
+                    $app = $this->appModel();
+                    $body = $this->getRequest()->isPost() ? $this->body() : [];
+                    $payload = [
+                        'domain_id' => (int)$app->getDomain()->getId(),
+                    ];
+                    if (!empty($body['health_path'])) {
+                        $payload['health_path'] = (string)$body['health_path'];
+                    }
+                    if (isset($body['health_match'])) {
+                        $payload['health_match'] = (string)$body['health_match'];
+                    }
+                    return Modules_Runway_Helper::call('health-ping', $payload);
                 default:
                     throw new Modules_Runway_Exception(pm_Locale::lmsg('errorInvalidOperation'));
             }

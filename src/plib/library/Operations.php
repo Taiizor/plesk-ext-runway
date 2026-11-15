@@ -10,7 +10,7 @@ class Modules_Runway_Operations
             throw new Modules_Runway_Exception(pm_Locale::lmsg('errorNotConfigured'));
         }
         $action = isset($body['action']) && is_string($body['action']) ? $body['action'] : 'status';
-        if (!in_array($action, ['status', 'save', 'history', 'diagnostics', 'rollback', 'export', 'import', 'clear-releases'], true)) {
+        if (!in_array($action, ['status', 'save', 'history', 'diagnostics', 'rollback', 'export', 'import', 'clear-releases', 'test-notification'], true)) {
             throw new Modules_Runway_Exception(pm_Locale::lmsg('errorInvalidOperation'));
         }
         if ($action === 'import') {
