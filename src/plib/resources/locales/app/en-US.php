@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'the classic unit',
             'versions' => 'Versions',
             'versionLive' => '(serves the traffic)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'preparing the switch',
                 'starting' => 'starting the new version',

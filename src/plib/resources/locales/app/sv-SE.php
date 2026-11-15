@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'den klassiska enheten',
             'versions' => 'Versioner',
             'versionLive' => '(hanterar trafiken)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'förbereder växlingen',
                 'starting' => 'startar den nya versionen',

@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'die klassische Unit',
             'versions' => 'Versionen',
             'versionLive' => '(erhält den Traffic)',
+            'serviceActive' => [
+                'active' => 'aktiv',
+                'reloading' => 'wird neu geladen',
+                'inactive' => 'inaktiv',
+                'failed' => 'fehlgeschlagen',
+                'activating' => 'wird aktiviert',
+                'deactivating' => 'wird deaktiviert',
+            ],
+            'serviceSub' => [
+                'running' => 'wird ausgeführt',
+                'dead' => 'beendet',
+                'exited' => 'beendet',
+                'failed' => 'fehlgeschlagen',
+                'auto_restart' => 'automatischer Neustart',
+            ],
             'switchPhase' => [
                 'prepare' => 'Umschaltung wird vorbereitet',
                 'starting' => 'neue Version wird gestartet',

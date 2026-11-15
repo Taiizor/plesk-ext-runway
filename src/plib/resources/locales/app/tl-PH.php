@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'ang classic na unit',
             'versions' => 'Mga bersyon',
             'versionLive' => '(nagsisilbi ng traffic)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'inihahanda ang paglipat',
                 'starting' => 'sinisimulan ang bagong bersyon',

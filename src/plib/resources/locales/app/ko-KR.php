@@ -374,6 +374,21 @@ return [
             'slotClassic' => '기존 유닛',
             'versions' => '버전',
             'versionLive' => '(트래픽 처리 중)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => '전환 준비 중',
                 'starting' => '새 버전 시작 중',

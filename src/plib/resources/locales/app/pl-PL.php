@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'klasyczna jednostka',
             'versions' => 'Wersje',
             'versionLive' => '(obsługuje ruch)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'przygotowywanie przełączenia',
                 'starting' => 'uruchamianie nowej wersji',

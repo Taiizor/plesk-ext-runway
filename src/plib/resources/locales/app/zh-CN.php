@@ -374,6 +374,21 @@ return [
             'slotClassic' => '经典单元',
             'versions' => '版本',
             'versionLive' => '（正在承载流量）',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => '正在准备切换',
                 'starting' => '正在启动新版本',

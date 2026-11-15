@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'الوحدة الكلاسيكية',
             'versions' => 'الإصدارات',
             'versionLive' => '(تخدم حركة المرور)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'تحضير التبديل',
                 'starting' => 'بدء تشغيل الإصدار الجديد',

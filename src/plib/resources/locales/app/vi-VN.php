@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'dịch vụ cổ điển',
             'versions' => 'Phiên bản',
             'versionLive' => '(đang phục vụ lưu lượng)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'đang chuẩn bị chuyển đổi',
                 'starting' => 'đang khởi động phiên bản mới',

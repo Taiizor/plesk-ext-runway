@@ -374,6 +374,21 @@ return [
             'slotClassic' => '従来のユニット',
             'versions' => 'バージョン',
             'versionLive' => '（トラフィックを処理中）',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => '切り替えを準備中',
                 'starting' => '新しいバージョンを起動中',

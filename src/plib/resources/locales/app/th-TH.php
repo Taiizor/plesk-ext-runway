@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'ยูนิตแบบดั้งเดิม',
             'versions' => 'เวอร์ชัน',
             'versionLive' => '(กำลังให้บริการทราฟฟิก)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'กำลังเตรียมการสลับ',
                 'starting' => 'กำลังเริ่มเวอร์ชันใหม่',

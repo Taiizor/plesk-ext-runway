@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'unitatea clasică',
             'versions' => 'Versiuni',
             'versionLive' => '(deservește traficul)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'se pregătește comutarea',
                 'starting' => 'se pornește noua versiune',

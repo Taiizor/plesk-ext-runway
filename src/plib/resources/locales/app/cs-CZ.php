@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'klasická jednotka',
             'versions' => 'Verze',
             'versionLive' => '(obsluhuje provoz)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'připravuje se přepnutí',
                 'starting' => 'spouští se nová verze',

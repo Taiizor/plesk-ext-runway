@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'класична служба',
             'versions' => 'Версії',
             'versionLive' => '(обслуговує трафік)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'підготовка перемикання',
                 'starting' => 'запуск нової версії',

@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'unit klasik',
             'versions' => 'Versi',
             'versionLive' => '(melayani lalu lintas)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'menyiapkan peralihan',
                 'starting' => 'memulai versi baru',

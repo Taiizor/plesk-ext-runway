@@ -31,6 +31,36 @@ const HEALTH = {
 // With an expected response content (health_match): found, not found, not a JSON object.
 // i18n-keys: Domain.status.healthDetail.http_match Domain.status.healthDetail.body_mismatch
 // i18n-keys: Domain.status.healthDetail.body_not_json
+// Systemd active and sub states for the service fact and zero-downtime slot versions.
+// i18n-keys: Domain.status.serviceActive.active Domain.status.serviceActive.reloading Domain.status.serviceActive.inactive
+// i18n-keys: Domain.status.serviceActive.failed Domain.status.serviceActive.activating Domain.status.serviceActive.deactivating
+// i18n-keys: Domain.status.serviceSub.running Domain.status.serviceSub.dead Domain.status.serviceSub.exited
+// i18n-keys: Domain.status.serviceSub.failed Domain.status.serviceSub.auto_restart
+const formatActiveState = (translate, activeState) => {
+    if (!activeState) {
+        return '';
+    }
+    const key = `Domain.status.serviceActive.${activeState}`;
+    const translated = translate(key);
+    return translated && translated !== key ? translated : activeState;
+};
+
+const formatServiceState = (translate, service) => {
+    const active = service.active_state;
+    if (!active) {
+        return null;
+    }
+    const activeText = formatActiveState(translate, active);
+    const sub = service.sub_state;
+    if (!sub) {
+        return activeText;
+    }
+    const subKey = `Domain.status.serviceSub.${sub.replace(/-/g, '_')}`;
+    const translatedSub = translate(subKey);
+    const subText = translatedSub && translatedSub !== subKey ? translatedSub : sub;
+    return `${activeText} (${subText})`;
+};
+
 const detailText = (translate, prefix, code, params, fallback) => (
     code ? helperText(translate, `${prefix}.${code}`, params, fallback) : (fallback || '')
 );
@@ -221,7 +251,7 @@ const memoryValue = (service, worker, documentRoot) => {
 };
 
 /** The instances that run right now (both during a switch), with their state and memory. */
-const versionsValue = current => {
+const versionsValue = (translate, current) => {
     const slots = isObject(current.slots) ? current.slots : null;
     if (!slots) {
         return null;
@@ -236,7 +266,7 @@ const versionsValue = current => {
                 <div key={key || 'classic'}>
                     {slotName(key)}
                     {': '}
-                    {slots[key].active_state}
+                    {formatActiveState(translate, slots[key].active_state)}
                     {usedMemory(slots[key]) ? `, ${formatBytes(usedMemory(slots[key]))}` : ''}
                     {slots[key].live ? <Text intent="muted" fontSize="sm">{' '}<Translate content="Domain.status.versionLive" /></Text> : null}
                 </div>
@@ -305,7 +335,7 @@ const StatusPanel = ({ data, status = null, error = null, updatedAt = null, busy
         {
             key: 'service',
             label: <Translate content="Domain.status.service" />,
-            value: service.active_state ? `${service.active_state}${service.sub_state ? ` (${service.sub_state})` : ''}` : null,
+            value: formatServiceState(translate, service),
         },
         { key: 'pid', label: <Translate content="Domain.status.pid" />, value: running && service.main_pid ? String(service.main_pid) : null },
         {
@@ -330,7 +360,7 @@ const StatusPanel = ({ data, status = null, error = null, updatedAt = null, busy
         { key: 'healthWatch', label: <Translate content="Domain.status.healthWatch" />, value: healthWatchValue(translate, current, worker) },
         { key: 'zeroDowntime', label: <Translate content="Domain.status.zeroDowntime" />, value: worker ? null : zeroDowntimeValue(current) },
         { key: 'switch', label: <Translate content="Domain.status.switch" />, value: switchValue(translate, deploy, deploying) },
-        { key: 'versions', label: <Translate content="Domain.status.versions" />, value: switchable ? versionsValue(current) : null },
+        { key: 'versions', label: <Translate content="Domain.status.versions" />, value: switchable ? versionsValue(translate, current) : null },
         { key: 'deploy', label: <Translate content="Domain.status.deploy" />, value: deployValue(translate, deploy, deploying) },
         { key: 'triggers', label: <Translate content="Domain.status.triggers" />, value: triggers },
     ];

@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'a klasszikus egység',
             'versions' => 'Verziók',
             'versionLive' => '(ez szolgálja ki a forgalmat)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'a váltás előkészítése',
                 'starting' => 'az új verzió indítása',

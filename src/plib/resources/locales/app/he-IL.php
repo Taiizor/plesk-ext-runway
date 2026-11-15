@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'היחידה הקלאסית',
             'versions' => 'גרסאות',
             'versionLive' => '(יעד התעבורה)',
+            'serviceActive' => [
+                'active' => 'active',
+                'reloading' => 'reloading',
+                'inactive' => 'inactive',
+                'failed' => 'failed',
+                'activating' => 'activating',
+                'deactivating' => 'deactivating',
+            ],
+            'serviceSub' => [
+                'running' => 'running',
+                'dead' => 'dead',
+                'exited' => 'exited',
+                'failed' => 'failed',
+                'auto_restart' => 'auto-restart',
+            ],
             'switchPhase' => [
                 'prepare' => 'הכנת ההחלפה',
                 'starting' => 'הפעלת הגרסה החדשה',

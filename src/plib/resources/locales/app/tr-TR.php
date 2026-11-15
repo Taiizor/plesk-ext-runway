@@ -374,6 +374,21 @@ return [
             'slotClassic' => 'klasik birim',
             'versions' => 'Sürümler',
             'versionLive' => '(trafiğe hizmet veriyor)',
+            'serviceActive' => [
+                'active' => 'etkin',
+                'reloading' => 'yeniden yükleniyor',
+                'inactive' => 'etkin değil',
+                'failed' => 'başarısız',
+                'activating' => 'etkinleştiriliyor',
+                'deactivating' => 'devre dışı bırakılıyor',
+            ],
+            'serviceSub' => [
+                'running' => 'çalışıyor',
+                'dead' => 'kapalı',
+                'exited' => 'sonlandı',
+                'failed' => 'başarısız',
+                'auto_restart' => 'otomatik yeniden başlatma',
+            ],
             'switchPhase' => [
                 'prepare' => 'geçiş hazırlanıyor',
                 'starting' => 'yeni sürüm başlatılıyor',
