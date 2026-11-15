@@ -43,12 +43,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Source sections share one namespace. Analyze the complete program as a .py file so
+      # cross-section calls remain visible, rather than treating each section as a module.
+      - name: Prepare standalone helper for Python analysis
+        if: matrix.language == 'python'
+        run: |
+          python scripts/build_helper.py --check
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          target = Path('codeql-helper/runway_helper.py')
+          target.parent.mkdir(exist_ok=True)
+          shutil.copyfile('src/sbin/runway-helper', target)
+          PY
+
       - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
           config: |
+            paths-ignore:
+              - helper/**
             query-filters:
               # The helper sets deliberate group/world-readable modes: root-owned read-only
               # toolchain trees (0755/0644), user-owned application files (0750) and the
@@ -60,4 +76,18 @@ jobs:
 
       - uses: github/codeql-action/analyze@v4
         with:
+          category: "/language:${{ matrix.language }}"
+          output: codeql-sarif
+          upload: ${{ matrix.language == 'python' && 'failure-only' || 'always' }}
+
+      # The .py analysis copy has exactly the committed helper's contents and line numbers.
+      # Map it back before upload so findings link to a file that exists in the repository.
+      - name: Map Python findings to the committed helper
+        if: matrix.language == 'python'
+        run: python scripts/helper_sarif.py codeql-sarif
+
+      - uses: github/codeql-action/upload-sarif@v4
+        if: matrix.language == 'python'
+        with:
+          sarif_file: codeql-sarif
           category: "/language:${{ matrix.language }}"

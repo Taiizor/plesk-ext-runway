@@ -14,7 +14,8 @@
 
 ## Checklist
 
-- [ ] `python build.py --check`, `python tests/check_locales.py` and `python -m pyflakes src/sbin/runway-helper build.py tests/check_locales.py` pass
+- [ ] `python scripts/build_helper.py --check` and `python -m unittest discover -s tests -p 'test_*.py'` pass
+- [ ] `python build.py --check`, `python tests/check_locales.py` and pyflakes on the assembled helper and build tools pass
 - [ ] Tests cover the change (`tests/helper-smoke.sh`, `tests/api-smoke.sh`, `tests/runtime-e2e.sh`)
 - [ ] `CHANGELOG.md` has an entry under `## [Unreleased]` (or the pull request gets the `skip-changelog` label)
 - [ ] Documentation is updated (`README.md`; `docs/DESIGN.md` for contract changes; `docs/runtimes/` for adapters)

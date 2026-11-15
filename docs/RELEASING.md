@@ -22,8 +22,9 @@ end-to-end job installed and tested. Title and notes of the release page are gen
 
 1. Make sure CI is green on `develop` (the default branch; releases are tagged on it).
 2. Bump `<version>` / `<release>` in `src/meta.xml`, `version` in `package.json` and
-   `VERSION = "X.Y.Z"` in `src/sbin/runway-helper` (shown as the helper version and sent as the
-   User-Agent of downloads); `build.py --check` verifies that the three agree.
+   `VERSION = "X.Y.Z"` in `helper/bootstrap.py` (shown as the helper version and sent as the
+   User-Agent of downloads), then run `python scripts/build_helper.py` and commit the generated
+   `src/sbin/runway-helper`; `build.py --check` verifies the assembly and that the three agree.
 3. Changelogs, both are required by `build.py` (it fails when the version has no entry):
    - `CHANGELOG.md`: move the `## [Unreleased]` items to `## [X.Y.Z] - YYYY-MM-DD`, update
      the compare links at the bottom.

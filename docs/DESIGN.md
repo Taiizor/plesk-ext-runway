@@ -27,6 +27,8 @@ Runway/
   README.md  LICENSE (MIT)  SECURITY.md  CHANGELOG.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md
   package.json  bun.lock  extension.config.js  .gitignore  .gitattributes  .editorconfig
   build.py                       # packages src/ (incl. generated htdocs/index.php + htdocs/dist) into dist/runway-<ver>.zip
+  helper/                        # Python helper source sections and their explicit assembly manifest (helper/README.md)
+  scripts/build_helper.py        # deterministically assembles helper/ into the committed standalone root helper
   src/
     meta.xml  DESCRIPTION.md  CHANGES.md
     _meta/icons/{32x32,64x64,128x128}.png  _meta/screenshots/*.png
@@ -38,7 +40,7 @@ Runway/
       library/                              # Modules_Runway_* : App, Access, Helper, WebConfig, Reconcile, Settings, Updater, Log, Runtime, Cli, EventListener.php
       resources/locales/<locale>.php        # 32 Plesk locales; loaders: server/<locale>.php (lmsg) + app/<locale>.php ('app' section for the frontend)
       scripts/{pre-install,post-install,pre-uninstall,reconcile}.php
-    sbin/runway-helper                      # python3 root helper (adapter-based)
+    sbin/runway-helper                      # generated standalone python3 root helper (adapter-based; sources in helper/)
   examples/{go,rust,bun,java,dotnet,python,ruby,php}-hello/  examples/python-fastapi/
   tests/
     helper-smoke.sh              # runs inside a Plesk server as root (regression)
@@ -104,6 +106,17 @@ Runway/
 ## 5. Runtime adapters
 
 ### 5.1 Helper side (`sbin/runway-helper`, module-level registry)
+
+The maintained sources live in `helper/`: `runtimes/base.py` defines the adapter interface,
+`runtimes/<runtime>.py` holds each adapter, `samples.py` holds application templates, and
+`runtimes/registry.py` creates the registry. The other source sections separate validation,
+privilege dropping, units, commands, deployment and zero-downtime switching. They share one
+namespace and execute in the explicit `helper/manifest.json` order; they are not runtime imports.
+`scripts/build_helper.py` validates Python 3.8 syntax and assembles a standalone script with only
+comments/whitespace added. Commit the sources and generated `src/sbin/runway-helper` together.
+Normal package builds regenerate it, while `build.py --check` and CI reject a stale artifact.
+Installation, the isolated interpreter, atomic stable helper replacement and all contracts stay
+unchanged. Details and editing commands: [helper/README.md](../helper/README.md).
 
 Each runtime is a class with a common interface; the registry is `RUNTIMES = {"go": GoRuntime(), ...}`.
 
@@ -745,6 +758,14 @@ no option to change the document root (Plesk's own `plesk bin site --update <dom
 does).
 
 ## 10. Testing and release
+
+- Helper source/build regressions: `python scripts/build_helper.py --check` and
+  `python -m unittest discover -s tests -p 'test_*.py' -v`. Assembly checks run on Windows and Linux;
+  Linux contracts cover runtime metadata, project defaults, sample templates, unit/environment
+  rendering, validation and standalone CLI execution (root only for the CLI protocol). CI also runs
+  them on Python 3.8 in Docker, without Plesk or systemd. CodeQL uses a complete `.py` copy of the
+  assembled helper to retain its shared-namespace call graph, excluding the individual sections;
+  `scripts/helper_sarif.py` maps artifact URIs back to the committed helper before uploading.
 
 - Frontend regressions: `bun run test:frontend` (Bun's test runner, React and jsdom) checks API
   deadlines before headers and during body reads, cleanup, status freshness and recovery, late

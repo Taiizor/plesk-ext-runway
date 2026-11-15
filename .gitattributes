@@ -11,3 +11,4 @@ src/sbin/* text eol=lf
 
 # Keep GitHub's language statistics about the extension, not the lock file.
 bun.lock linguist-generated=true
+src/sbin/runway-helper linguist-generated=true

@@ -29,6 +29,16 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   The form's note under *Document root* says so instead of naming a command. README section
   *Static files and the document root*.
 
+### Changed
+
+- Maintain the privileged helper in source sections under `helper/` (one adapter per runtime,
+  separate validation, customer file access, systemd, health, deployment and traffic switching),
+  assembled deterministically by `scripts/build_helper.py` into the committed standalone
+  `src/sbin/runway-helper`. Package builds regenerate it; source checks and CI reject stale or
+  invalid output. The installed file, isolated interpreter, atomic replacement and runtime
+  behavior stay the same. Source assembly and Linux contract tests run without Plesk, including
+  on Python 3.8; contributor/release instructions and CodeQL follow the source layout.
+
 ### Fixed
 
 - The domain status card reports failed refreshes and the time of its last successful update,

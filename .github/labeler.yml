@@ -4,7 +4,7 @@
 # file: nearly every pull request touches it.
 helper:
   - changed-files:
-      - any-glob-to-any-file: ["src/sbin/**"]
+      - any-glob-to-any-file: ["helper/**", "src/sbin/**", "scripts/build_helper.py"]
 
 php:
   - changed-files:
@@ -20,7 +20,7 @@ locales:
 
 packaging:
   - changed-files:
-      - any-glob-to-any-file: ["build.py", "src/meta.xml", "src/DESCRIPTION.md", "src/CHANGES.md", "src/_meta/**", "assets/**", "scripts/render-assets.ts"]
+      - any-glob-to-any-file: ["build.py", "scripts/build_helper.py", "src/meta.xml", "src/DESCRIPTION.md", "src/CHANGES.md", "src/_meta/**", "assets/**", "scripts/render-assets.ts"]
 
 tests:
   - changed-files:

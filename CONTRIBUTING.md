@@ -28,7 +28,7 @@ python build.py            # package: dist/runway-<version>-<release>.zip
 
 | Area | Rules |
 |---|---|
-| `src/sbin/runway-helper` | python3 **3.8+ standard library only** (it runs on the server's system python). Must pass `python -m pyflakes` and `ast.parse(..., feature_version=(3, 8))`. Every privileged action re-validates its input; anything touching customer files runs through the drop-privileges child (`call_as_user`). Keep the security invariants listed in DESIGN section 4. |
+| `helper/` → `src/sbin/runway-helper` | Edit the source sections and explicit manifest in `helper/` ([assembly contract](helper/README.md)), then run `python scripts/build_helper.py` and commit the generated standalone script too. Python **3.8+ standard library only**; lint the assembled script with pyflakes. Every privileged action re-validates its input; customer files go through the drop-privileges child (`call_as_user`). Keep the security invariants in DESIGN section 4. |
 | `src/plib/` | PHP **7.4 and 8.x** compatible, no Composer dependencies, class prefix `Modules_Runway_`. Files start with `<?php`, have no closing `?>` and no BOM. User-visible strings come from the locale files. |
 | `src/frontend/` | React with plain JavaScript (no TypeScript), components from `@plesk/plesk-ext-sdk` (Plesk UI Library). Files with JSX import `createElement` from `react`. Never `window.confirm`: use the ui-library `Dialog`. Arabic and Hebrew panels are right-to-left: show code (paths, commands, variables, logs) through `Mono`, `dir="ltr"` inputs or `LogOutput`, and runtime names, versions and other mixed-direction values through `isolate()` / `runtimeName()` of `lib/format.js`; use logical CSS properties (`marginInlineStart`) instead of left/right. |
 | Locales | `en-US` is the reference; every Plesk locale (32 locales with three files each: `<locale>.php` loader, `server/<locale>.php`, `app/<locale>.php`) mirrors its en-US file line for line: the same keys and placeholders on the same line numbers, only the string values and line 3 (a comment naming the language) differ. Add a new key at the same line in every file; `python tests/check_locales.py` checks all of it. The translations other than English and Turkish were produced by machine translation with a review pass; corrections from native speakers are welcome (label `locales`). |
@@ -43,7 +43,9 @@ and on every push that changes code (pushes that only change `docs/`, root-level
 locally:
 
 ```sh
-python -m pyflakes src/sbin/runway-helper build.py tests/check_locales.py
+python scripts/build_helper.py --check
+python -m unittest discover -s tests -p 'test_*.py' -v
+python -m pyflakes src/sbin/runway-helper scripts/build_helper.py build.py tests/check_locales.py
 python build.py --check
 python tests/check_locales.py
 bun run test:frontend                         # API deadlines, status freshness and polling recovery
@@ -56,7 +58,8 @@ docker cp tests/helper-smoke.sh runway-plesk:/root/ && docker exec runway-plesk 
 
 CI (`.github/workflows/ci.yml`):
 
-1. **Lint**: pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
+1. **Lint**: helper assembly check, source/build and Linux contract tests (also on Python 3.8 in
+   Docker, without Plesk), pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
    frontend regression tests and build, `build.py --check`, `php -l` with PHP 7.4 and 8.2.
 2. **Package**: `python build.py --strict`, uploads the zip as the `runway-package` artifact.
 3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
@@ -88,8 +91,9 @@ panel in the light and the dark theme (no console errors).
 1. Write `docs/runtimes/<key>.md` (version discovery, download and checksums, install layout,
    per-user environment, detection, defaults, listen modes, minimal sample) following the
    existing files.
-2. Add the adapter class to the `RUNTIMES` registry of the helper (interface in DESIGN 5.1);
-   PHP and the UI pick up the metadata from the `runtimes` command.
+2. Add the adapter in `helper/runtimes/<key>.py`, list it in `helper/manifest.json` and register it
+   in `helper/runtimes/registry.py` (interface in DESIGN 5.1); regenerate the helper. PHP and the UI
+   pick up the metadata from the `runtimes` command.
 3. Add `examples/<key>-hello`, a row to the README runtime table and helper smoke tests.
 
 ## Pull requests

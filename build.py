@@ -17,6 +17,10 @@ The frontend is built with the Plesk Extension SDK through Bun ("bun run build" 
 git-ignored), which are packaged together with the rest of src/. src/frontend/ (the React
 sources) and source maps are not part of the package.
 
+The privileged helper is assembled from helper/ source sections before every build. The
+committed src/sbin/runway-helper stays a single standalone Python script; --check verifies that
+it matches its sources without rewriting it. See helper/README.md.
+
 The generated htdocs/index.php loads dist/main.js through RequireJS without cache headers, so
 browsers would keep an old bundle after an upgrade. The packaged copy is patched to request
 dist/main.js?v=<version>-<release>.<sha256 prefix of main.js> (cache-buster); the generated
@@ -46,17 +50,19 @@ import subprocess
 import sys
 import zipfile
 
+from scripts.build_helper import SOURCE_DIR as HELPER_SOURCES, SourceError, build_helper, check_helper
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
 DIST = os.path.join(ROOT, "dist")
 
-TEXT_EXTENSIONS = {".php", ".phtml", ".xml", ".js", ".css", ".md", ".txt", ".json", ".ini", ".sh", ".svg", ".html"}
+TEXT_EXTENSIONS = {".php", ".phtml", ".xml", ".js", ".css", ".md", ".txt", ".json", ".ini", ".sh", ".svg", ".html", ".py"}
 EXECUTABLE_PREFIXES = ("sbin/",)
 # Source-only directories (relative to src/) that are never packaged.
 EXCLUDED_DIRS = ("frontend",)
 EXCLUDED_SUFFIXES = (".bak", ".swp", "~", ".map")
-# Generated files: checked for presence, but not scanned for placeholders (third-party bundle).
-GENERATED = ("htdocs/index.php", "htdocs/dist/")
+# Generated files: source sections are scanned instead of the assembled helper, as with the UI.
+GENERATED = ("htdocs/index.php", "htdocs/dist/", "sbin/runway-helper")
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
 ICON_SIZES = (32, 64, 128)
 REQUIRED_IN_PACKAGE = ("meta.xml", "DESCRIPTION.md", "CHANGES.md", "sbin/runway-helper",
@@ -165,9 +171,11 @@ def is_text(rel):
 def find_placeholders():
     """Leftover placeholders in packaged text files and frontend sources: ["rel:line: kind 'text'"]."""
     found = []
-    candidates = [(full, rel) for full, rel in iter_source_files()
+    candidates = [(full, "src/" + rel) for full, rel in iter_source_files()
                   if is_text(rel) and not rel.startswith(GENERATED)]
-    candidates += list(iter_frontend_sources())
+    candidates += [(full, "src/" + rel) for full, rel in iter_frontend_sources()]
+    candidates += [(str(path), "helper/" + path.relative_to(HELPER_SOURCES).as_posix())
+                   for path in sorted(HELPER_SOURCES.rglob("*.py"))]
     for full, rel in candidates:
         with open(full, "rb") as fh:
             text = fh.read().decode("utf-8", "replace")
@@ -175,7 +183,7 @@ def find_placeholders():
             for pattern, kind in PLACEHOLDER_PATTERNS:
                 match = pattern.search(line)
                 if match:
-                    found.append("src/%s:%d: %s %r" % (rel, number, kind, match.group(0)))
+                    found.append("%s:%d: %s %r" % (rel, number, kind, match.group(0)))
                     break
     return found
 
@@ -193,6 +201,7 @@ def check_tree(meta, require_generated=True):
     """Structural checks of src/. Returns (errors, notes)."""
     errors = []
     notes = []
+    errors.extend(check_helper())
     for rel in ("meta.xml", "sbin/runway-helper", "DESCRIPTION.md", "CHANGES.md"):
         if not os.path.isfile(os.path.join(SRC, rel)):
             errors.append("missing src/%s" % rel)
@@ -404,8 +413,14 @@ def main():
         print("Package OK: %s" % args.verify)
         return 0
 
-    if not args.check and not args.no_frontend:
-        build_frontend()
+    if not args.check:
+        try:
+            build_helper()
+        except SourceError as exc:
+            report([str(exc)])
+            return 1
+        if not args.no_frontend:
+            build_frontend()
     errors, notes = check_tree(meta, require_generated=not args.check)
     for note in notes:
         print("NOTE: " + note)
