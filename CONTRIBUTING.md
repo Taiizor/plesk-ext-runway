@@ -46,6 +46,7 @@ locally:
 python -m pyflakes src/sbin/runway-helper build.py tests/check_locales.py
 python build.py --check
 python tests/check_locales.py
+bun run test:frontend                         # API deadlines, status freshness and polling recovery
 scripts/plesk-dev.sh test                     # everything CI runs, against the local container
 bash tests/api-smoke.sh                       # against the local Plesk container
 bash tests/runtime-e2e.sh                     # every runtime's sample app through nginx (local only)
@@ -56,7 +57,7 @@ docker cp tests/helper-smoke.sh runway-plesk:/root/ && docker exec runway-plesk 
 CI (`.github/workflows/ci.yml`):
 
 1. **Lint**: pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
-   frontend build, `build.py --check`, `php -l` with PHP 7.4 and 8.2.
+   frontend regression tests and build, `build.py --check`, `php -l` with PHP 7.4 and 8.2.
 2. **Package**: `python build.py --strict`, uploads the zip as the `runway-package` artifact.
 3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
    the zip, creating the subscription `gotest.local` and (when the license allows customer

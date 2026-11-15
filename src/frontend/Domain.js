@@ -7,7 +7,7 @@ import {
 } from '@plesk/plesk-ext-sdk';
 import { isObject } from './lib/format';
 import {
-    isBusy, POLL_BUSY_MS, POLL_IDLE_MS, queryParam, useApi, useApiData, useLatest, usePolling,
+    isBusy, POLL_BUSY_MS, POLL_IDLE_MS, queryParam, useApi, useApiData, useAppStatus, useLatest, usePolling,
 } from './lib/hooks';
 import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
@@ -31,7 +31,6 @@ const Domain = ({ baseUrl, statusMessages }) => {
     const siteId = queryParam('site_id') || queryParam('dom_id');
     const context = useApiData(() => api.get('context'), [api]);
     const page = useApiData(() => (siteId ? api.get('app', { site_id: siteId }) : Promise.resolve(null)), [api, siteId]);
-    const [status, setStatus] = useState(null);
     const [formVersion, setFormVersion] = useState(0);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState(null);
@@ -43,11 +42,13 @@ const Domain = ({ baseUrl, statusMessages }) => {
     const [drawer, setDrawer] = useState(null);
     const [drawerBusy, setDrawerBusy] = useState(false);
     const [drawerError, setDrawerError] = useState(null);
-    const beginStatus = useLatest();
     const beginLog = useLatest();
     const lastDeploy = useRef(null);
 
     const data = page.data;
+    const {
+        status, error: statusError, updatedAt: statusUpdatedAt, refresh: refreshStatus, setStatus,
+    } = useAppStatus(api, siteId, data);
     const configured = Boolean(data && data.configured);
     const deploy = status && isObject(status.deploy) ? status.deploy : null;
     const deploying = isBusy(deploy);
@@ -55,18 +56,6 @@ const Domain = ({ baseUrl, statusMessages }) => {
     const isAdmin = Boolean((data && data.isAdmin) || (context.data && context.data.isAdmin));
 
     const toast = (intent, message) => statusMessages.add({ intent, message });
-
-    const refreshStatus = () => {
-        if (!siteId) {
-            return Promise.resolve();
-        }
-        const current = beginStatus();
-        return api.get('app/status', { site_id: siteId }).then(result => {
-            if (current() && isObject(result)) {
-                setStatus(result);
-            }
-        }, () => null);
-    };
 
     const refreshLog = kind => {
         const which = kind || logKind;
@@ -85,14 +74,6 @@ const Domain = ({ baseUrl, statusMessages }) => {
             }
         });
     };
-
-    // A (re)loaded page brings a fresh status; newer polls may replace it afterwards.
-    useEffect(() => {
-        if (data) {
-            beginStatus();
-            setStatus(isObject(data.status) ? data.status : null);
-        }
-    }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (configured) {
@@ -269,6 +250,8 @@ const Domain = ({ baseUrl, statusMessages }) => {
                     <StatusPanel
                         data={data}
                         status={status}
+                        error={statusError}
+                        updatedAt={statusUpdatedAt}
                         busyOp={busyOp}
                         onControl={control}
                         onStop={() => setConfirm('stop')}

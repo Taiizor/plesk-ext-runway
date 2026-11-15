@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Pyyntö epäonnistui (HTTP %%status%%).',
         'unexpectedResponse' => 'Odottamaton vastaus palvelimelta (HTTP %%status%%). Päivitä sivu ja yritä uudelleen.',
+        'requestTimeout' => 'Pyynnön aikakatkaisu. Palvelin saattaa yhä käsitellä pyyntöä; päivitä sivu ennen kuin yrität uudelleen.',
         'jobTitle' => [
             'install' => 'Asenna %%runtime%% %%version%%',
             'update' => 'Päivitä %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Valitse "Ota sovellus käyttöön" ja tallenna. Runway koostaa ja käynnistää sovelluksen ja ohjaa toimialueen siihen.',
         ],
         'status' => [
+            'refreshFailed' => 'Tilaa ei voitu päivittää. Alla olevat tiedot voivat olla vanhentuneita.',
+            'lastUpdated' => 'Viimeisin onnistunut päivitys: %%time%%',
             'title' => 'Tila',
             'deploying' => 'Koostetaan...',
             'service' => 'Palvelu',

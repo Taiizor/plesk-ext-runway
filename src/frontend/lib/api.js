@@ -11,8 +11,8 @@
  * Every request sends the panel's CSRF token (X-Forgery-Protection-Token, read from the
  * <meta id="forgery_protection_token"> tag of the Plesk page) like the SDK's own client.
  * Errors of the client itself (an HTML page instead of JSON, an unknown error format) use the locale
- * keys Common.unexpectedResponse / Common.requestFailed through `translate` (useApi passes the
- * page's translate function); the server's messages are already translated.
+ * keys Common.unexpectedResponse / Common.requestFailed / Common.requestTimeout through `translate`
+ * (useApi passes the page's translate function); the server's messages are already translated.
  * A response {"status":"error"} rejects with an ApiError:
  *   error.message      first message (for an Alert or a toast)
  *   error.messages     every message as a flat list
@@ -50,7 +50,14 @@ const buildUrl = (baseUrl, path, query) => {
     return url;
 };
 
-// i18n-keys: Common.requestFailed Common.unexpectedResponse
+// Polls must recover promptly; other reads can inspect projects or fetch release lists, and
+// writes can wait for helper locks, service stops and Plesk's web server reconfiguration.
+const POLL_TIMEOUT_MS = 30000;
+const READ_TIMEOUT_MS = 120000;
+const WRITE_TIMEOUT_MS = 300000;
+const POLL_PATHS = ['app/status', 'app/logs', 'job', 'update'];
+
+// i18n-keys: Common.requestFailed Common.unexpectedResponse Common.requestTimeout
 /** Translated message of the client, English when no translate function is available. */
 const clientMessage = (translate, key, status, fallback) => {
     if (typeof translate === 'function') {
@@ -79,6 +86,9 @@ const toApiError = (json, status, translate) => {
 };
 
 const request = (baseUrl, path, { method = 'GET', query, body } = {}, translate = null) => {
+    const controller = new AbortController();
+    const timeoutMs = method !== 'GET' ? WRITE_TIMEOUT_MS
+        : (POLL_PATHS.includes(path.replace(/^\/+/, '')) ? POLL_TIMEOUT_MS : READ_TIMEOUT_MS);
     const headers = {
         Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
@@ -87,7 +97,7 @@ const request = (baseUrl, path, { method = 'GET', query, body } = {}, translate 
     if (token) {
         headers['X-Forgery-Protection-Token'] = token;
     }
-    const init = { method, headers, credentials: 'same-origin' };
+    const init = { method, headers, credentials: 'same-origin', signal: controller.signal };
     if (method !== 'GET') {
         headers['Content-Type'] = 'application/json; charset=utf-8';
         init.body = JSON.stringify(body || {});
@@ -95,7 +105,16 @@ const request = (baseUrl, path, { method = 'GET', query, body } = {}, translate 
     if (window.Ajax) {
         window.Ajax.activeRequestCount++;
     }
-    return fetch(buildUrl(baseUrl, path, query), init)
+    let timer;
+    const deadline = new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+            // Reject before aborting so the deadline wins over fetch's generic AbortError.
+            reject(new ApiError([clientMessage(translate, 'Common.requestTimeout', 0,
+                'The request timed out. The server may still be processing it; refresh the page before trying again.')], null, 0));
+            controller.abort();
+        }, timeoutMs);
+    });
+    const result = Promise.resolve().then(() => fetch(buildUrl(baseUrl, path, query), init))
         .then(response => response.text().then(text => {
             let json = null;
             try {
@@ -109,8 +128,11 @@ const request = (baseUrl, path, { method = 'GET', query, body } = {}, translate 
                 return json.data;
             }
             throw toApiError(json, response.status, translate);
-        }))
+        }));
+    // Include the response body in the deadline; a server can send headers and then stall.
+    return Promise.race([result, deadline])
         .finally(() => {
+            clearTimeout(timer);
             if (window.Ajax) {
                 window.Ajax.activeRequestCount--;
             }

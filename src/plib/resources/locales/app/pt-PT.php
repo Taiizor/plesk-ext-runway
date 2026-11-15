@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'O pedido falhou (HTTP %%status%%).',
         'unexpectedResponse' => 'Resposta inesperada do servidor (HTTP %%status%%). Recarregue a página e tente novamente.',
+        'requestTimeout' => 'O pedido excedeu o tempo limite. O servidor pode ainda estar a processá-lo; atualize a página antes de tentar novamente.',
         'jobTitle' => [
             'install' => 'Instalar %%runtime%% %%version%%',
             'update' => 'Atualizar %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Marque "Ativar a aplicação" e guarde. O Runway compila e inicia a aplicação e aponta o domínio para ela.',
         ],
         'status' => [
+            'refreshFailed' => 'Não foi possível atualizar o estado. As informações abaixo podem estar desatualizadas.',
+            'lastUpdated' => 'Última atualização bem-sucedida: %%time%%',
             'title' => 'Estado',
             'deploying' => 'A compilar...',
             'service' => 'Serviço',

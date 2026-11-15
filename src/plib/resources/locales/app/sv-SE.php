@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Förfrågan misslyckades (HTTP %%status%%).',
         'unexpectedResponse' => 'Oväntat svar från servern (HTTP %%status%%). Ladda om sidan och försök igen.',
+        'requestTimeout' => 'Begäran tog för lång tid. Servern kanske fortfarande behandlar den; uppdatera sidan innan du försöker igen.',
         'jobTitle' => [
             'install' => 'Installera %%runtime%% %%version%%',
             'update' => 'Uppdatera %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Markera "Aktivera applikationen" och spara. Runway bygger och startar applikationen och pekar domänen mot den.',
         ],
         'status' => [
+            'refreshFailed' => 'Statusen kunde inte uppdateras. Informationen nedan kan vara inaktuell.',
+            'lastUpdated' => 'Senaste lyckade uppdatering: %%time%%',
             'title' => 'Status',
             'deploying' => 'Bygger...',
             'service' => 'Tjänst',

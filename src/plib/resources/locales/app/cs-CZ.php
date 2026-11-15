@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Požadavek selhal (HTTP %%status%%).',
         'unexpectedResponse' => 'Neočekávaná odpověď serveru (HTTP %%status%%). Obnovte stránku a zkuste to znovu.',
+        'requestTimeout' => 'Vypršel časový limit požadavku. Server jej může stále zpracovávat; před dalším pokusem obnovte stránku.',
         'jobTitle' => [
             'install' => 'Instalace %%runtime%% %%version%%',
             'update' => 'Aktualizace %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Zaškrtněte „Povolit aplikaci“ a uložte. Runway aplikaci sestaví, spustí a nasměruje na ni doménu.',
         ],
         'status' => [
+            'refreshFailed' => 'Stav se nepodařilo aktualizovat. Níže uvedené informace mohou být zastaralé.',
+            'lastUpdated' => 'Poslední úspěšná aktualizace: %%time%%',
             'title' => 'Stav',
             'deploying' => 'Sestavuje se...',
             'service' => 'Služba',

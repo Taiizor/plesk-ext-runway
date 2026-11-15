@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Request failed (HTTP %%status%%).',
         'unexpectedResponse' => 'Unexpected response from the server (HTTP %%status%%). Reload the page and try again.',
+        'requestTimeout' => 'The request timed out. The server may still be processing it; refresh the page before trying again.',
         'jobTitle' => [
             'install' => 'Install %%runtime%% %%version%%',
             'update' => 'Update %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Tick "Enable the application" and save. Runway builds and starts the application and points the domain to it.',
         ],
         'status' => [
+            'refreshFailed' => 'Status could not be refreshed. The information below may be out of date.',
+            'lastUpdated' => 'Last successful update: %%time%%',
             'title' => 'Status',
             'deploying' => 'Building...',
             'service' => 'Service',

@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'فشل الطلب (HTTP %%status%%).',
         'unexpectedResponse' => 'استجابة غير متوقعة من الخادم (HTTP %%status%%). أعد تحميل الصفحة وحاول مرة أخرى.',
+        'requestTimeout' => 'انتهت مهلة الطلب. قد يستمر الخادم في معالجته؛ حدّث الصفحة قبل المحاولة مرة أخرى.',
         'jobTitle' => [
             'install' => 'تثبيت %%runtime%% %%version%%',
             'update' => 'تحديث %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'حدد "تمكين التطبيق" ثم احفظ. يبني Runway التطبيق ويشغّله ويوجّه النطاق إليه.',
         ],
         'status' => [
+            'refreshFailed' => 'تعذّر تحديث الحالة. قد تكون المعلومات أدناه غير محدثة.',
+            'lastUpdated' => 'آخر تحديث ناجح: %%time%%',
             'title' => 'الحالة',
             'deploying' => 'جارٍ البناء...',
             'service' => 'الخدمة',

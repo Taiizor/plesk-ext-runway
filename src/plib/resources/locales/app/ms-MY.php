@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Permintaan gagal (HTTP %%status%%).',
         'unexpectedResponse' => 'Respons tidak dijangka daripada pelayan (HTTP %%status%%). Muat semula halaman dan cuba lagi.',
+        'requestTimeout' => 'Permintaan telah tamat masa. Pelayan mungkin masih memprosesnya; muat semula halaman sebelum mencuba lagi.',
         'jobTitle' => [
             'install' => 'Pasang %%runtime%% %%version%%',
             'update' => 'Kemas kini %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Tandakan "Dayakan aplikasi" dan simpan. Runway membina dan memulakan aplikasi serta menghalakan domain kepadanya.',
         ],
         'status' => [
+            'refreshFailed' => 'Status tidak dapat dimuat semula. Maklumat di bawah mungkin tidak terkini.',
+            'lastUpdated' => 'Kemas kini terakhir yang berjaya: %%time%%',
             'title' => 'Status',
             'deploying' => 'Membina...',
             'service' => 'Perkhidmatan',

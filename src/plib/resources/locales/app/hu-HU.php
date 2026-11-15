@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'A kérés sikertelen (HTTP %%status%%).',
         'unexpectedResponse' => 'Váratlan válasz érkezett a kiszolgálótól (HTTP %%status%%). Töltse újra az oldalt, és próbálja meg ismét.',
+        'requestTimeout' => 'A kérés túllépte az időkorlátot. A szerver még feldolgozhatja; újabb próbálkozás előtt frissítse az oldalt.',
         'jobTitle' => [
             'install' => '%%runtime%% %%version%% telepítése',
             'update' => '%%runtime%% %%version%% frissítése',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Jelölje be az „Alkalmazás engedélyezése” jelölőnégyzetet, és mentse a beállításokat. A Runway összeállítja és elindítja az alkalmazást, majd ráirányítja a domaint.',
         ],
         'status' => [
+            'refreshFailed' => 'Az állapot frissítése nem sikerült. Az alábbi információk elavultak lehetnek.',
+            'lastUpdated' => 'Utolsó sikeres frissítés: %%time%%',
             'title' => 'Állapot',
             'deploying' => 'Összeállítás...',
             'service' => 'Szolgáltatás',

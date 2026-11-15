@@ -264,7 +264,7 @@ const deployValue = (translate, deploy, deploying) => {
  * Status card of the domain page: state label, facts about the service, the listener, the
  * health check and the last deployment, and the control buttons.
  */
-const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
+const StatusPanel = ({ data, status, error, updatedAt, busyOp, onControl, onStop }) => {
     const translate = useTranslate();
     const config = isObject(data.config) ? data.config : {};
     const configured = Boolean(data.configured);
@@ -337,6 +337,19 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
 
     return (
         <Panel title={<Translate content="Domain.status.title" />}>
+            {error && (
+                <Alert intent="warning">
+                    <Translate content="Domain.status.refreshFailed" />
+                    <div>{isolate(error)}</div>
+                </Alert>
+            )}
+            {updatedAt && (
+                <div style={{ marginBottom: '8px' }}>
+                    <Text intent="muted" fontSize="sm">
+                        <Translate content="Domain.status.lastUpdated" params={{ time: isolate(formatTime(updatedAt)) }} />
+                    </Text>
+                </div>
+            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
                 <StateLabel state={state} size="lg" />
                 {deploying && <Label intent="info" size="lg" view="light"><Translate content="Domain.status.deploying" /></Label>}
@@ -418,6 +431,8 @@ const StatusPanel = ({ data, status, busyOp, onControl, onStop }) => {
 StatusPanel.propTypes = {
     data: PropTypes.object.isRequired,
     status: PropTypes.object,
+    error: PropTypes.string,
+    updatedAt: PropTypes.string,
     busyOp: PropTypes.string,
     onControl: PropTypes.func.isRequired,
     onStop: PropTypes.func.isRequired,
@@ -425,6 +440,8 @@ StatusPanel.propTypes = {
 
 StatusPanel.defaultProps = {
     status: null,
+    error: null,
+    updatedAt: null,
     busyOp: null,
 };
 

@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'La requête a échoué (HTTP %%status%%).',
         'unexpectedResponse' => 'Réponse inattendue du serveur (HTTP %%status%%). Rechargez la page et réessayez.',
+        'requestTimeout' => 'Le délai de la requête a expiré. Le serveur la traite peut-être encore ; actualisez la page avant de réessayer.',
         'jobTitle' => [
             'install' => 'Installation de %%runtime%% %%version%%',
             'update' => 'Mise à jour de %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Cochez « Activer l\'application » et enregistrez. Runway compile et démarre l\'application, puis y fait pointer le domaine.',
         ],
         'status' => [
+            'refreshFailed' => 'Impossible d’actualiser l’état. Les informations ci-dessous peuvent être obsolètes.',
+            'lastUpdated' => 'Dernière actualisation réussie : %%time%%',
             'title' => 'État',
             'deploying' => 'Compilation en cours...',
             'service' => 'Service',

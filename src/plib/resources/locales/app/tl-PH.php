@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Nabigo ang request (HTTP %%status%%).',
         'unexpectedResponse' => 'Hindi inaasahang tugon mula sa server (HTTP %%status%%). I-reload ang page at subukang muli.',
+        'requestTimeout' => 'Nag-time out ang kahilingan. Maaaring pinoproseso pa rin ito ng server; i-refresh ang pahina bago subukan muli.',
         'jobTitle' => [
             'install' => 'I-install ang %%runtime%% %%version%%',
             'update' => 'I-update ang %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Lagyan ng check ang "Paganahin ang application" at i-save. Bini-build at sinisimulan ng Runway ang application at itinuturo ang domain dito.',
         ],
         'status' => [
+            'refreshFailed' => 'Hindi ma-refresh ang katayuan. Maaaring hindi na napapanahon ang impormasyon sa ibaba.',
+            'lastUpdated' => 'Huling matagumpay na pag-update: %%time%%',
             'title' => 'Status',
             'deploying' => 'Bini-build...',
             'service' => 'Serbisyo',

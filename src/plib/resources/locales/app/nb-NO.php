@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Forespørselen mislyktes (HTTP %%status%%).',
         'unexpectedResponse' => 'Uventet svar fra serveren (HTTP %%status%%). Last inn siden på nytt og prøv igjen.',
+        'requestTimeout' => 'Forespørselen fikk tidsavbrudd. Serveren behandler den kanskje fortsatt; oppdater siden før du prøver igjen.',
         'jobTitle' => [
             'install' => 'Installer %%runtime%% %%version%%',
             'update' => 'Oppdater %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Kryss av for "Aktiver applikasjonen" og lagre. Runway bygger og starter applikasjonen og peker domenet til den.',
         ],
         'status' => [
+            'refreshFailed' => 'Statusen kunne ikke oppdateres. Informasjonen nedenfor kan være utdatert.',
+            'lastUpdated' => 'Siste vellykkede oppdatering: %%time%%',
             'title' => 'Status',
             'deploying' => 'Bygger...',
             'service' => 'Tjeneste',

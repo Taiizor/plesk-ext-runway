@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => '請求失敗 (HTTP %%status%%)。',
         'unexpectedResponse' => '伺服器傳回非預期的回應 (HTTP %%status%%)。請重新載入頁面後再試一次。',
+        'requestTimeout' => '請求逾時。伺服器可能仍在處理；請重新整理頁面後再重試。',
         'jobTitle' => [
             'install' => '安裝 %%runtime%% %%version%%',
             'update' => '更新 %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => '勾選「啟用應用程式」並儲存。Runway 會建置並啟動應用程式，然後將域名指向它。',
         ],
         'status' => [
+            'refreshFailed' => '無法重新整理狀態。以下資訊可能已過時。',
+            'lastUpdated' => '上次成功更新：%%time%%',
             'title' => '狀態',
             'deploying' => '建置中...',
             'service' => '服務',

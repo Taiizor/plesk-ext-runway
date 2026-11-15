@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Cererea a eșuat (HTTP %%status%%).',
         'unexpectedResponse' => 'Răspuns neașteptat de la server (HTTP %%status%%). Reîncărcați pagina și încercați din nou.',
+        'requestTimeout' => 'Solicitarea a expirat. Serverul o poate procesa în continuare; reîmprospătați pagina înainte de a încerca din nou.',
         'jobTitle' => [
             'install' => 'Instalare %%runtime%% %%version%%',
             'update' => 'Actualizare %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Bifați „Activare aplicație” și salvați. Runway compilează și pornește aplicația, apoi direcționează domeniul către ea.',
         ],
         'status' => [
+            'refreshFailed' => 'Starea nu a putut fi actualizată. Informațiile de mai jos pot fi învechite.',
+            'lastUpdated' => 'Ultima actualizare reușită: %%time%%',
             'title' => 'Stare',
             'deploying' => 'Se compilează...',
             'service' => 'Serviciu',

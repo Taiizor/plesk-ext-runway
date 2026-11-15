@@ -29,6 +29,16 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   The form's note under *Document root* says so instead of naming a command. README section
   *Static files and the document root*.
 
+### Fixed
+
+- The domain status card reports failed refreshes and the time of its last successful update,
+  keeping the last known status until a successful poll or page reload clears the warning.
+- Frontend API requests have a deadline covering both the response headers and body: 30 seconds
+  for status, logs, job and update polls, 120 seconds for other reads, and 300 seconds for writes
+  that may wait for services or Plesk. A timeout aborts the request and releases polling and panel
+  request bookkeeping; writes are never retried automatically, since the server may still finish
+  the operation. Timeout and status freshness messages are translated in all 32 panel languages.
+
 ## [1.2.0] - 2026-11-13
 
 Feedback from a production server: Runway in every panel view, the application's real memory,

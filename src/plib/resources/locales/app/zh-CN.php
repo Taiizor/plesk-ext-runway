@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => '请求失败（HTTP %%status%%）。',
         'unexpectedResponse' => '服务器返回了意外的响应（HTTP %%status%%）。请重新加载页面后重试。',
+        'requestTimeout' => '请求超时。服务器可能仍在处理；请刷新页面后再重试。',
         'jobTitle' => [
             'install' => '安装 %%runtime%% %%version%%',
             'update' => '更新 %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => '勾选“启用应用程序”并保存。Runway 会构建并启动应用程序，并将域名指向它。',
         ],
         'status' => [
+            'refreshFailed' => '无法刷新状态。以下信息可能已过时。',
+            'lastUpdated' => '上次成功更新：%%time%%',
             'title' => '状态',
             'deploying' => '正在构建...',
             'service' => '服务',

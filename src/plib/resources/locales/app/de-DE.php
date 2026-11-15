@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Anfrage fehlgeschlagen (HTTP %%status%%).',
         'unexpectedResponse' => 'Unerwartete Antwort vom Server (HTTP %%status%%). Laden Sie die Seite neu und versuchen Sie es erneut.',
+        'requestTimeout' => 'Die Zeitüberschreitung der Anfrage wurde erreicht. Der Server verarbeitet sie möglicherweise noch; aktualisieren Sie die Seite, bevor Sie es erneut versuchen.',
         'jobTitle' => [
             'install' => '%%runtime%% %%version%% installieren',
             'update' => '%%runtime%% %%version%% aktualisieren',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Aktivieren Sie das Kontrollkästchen „Anwendung aktivieren“ und speichern Sie. Runway baut und startet die Anwendung und leitet die Domain an sie weiter.',
         ],
         'status' => [
+            'refreshFailed' => 'Der Status konnte nicht aktualisiert werden. Die folgenden Informationen sind möglicherweise veraltet.',
+            'lastUpdated' => 'Letzte erfolgreiche Aktualisierung: %%time%%',
             'title' => 'Status',
             'deploying' => 'Build läuft...',
             'service' => 'Dienst',

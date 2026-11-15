@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'הבקשה נכשלה (HTTP %%status%%).',
         'unexpectedResponse' => 'התקבלה תגובה לא צפויה מהשרת (HTTP %%status%%). טען מחדש את הדף ונסה שוב.',
+        'requestTimeout' => 'תם הזמן שהוקצב לבקשה. ייתכן שהשרת עדיין מעבד אותה; יש לרענן את הדף לפני ניסיון נוסף.',
         'jobTitle' => [
             'install' => 'התקנת %%runtime%% %%version%%',
             'update' => 'עדכון %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'סמן את "הפעל את היישום" ושמור. Runway בונה ומפעיל את היישום ומפנה אליו את הדומיין.',
         ],
         'status' => [
+            'refreshFailed' => 'לא ניתן היה לרענן את המצב. ייתכן שהמידע להלן אינו עדכני.',
+            'lastUpdated' => 'העדכון המוצלח האחרון: %%time%%',
             'title' => 'סטטוס',
             'deploying' => 'בבנייה...',
             'service' => 'שירות',

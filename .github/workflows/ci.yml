@@ -93,9 +93,10 @@ jobs:
       - name: Locale files (keys, placeholders and line layout of every locale against en-US)
         run: python tests/check_locales.py
 
-      - name: Frontend build (bun + plesk-ext-sdk)
+      - name: Frontend tests and build (bun + plesk-ext-sdk)
         run: |
           bun install --frozen-lockfile
+          bun run test:frontend
           bun run build
 
       - name: Source tree check (structure, changelogs, leftover placeholders)

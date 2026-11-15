@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Żądanie nie powiodło się (HTTP %%status%%).',
         'unexpectedResponse' => 'Nieoczekiwana odpowiedź serwera (HTTP %%status%%). Odśwież stronę i spróbuj ponownie.',
+        'requestTimeout' => 'Upłynął limit czasu żądania. Serwer może nadal je przetwarzać; przed kolejną próbą odśwież stronę.',
         'jobTitle' => [
             'install' => 'Instalacja %%runtime%% %%version%%',
             'update' => 'Aktualizacja %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Zaznacz „Włącz aplikację” i zapisz. Runway skompiluje i uruchomi aplikację oraz skieruje do niej domenę.',
         ],
         'status' => [
+            'refreshFailed' => 'Nie udało się odświeżyć stanu. Poniższe informacje mogą być nieaktualne.',
+            'lastUpdated' => 'Ostatnia udana aktualizacja: %%time%%',
             'title' => 'Status',
             'deploying' => 'Kompilowanie...',
             'service' => 'Usługa',

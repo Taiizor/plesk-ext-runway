@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Richiesta non riuscita (HTTP %%status%%).',
         'unexpectedResponse' => 'Risposta imprevista dal server (HTTP %%status%%). Ricarica la pagina e riprova.',
+        'requestTimeout' => 'La richiesta è scaduta. Il server potrebbe ancora elaborarla; aggiorna la pagina prima di riprovare.',
         'jobTitle' => [
             'install' => 'Installazione di %%runtime%% %%version%%',
             'update' => 'Aggiornamento di %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Seleziona "Abilita l\'applicazione" e salva. Runway esegue la build, avvia l\'applicazione e vi indirizza il dominio.',
         ],
         'status' => [
+            'refreshFailed' => 'Impossibile aggiornare lo stato. Le informazioni seguenti potrebbero non essere aggiornate.',
+            'lastUpdated' => 'Ultimo aggiornamento riuscito: %%time%%',
             'title' => 'Stato',
             'deploying' => 'Build in corso...',
             'service' => 'Servizio',

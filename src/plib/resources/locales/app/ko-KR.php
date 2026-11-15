@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => '요청이 실패했습니다(HTTP %%status%%).',
         'unexpectedResponse' => '서버에서 예기치 않은 응답을 받았습니다(HTTP %%status%%). 페이지를 새로 고친 후 다시 시도하십시오.',
+        'requestTimeout' => '요청 시간이 초과되었습니다. 서버가 아직 처리 중일 수 있으므로 다시 시도하기 전에 페이지를 새로 고치세요.',
         'jobTitle' => [
             'install' => '%%runtime%% %%version%% 설치',
             'update' => '%%runtime%% %%version%% 업데이트',
@@ -239,6 +240,8 @@ return [
             'step4' => '"애플리케이션 활성화"를 선택하고 저장하십시오. Runway가 애플리케이션을 빌드하고 시작한 다음 도메인을 애플리케이션에 연결합니다.',
         ],
         'status' => [
+            'refreshFailed' => '상태를 새로 고칠 수 없습니다. 아래 정보가 최신이 아닐 수 있습니다.',
+            'lastUpdated' => '마지막으로 성공한 업데이트: %%time%%',
             'title' => '상태',
             'deploying' => '빌드 중...',
             'service' => '서비스',

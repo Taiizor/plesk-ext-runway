@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'リクエストに失敗しました（HTTP %%status%%）。',
         'unexpectedResponse' => 'サーバから予期しない応答がありました（HTTP %%status%%）。ページを再読み込みして、もう一度お試しください。',
+        'requestTimeout' => 'リクエストがタイムアウトしました。サーバーがまだ処理中の可能性があります。再試行する前にページを再読み込みしてください。',
         'jobTitle' => [
             'install' => '%%runtime%% %%version%% のインストール',
             'update' => '%%runtime%% %%version%% のアップデート',
@@ -239,6 +240,8 @@ return [
             'step4' => '「アプリケーションを有効にする」にチェックを入れて保存します。Runway がアプリケーションをビルドして起動し、ドメインをそこに向けます。',
         ],
         'status' => [
+            'refreshFailed' => 'ステータスを更新できませんでした。以下の情報は古い可能性があります。',
+            'lastUpdated' => '最終更新成功日時: %%time%%',
             'title' => 'ステータス',
             'deploying' => 'ビルド中...',
             'service' => 'サービス',

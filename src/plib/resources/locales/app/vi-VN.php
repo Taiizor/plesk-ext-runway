@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Yêu cầu thất bại (HTTP %%status%%).',
         'unexpectedResponse' => 'Phản hồi không mong đợi từ máy chủ (HTTP %%status%%). Hãy tải lại trang và thử lại.',
+        'requestTimeout' => 'Yêu cầu đã hết thời gian chờ. Máy chủ có thể vẫn đang xử lý; hãy tải lại trang trước khi thử lại.',
         'jobTitle' => [
             'install' => 'Cài đặt %%runtime%% %%version%%',
             'update' => 'Cập nhật %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Đánh dấu "Bật ứng dụng" và lưu. Runway sẽ biên dịch, khởi động ứng dụng và trỏ tên miền tới nó.',
         ],
         'status' => [
+            'refreshFailed' => 'Không thể làm mới trạng thái. Thông tin bên dưới có thể đã cũ.',
+            'lastUpdated' => 'Lần cập nhật thành công gần nhất: %%time%%',
             'title' => 'Trạng thái',
             'deploying' => 'Đang biên dịch...',
             'service' => 'Dịch vụ',

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslate } from '@plesk/plesk-ext-sdk';
 import { createApi } from './api';
+import { isObject } from './format';
 
 /** Polling keeps running while the tab is hidden for this long after a user action (DESIGN section 8). */
 export const POLL_GRACE_MS = 120000;
@@ -93,6 +94,54 @@ export const useApiData = (load, deps = []) => {
     })), []);
 
     return { ...state, reload, setData };
+};
+
+/**
+ * Last known application status and its freshness. Failed polls keep the snapshot and timestamp;
+ * successful polls or page loads clear the error. Local job hints never mark a snapshot fresh.
+ */
+export const useAppStatus = (api, siteId, page) => {
+    const [snapshot, setSnapshot] = useState({ status: null, error: null, updatedAt: null });
+    const begin = useLatest();
+
+    useEffect(() => {
+        begin();
+        setSnapshot({ status: null, error: null, updatedAt: null });
+    }, [siteId, begin]);
+
+    useEffect(() => {
+        if (page) {
+            begin();
+            if (isObject(page.status)) {
+                setSnapshot({ status: page.status, error: null, updatedAt: new Date().toISOString() });
+            } else if (page.pageError) {
+                setSnapshot(prev => ({ ...prev, error: page.pageError }));
+            }
+        }
+    }, [page, begin]);
+
+    const refresh = useCallback(() => {
+        if (!siteId) {
+            return Promise.resolve();
+        }
+        const current = begin();
+        return api.get('app/status', { site_id: siteId }).then(status => {
+            if (current() && isObject(status)) {
+                setSnapshot({ status, error: null, updatedAt: new Date().toISOString() });
+            }
+        }, error => {
+            if (current()) {
+                setSnapshot(prev => ({ ...prev, error: error.message }));
+            }
+        });
+    }, [api, siteId, begin]);
+
+    const setStatus = useCallback(update => setSnapshot(prev => {
+        const status = typeof update === 'function' ? update(prev.status) : update;
+        return status === null ? { status: null, error: null, updatedAt: null } : { ...prev, status };
+    }), []);
+
+    return { ...snapshot, refresh, setStatus };
 };
 
 /**

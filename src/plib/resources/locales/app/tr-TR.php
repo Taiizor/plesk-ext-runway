@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'İstek başarısız oldu (HTTP %%status%%).',
         'unexpectedResponse' => 'Sunucudan beklenmeyen bir yanıt geldi (HTTP %%status%%). Sayfayı yenileyip tekrar deneyin.',
+        'requestTimeout' => 'İstek zaman aşımına uğradı. Sunucu işlemi sürdürüyor olabilir; tekrar denemeden önce sayfayı yenileyin.',
         'jobTitle' => [
             'install' => '%%runtime%% %%version%% kurulumu',
             'update' => '%%runtime%% %%version%% güncellemesi',
@@ -239,6 +240,8 @@ return [
             'step4' => '"Uygulamayı etkinleştir" kutusunu işaretleyip kaydedin. Runway uygulamayı derleyip başlatır ve alan adını ona yönlendirir.',
         ],
         'status' => [
+            'refreshFailed' => 'Durum yenilenemedi. Aşağıdaki bilgiler güncel olmayabilir.',
+            'lastUpdated' => 'Son başarılı güncelleme: %%time%%',
             'title' => 'Durum',
             'deploying' => 'Derleniyor...',
             'service' => 'Servis',

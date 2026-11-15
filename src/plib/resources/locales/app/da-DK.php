@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Anmodningen mislykkedes (HTTP %%status%%).',
         'unexpectedResponse' => 'Uventet svar fra serveren (HTTP %%status%%). Genindlæs siden, og prøv igen.',
+        'requestTimeout' => 'Anmodningen fik timeout. Serveren behandler den muligvis stadig; opdater siden, før du prøver igen.',
         'jobTitle' => [
             'install' => 'Installer %%runtime%% %%version%%',
             'update' => 'Opdater %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Markér "Aktivér applikationen", og gem. Runway bygger og starter applikationen og peger domænet på den.',
         ],
         'status' => [
+            'refreshFailed' => 'Status kunne ikke opdateres. Oplysningerne nedenfor kan være forældede.',
+            'lastUpdated' => 'Seneste vellykkede opdatering: %%time%%',
             'title' => 'Status',
             'deploying' => 'Bygger...',
             'service' => 'Tjeneste',

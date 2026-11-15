@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Verzoek mislukt (HTTP %%status%%).',
         'unexpectedResponse' => 'Onverwacht antwoord van de server (HTTP %%status%%). Laad de pagina opnieuw en probeer het nogmaals.',
+        'requestTimeout' => 'De aanvraag heeft de tijdslimiet overschreden. De server verwerkt deze mogelijk nog; vernieuw de pagina voordat u het opnieuw probeert.',
         'jobTitle' => [
             'install' => 'Installatie van %%runtime%% %%version%%',
             'update' => 'Update van %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Vink "Applicatie inschakelen" aan en sla op. Runway bouwt en start de applicatie en verwijst het domein ernaar.',
         ],
         'status' => [
+            'refreshFailed' => 'De status kon niet worden vernieuwd. De onderstaande informatie is mogelijk verouderd.',
+            'lastUpdated' => 'Laatste geslaagde update: %%time%%',
             'title' => 'Status',
             'deploying' => 'Bouwen...',
             'service' => 'Service',

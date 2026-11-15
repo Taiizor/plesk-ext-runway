@@ -707,11 +707,23 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
   after 3 restarts within an hour.
 - Polling pauses when `document.hidden` except for 2 min after a user action; status updates
   every 6 s (2 s while a job runs). Confirmations use ui-library `Dialog`, never `window.confirm`.
+- Status freshness (`useAppStatus`): the domain card shows the time of the last successful status
+  poll or page snapshot, and a warning with the error when a refresh fails. The last snapshot and
+  its timestamp stay visible; a successful poll or page reload clears the warning. Local queued-job
+  hints do not mark data fresh. Sequence guards ignore responses superseded by another request, a
+  page snapshot or a domain change, and responses after unmount.
+- API deadlines (`lib/api.js`) cover the headers and the entire response body: 30 s for GET
+  `app/status`, `app/logs`, `job` and `update`, 120 s for other GET requests, 300 s for POST requests
+  (helper locks, service stops and Plesk reconfiguration may take time). The deadline aborts fetch,
+  rejects with a translated `ApiError`, and releases the panel's active-request counter so polling
+  can continue. A timed-out POST may still finish on the server: the message asks to refresh the
+  page before retrying, and the client never retries writes automatically.
 - Translations: `src/plib/resources/locales/*.php` key `'app' => [...]` nested per component
   (`Overview.title`, ...). Every Plesk locale (en-US is the reference, tr-TR hand-written, the
   other 30 machine-translated and reviewed). Texts produced by the helper are translated through
   their keys (`hint_key`, `title_key`, `listener_code`, `health_code`) with the English text as
-  fallback; the API client's own errors use `Common.requestFailed`/`Common.unexpectedResponse`.
+  fallback; the API client's own errors use `Common.requestFailed`/`Common.unexpectedResponse`/
+  `Common.requestTimeout`.
 
 ## 9. CLI (`pm_Hook_ApiCli`, `plesk ext runway ...`)
 
@@ -733,6 +745,10 @@ no option to change the document root (Plesk's own `plesk bin site --update <dom
 does).
 
 ## 10. Testing and release
+
+- Frontend regressions: `bun run test:frontend` (Bun's test runner, React and jsdom) checks API
+  deadlines before headers and during body reads, cleanup, status freshness and recovery, late
+  responses, the status card warning and polling after a timeout; it needs no Plesk server.
 
 - Local: `plesk/plesk` container (`scripts/plesk-dev.sh`), `tests/helper-smoke.sh` (root helper,
   fake domain id 999 with the reconcile pause flag), `tests/api-smoke.sh` (login link → cookies →

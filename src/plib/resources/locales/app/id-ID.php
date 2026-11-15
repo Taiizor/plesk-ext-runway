@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'Permintaan gagal (HTTP %%status%%).',
         'unexpectedResponse' => 'Respons tidak terduga dari server (HTTP %%status%%). Muat ulang halaman dan coba lagi.',
+        'requestTimeout' => 'Permintaan kehabisan waktu. Server mungkin masih memprosesnya; muat ulang halaman sebelum mencoba lagi.',
         'jobTitle' => [
             'install' => 'Instal %%runtime%% %%version%%',
             'update' => 'Perbarui %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Centang "Aktifkan aplikasi" lalu simpan. Runway mem-build dan memulai aplikasi, lalu mengarahkan domain ke aplikasi tersebut.',
         ],
         'status' => [
+            'refreshFailed' => 'Status tidak dapat diperbarui. Informasi di bawah ini mungkin sudah tidak terbaru.',
+            'lastUpdated' => 'Pembaruan terakhir yang berhasil: %%time%%',
             'title' => 'Status',
             'deploying' => 'Sedang di-build...',
             'service' => 'Layanan',

@@ -26,6 +26,7 @@ return [
         ],
         'requestFailed' => 'La sol·licitud ha fallat (HTTP %%status%%).',
         'unexpectedResponse' => 'Resposta inesperada del servidor (HTTP %%status%%). Torneu a carregar la pàgina i proveu-ho de nou.',
+        'requestTimeout' => 'La sol·licitud ha superat el temps límit. El servidor encara la pot estar processant; actualitzeu la pàgina abans de tornar-ho a provar.',
         'jobTitle' => [
             'install' => 'Instal·lació de %%runtime%% %%version%%',
             'update' => 'Actualització de %%runtime%% %%version%%',
@@ -239,6 +240,8 @@ return [
             'step4' => 'Marqueu "Habilita l\'aplicació" i deseu. Runway compila i inicia l\'aplicació i hi dirigeix el domini.',
         ],
         'status' => [
+            'refreshFailed' => 'No s’ha pogut actualitzar l’estat. La informació següent pot estar desactualitzada.',
+            'lastUpdated' => 'Darrera actualització correcta: %%time%%',
             'title' => 'Estat',
             'deploying' => 'S\'està compilant...',
             'service' => 'Servei',
