@@ -162,14 +162,26 @@ const FetchDrawer = ({ isOpen, busy = false, error = null, onSubmit, onClose }) 
                 placeholder="https://"
                 size="fill"
                 required
-                inputProps={{ spellCheck: false, dir: 'ltr' }}
+                inputProps={{
+                    type: 'url',
+                    spellCheck: false,
+                    autoCorrect: 'off',
+                    autoCapitalize: 'none',
+                    dir: 'ltr',
+                }}
             />
             <FormFieldText
                 name="sha256"
                 label={<Translate content="Domain.project.fetchSha256" />}
                 description={<Translate content="Domain.project.fetchSha256Hint" />}
                 size="fill"
-                inputProps={{ spellCheck: false, dir: 'ltr' }}
+                inputProps={{
+                    spellCheck: false,
+                    autoCorrect: 'off',
+                    autoCapitalize: 'none',
+                    style: { fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: '12px' },
+                    dir: 'ltr',
+                }}
             />
             <FormFieldCheckbox
                 name="extract"

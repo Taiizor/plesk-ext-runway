@@ -16,7 +16,8 @@ const EVENTS = ['deploy_succeeded', 'deploy_failed', 'health_restart', 'health_p
 // i18n-keys: Operations.checks.source Operations.checks.writable Operations.checks.toolchain Operations.checks.disk Operations.checks.release_size
 // i18n-keys: Operations.title Operations.intro Operations.historyTitle Operations.history Operations.history_limit Operations.historyHint Operations.diagnosticsTitle Operations.diagnostics Operations.preflight Operations.preflightHint Operations.min_free_mb Operations.releasesTitle Operations.releases Operations.releasesHint Operations.sharedHint Operations.shared_paths Operations.pathsHint Operations.exclude_paths Operations.excludeHint Operations.release_limit Operations.retentionHint Operations.release_max_mb Operations.sizeHint Operations.notificationsTitle Operations.notifications Operations.notificationsHint Operations.notification_url Operations.notification_secret Operations.secretHint Operations.secretKept Operations.clear_notification_secret Operations.backupTitle Operations.backup Operations.backupHint Operations.backup_secrets Operations.backupSecretsHint Operations.restore_start Operations.restoreStartHint Operations.runDiagnostics Operations.exportReport Operations.exportBackup Operations.importBackup Operations.importHint Operations.recoveryJson Operations.restoreSecrets Operations.invalidBackup Operations.restored Operations.saved Operations.clearReleases Operations.clearHint Operations.rollback Operations.rollbackHint Operations.active Operations.empty Operations.viewLog Operations.confirmTitle Operations.confirm Operations.lastNotification Operations.checksPassed Operations.checksFailed Operations.checkedAtDeploy Operations.passed Operations.failed
 const tr = key => <Translate content={`Operations.${key}`} />;
-const codeInput = { dir: 'ltr', spellCheck: false };
+const codeInput = { dir: 'ltr', spellCheck: false, autoCorrect: 'off', autoCapitalize: 'none' };
+const numberInput = { dir: 'ltr', spellCheck: false, inputMode: 'numeric' };
 const actionsStyle = { display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '12px 0' };
 
 /** Optional settings are saved separately from application configuration and never restart a service. */
@@ -112,12 +113,12 @@ const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
                 >
                     <Section title={tr('historyTitle')}>
                         {toggle('history')}
-                        {values.history && field('history_limit', 'historyHint', { size: 'md' })}
+                        {values.history && field('history_limit', 'historyHint', { size: 'md', inputProps: numberInput })}
                     </Section>
                     <Section title={tr('diagnosticsTitle')}>
                         {toggle('diagnostics')}
                         {values.diagnostics && toggle('preflight', 'preflightHint')}
-                        {(values.diagnostics || values.releases) && field('min_free_mb', null, { size: 'md' })}
+                        {(values.diagnostics || values.releases) && field('min_free_mb', null, { size: 'md', inputProps: numberInput })}
                     </Section>
                     <Section title={tr('releasesTitle')}>
                         {toggle('releases', 'releasesHint')}
@@ -126,8 +127,8 @@ const OperationsPanel = ({ api, siteId, deploying, stopped, onChanged }) => {
                                 <Alert intent="warning">{tr('sharedHint')}</Alert>
                                 {field('shared_paths', 'pathsHint', { multiline: true, rows: 3, size: 'xl', placeholder: 'wwwroot\nuploads' })}
                                 {field('exclude_paths', 'excludeHint', { multiline: true, rows: 3, size: 'xl' })}
-                                {field('release_limit', 'retentionHint', { size: 'md' })}
-                                {field('release_max_mb', 'sizeHint', { size: 'md' })}
+                                {field('release_limit', 'retentionHint', { size: 'md', inputProps: numberInput })}
+                                {field('release_max_mb', 'sizeHint', { size: 'md', inputProps: numberInput })}
                             </div>
                         )}
                     </Section>

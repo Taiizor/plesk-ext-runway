@@ -1,18 +1,44 @@
 // Copyright 2026 Taiizor. Licensed under the MIT License.
 
-import { createElement, useState } from 'react';
+import { createElement, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Translate, useTranslate,
+    Alert, Button, Icon, Input, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Tooltip, Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { formatBytes, formatTime, isolate, runtimeName } from './lib/format';
 import { useApi, useApiData, usePolling } from './lib/hooks';
 import ErrorAlert from './components/ErrorAlert';
 import Facts from './components/Facts';
+import Mono from './components/Mono';
 import { StateLabel } from './components/StateLabel';
 import UpdateNotice from './components/UpdateNotice';
+import ResponsiveTableStyle from './components/ResponsiveTableStyle';
 
 const OVERVIEW_POLL_MS = 15000;
+
+const kpiGridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '12px',
+    margin: '16px 0',
+};
+
+const kpiCardStyle = {
+    background: '#ffffff',
+    border: '1px solid #dcdcdc',
+    borderRadius: '4px',
+    padding: '12px 16px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+};
+
+const kpiHeaderStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '2px',
+};
 
 const domainLink = row => `/domain?site_id=${encodeURIComponent(row.domainId)}`;
 
@@ -35,7 +61,7 @@ const endpoint = row => {
     if (row.listen === 'none' || row.mode === 'worker') {
         return <Translate content="Overview.endpointWorker" />;
     }
-    const target = row.listen === 'unix' ? <Translate content="Overview.endpointSocket" /> : (row.port ? `127.0.0.1:${row.port}` : null);
+    const target = row.listen === 'unix' ? <Translate content="Overview.endpointSocket" /> : (row.port ? <Mono>{`127.0.0.1:${row.port}`}</Mono> : null);
     if (row.mode === 'path') {
         return <span>{target} <Text intent="muted"><Translate content="Overview.endpointPath" /></Text></span>;
     }
@@ -137,18 +163,68 @@ const Overview = ({ baseUrl }) => {
     const server = data.server || null;
     const buildDeps = server && server.build_deps && typeof server.build_deps === 'object' ? server.build_deps : {};
 
+    const [restartingId, setRestartingId] = useState(null);
+    const [actionError, setActionError] = useState(null);
+    const [search, setSearch] = useState('');
+
+    const restartApp = row => {
+        setRestartingId(row.domainId);
+        setActionError(null);
+        api.post('app/control', { site_id: row.domainId, op: 'restart' }).then(
+            () => {
+                setRestartingId(null);
+                overview.reload();
+            },
+            err => {
+                setRestartingId(null);
+                setActionError(err.message || String(err));
+            },
+        );
+    };
+
+    const runningApps = apps.filter(row => row.configured && row.state === 'running');
+    const failedApps = apps.filter(row => row.configured && row.state === 'failed');
+    const totalMemory = apps.reduce((sum, row) => {
+        if (row.state !== 'running') {
+            return sum;
+        }
+        const used = typeof row.memoryUsedBytes === 'number' ? row.memoryUsedBytes : row.memoryBytes;
+        return sum + (typeof used === 'number' ? used : 0);
+    }, 0);
+
+    const runtimeCounts = {};
+    apps.forEach(row => {
+        if (row.configured && row.runtime) {
+            runtimeCounts[row.runtime] = (runtimeCounts[row.runtime] || 0) + 1;
+        }
+    });
+
+    const filteredApps = useMemo(() => {
+        const q = (search || '').trim().toLowerCase();
+        if (!q) {
+            return apps;
+        }
+        return apps.filter(row => {
+            const name = (row.displayName || row.domain || '').toLowerCase();
+            const rt = (row.runtime || '').toLowerCase();
+            return name.includes(q) || rt.includes(q);
+        });
+    }, [apps, search]);
+
     const columns = [
         {
             key: 'domain',
             type: 'title',
             title: <Translate content="Overview.columnDomain" />,
             render: row => (
-                <div>
-                    <RouterLink to={domainLink(row)}>{row.displayName || row.domain}</RouterLink>
+                <div style={{ minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                    <RouterLink to={domainLink(row)} style={{ wordBreak: 'break-all' }}>{row.displayName || row.domain}</RouterLink>
                     {/* The application's URL (with the mount path in path mode); workers have none. */}
                     {row.configured && row.appUrl && (
                         <div>
-                            <a href={row.appUrl} target="_blank" rel="noopener noreferrer"><Text fontSize="sm">{row.appUrl}</Text></a>
+                            <a href={row.appUrl} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all' }}>
+                                <Text fontSize="sm">{row.appUrl}</Text>
+                            </a>
                         </div>
                     )}
                 </div>
@@ -190,16 +266,31 @@ const Overview = ({ baseUrl }) => {
             key: 'actions',
             type: 'actions',
             render: row => (
-                <Button component={RouterLink} to={domainLink(row)} ghost icon="gear">
-                    {row.configured ? <Translate content="Overview.manage" /> : <Translate content="Overview.setUp" />}
-                </Button>
+                <span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                    {row.configured && row.state === 'running' && (
+                        <Tooltip content={<Translate content="Domain.actions.restart" />}>
+                            <Button
+                                ghost
+                                icon="reload"
+                                state={restartingId === row.domainId ? 'loading' : undefined}
+                                disabled={Boolean(restartingId)}
+                                onClick={() => restartApp(row)}
+                            />
+                        </Tooltip>
+                    )}
+                    <Button component={RouterLink} to={domainLink(row)} ghost icon="gear">
+                        {row.configured ? <Translate content="Overview.manage" /> : <Translate content="Overview.setUp" />}
+                    </Button>
+                </span>
             ),
         },
     ];
 
     return (
         <div>
+            <ResponsiveTableStyle />
             <ErrorAlert error={overview.data ? null : overview.error} />
+            <ErrorAlert error={actionError} />
             {Array.isArray(data.errors) && data.errors.length > 0 && (
                 <Alert intent="warning">
                     <Translate content="Overview.helperErrors" />
@@ -210,7 +301,7 @@ const Overview = ({ baseUrl }) => {
             {isAdmin && <UpdateNotice api={api} update={updateInfo} onReload={() => update.reload()} />}
 
             {isAdmin && (
-                <Toolbar>
+                <Toolbar style={{ flexWrap: 'wrap', gap: '8px' }}>
                     <Button component={RouterLink} to="/toolchains" icon="puzzle" intent="primary">
                         <Translate content="Overview.toolchains" />
                     </Button>
@@ -218,6 +309,17 @@ const Overview = ({ baseUrl }) => {
                         <Translate content="Overview.settings" />
                     </Button>
                     <ToolbarExpander />
+                    {apps.length > 0 && (
+                        <div style={{ width: '220px', maxWidth: '100%', marginInlineEnd: '8px' }}>
+                            <Input
+                                size="fill"
+                                placeholder="Search domains..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                prefix={<Icon name="search" size="12" />}
+                            />
+                        </div>
+                    )}
                     <Button ghost icon="reload" onClick={() => overview.reload()} state={overview.loading ? 'loading' : undefined}>
                         <Translate content="Common.refresh" />
                     </Button>
@@ -230,11 +332,72 @@ const Overview = ({ baseUrl }) => {
                 </Panel>
             )}
 
+            {overview.data && configured > 0 && (
+                <div style={kpiGridStyle}>
+                    <div style={kpiCardStyle}>
+                        <div style={kpiHeaderStyle}>
+                            <Text intent="muted" fontSize="sm"><Translate content="Domain.status.service" /></Text>
+                            <Icon name="rocket" size="16" intent="info" />
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 600, display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                            <span>{runningApps.length} / {configured}</span>
+                            <Label
+                                intent={failedApps.length > 0 ? 'danger' : (runningApps.length === configured ? 'success' : 'info')}
+                                view="light"
+                            >
+                                <Translate content="Overview.state.running" />
+                            </Label>
+                        </div>
+                        {failedApps.length > 0 && (
+                            <Text intent="danger" fontSize="sm">
+                                {failedApps.length} <Translate content="Overview.state.failed" />
+                            </Text>
+                        )}
+                    </div>
+
+                    <div style={kpiCardStyle}>
+                        <div style={kpiHeaderStyle}>
+                            <Text intent="muted" fontSize="sm"><Translate content="Domain.status.memory" /></Text>
+                            <Icon name="ram" size="16" intent="info" />
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: 600 }}>
+                            {formatBytes(totalMemory) || '0 B'}
+                        </div>
+                        <Text intent="muted" fontSize="sm">
+                            <Translate content="Overview.columnMemory" />
+                        </Text>
+                    </div>
+
+                    <div style={kpiCardStyle}>
+                        <div style={kpiHeaderStyle}>
+                            <Text intent="muted" fontSize="sm"><Translate content="Overview.columnRuntime" /></Text>
+                            <Icon name="puzzle" size="16" intent="info" />
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', minHeight: '26px' }}>
+                            {Object.keys(runtimeCounts).length > 0 ? (
+                                Object.keys(runtimeCounts).map(rtKey => {
+                                    const meta = runtimes[rtKey];
+                                    const name = meta ? runtimeName(translate, meta) : rtKey;
+                                    return (
+                                        <Label key={rtKey} intent="info" view="light">
+                                            {name} ({runtimeCounts[rtKey]})
+                                        </Label>
+                                    );
+                                })
+                            ) : (
+                                <Text intent="muted" fontSize="sm">—</Text>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div style={{ marginTop: '16px' }}>
                 <List
                     columns={columns}
-                    data={apps}
+                    data={filteredApps}
                     rowKey="domainId"
+                    vertical={720}
                     loading={!overview.data && overview.loading}
                     emptyView={overview.data ? (
                         <ListEmptyView
@@ -289,7 +452,11 @@ const Overview = ({ baseUrl }) => {
                             </Text>
                         </div>
                     )}
-                    <Text fontSize="sm"><Translate content="Overview.hint" /></Text>
+                    <div style={{ marginTop: '16px' }}>
+                        <Alert intent="info">
+                            <Translate content="Overview.hint" />
+                        </Alert>
+                    </div>
                 </Panel>
             )}
         </div>

@@ -12,6 +12,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
 import JobPanel from './components/JobPanel';
 import Mono from './components/Mono';
+import ResponsiveTableStyle from './components/ResponsiveTableStyle';
 
 const installedIds = entry => (Array.isArray(entry.installed) ? entry.installed.map(item => String(item.id)) : []);
 
@@ -65,6 +66,9 @@ const InstallControl = ({ meta, available = null, installed = [], busy = false, 
                     placeholder={translate('Toolchains.otherVersion')}
                     disabled={disabled}
                     size="md"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck="false"
                 />
                 <Button
                     intent="primary"
@@ -296,6 +300,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 columns={columns}
                 data={installedList}
                 rowKey="id"
+                vertical={720}
                 emptyView={(
                     <ListEmptyView
                         title={meta.toolchain === 'detected' ? <Translate content="Toolchains.noneDetected" /> : <Translate content="Toolchains.noneInstalled" />}
@@ -371,7 +376,8 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
 
     return (
         <div>
-            <Toolbar>
+            <ResponsiveTableStyle />
+            <Toolbar style={{ flexWrap: 'wrap', gap: '8px' }}>
                 <Button component={RouterLink} to="/overview" icon="arrow-left" ghost>
                     <Translate content="Common.backToOverview" />
                 </Button>

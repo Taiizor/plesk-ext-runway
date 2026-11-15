@@ -20,8 +20,9 @@ const DEFAULTS_INPUTS = ['runtime', 'toolchain', 'listen', 'mode'];
 const monospace = { fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: '12px' };
 // Commands, variables and paths are code: left-to-right also in right-to-left panel languages
 // (Arabic, Hebrew), where the form itself is mirrored.
-const codeInput = { style: monospace, spellCheck: false, dir: 'ltr' };
-const pathInput = { spellCheck: false, dir: 'ltr' };
+const codeInput = { style: monospace, spellCheck: false, autoCorrect: 'off', autoCapitalize: 'none', dir: 'ltr' };
+const pathInput = { spellCheck: false, autoCorrect: 'off', autoCapitalize: 'none', dir: 'ltr' };
+const numberInput = { inputMode: 'numeric', spellCheck: false, dir: 'ltr' };
 const noticeStyle = { display: 'inline-block', marginInlineStart: '12px', verticalAlign: 'middle' };
 // How long the confirmation or warning next to "Use the default commands" stays visible.
 const NOTICE_MS = 5000;
@@ -656,7 +657,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.healthWatchInterval" />}
                             description={<Translate content="Domain.form.healthWatchIntervalHint" />}
                             size="md"
-                            inputProps={pathInput}
+                            inputProps={numberInput}
                         />
                     )}
                     {!worker && values.healthWatch && (
@@ -665,7 +666,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.healthWatchFailures" />}
                             description={<Translate content="Domain.form.healthWatchFailuresHint" />}
                             size="md"
-                            inputProps={pathInput}
+                            inputProps={numberInput}
                         />
                     )}
                     <FormFieldCheckbox
@@ -694,7 +695,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.readyTimeout" />}
                             description={<Translate content="Domain.form.readyTimeoutHint" params={{ max: String(caps.ready) }} />}
                             size="md"
-                            inputProps={pathInput}
+                            inputProps={numberInput}
                         />
                     )}
                     {!worker && values.zeroDowntime && (
@@ -703,7 +704,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.drainSeconds" />}
                             description={<Translate content="Domain.form.drainSecondsHint" params={{ max: String(caps.drain) }} />}
                             size="md"
-                            inputProps={pathInput}
+                            inputProps={numberInput}
                         />
                     )}
                     {isAdmin && (
@@ -712,6 +713,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.memoryMb" />}
                             description={<Translate content="Domain.form.memoryMbHint" />}
                             size="md"
+                            inputProps={numberInput}
                         />
                     )}
                     {isAdmin && (
@@ -720,6 +722,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.cpuPercent" />}
                             description={<Translate content="Domain.form.cpuPercentHint" />}
                             size="md"
+                            inputProps={numberInput}
                         />
                     )}
                     {isAdmin && (
@@ -728,6 +731,7 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
                             label={<Translate content="Domain.form.tasks" />}
                             description={<Translate content="Domain.form.tasksHint" />}
                             size="md"
+                            inputProps={numberInput}
                         />
                     )}
                 </Section>

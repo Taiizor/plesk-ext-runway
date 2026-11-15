@@ -32,7 +32,18 @@ const toBody = values => {
     return body;
 };
 
-const NumberField = props => <FormFieldText size="md" {...props} />;
+const NumberField = props => (
+    <FormFieldText
+        size="md"
+        inputProps={{
+            inputMode: 'numeric',
+            autoCorrect: 'off',
+            autoCapitalize: 'none',
+            spellCheck: false,
+        }}
+        {...props}
+    />
+);
 
 /**
  * Server-wide settings (administrators only): port range, default limits of new applications,
@@ -75,7 +86,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
 
     return (
         <div>
-            <Toolbar>
+            <Toolbar style={{ flexWrap: 'wrap', gap: '8px' }}>
                 <Button component={RouterLink} to="/overview" icon="arrow-left" ghost>
                     <Translate content="Common.backToOverview" />
                 </Button>

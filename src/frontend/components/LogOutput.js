@@ -46,7 +46,17 @@ const LogOutput = ({ text = '', empty = null }) => {
     return (
         <div>
             <style>{darkThemeFix}</style>
-            <pre ref={ref} dir="ltr" className="runway-log" style={preStyle} onScroll={onScroll} data-testid="log-output">
+            <pre
+                ref={ref}
+                dir="ltr"
+                className="runway-log"
+                style={preStyle}
+                onScroll={onScroll}
+                tabIndex={0}
+                role="region"
+                aria-label="Application logs"
+                data-testid="log-output"
+            >
                 {text ? text : (empty || <Translate content="Common.logEmpty" />)}
             </pre>
         </div>
