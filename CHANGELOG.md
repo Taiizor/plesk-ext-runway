@@ -12,6 +12,32 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- Performance metrics and time-series monitoring system: pure SVG live area and line charts for
+  CPU (%), Memory (MiB), Disk (MiB), and Network Traffic (KB/s) in the application management tab
+  with 1h, 24h, and 7d range toggles, interactive crosshair tooltips, time-stepped downsampling,
+  rolling 14-day data retention in SQLite (`/var/lib/runway/metrics.sqlite`), and Min/Avg/Peak
+  summary statistics.
+- Service network accounting through `IPAccounting=yes` on systemd application units to capture
+  BPF `IPIngressBytes` and `IPEgressBytes`, and fast cached directory disk size calculation
+  (`du -sk`) with a 2-minute memory cache.
+- Overview dashboard KPI metric cards: a uniform 4-card grid featuring Service status, Runtime
+  breakdown, Project Load (aggregate CPU %, RAM, Disk, and Network I/O rate of all Runway
+  applications combined), and Server Load (host VPS metrics: CPU via `/proc/stat`, RAM via
+  `/proc/meminfo`, Disk via `statvfs('/')`, and Network RX/TX rate via `/proc/net/dev`).
+- Cloud-console management view redesign: modern Hero Header with domain title, live site link,
+  runtime and toolchain badges, endpoint listener, and instant control buttons (Start, Stop, Restart,
+  Build & restart), organized into clean tabs (Status & Metrics, Settings, Project & Files,
+  Optional operations, Logs, Help & Danger zone).
+- Interactive visual environment variables editor (`EnvEditor.js`) supporting a key-value table
+  with secret masking/unmasking eye toggles, row insertion/deletion, and a synchronized raw `.env`
+  editor with syntax validation.
+- Live health endpoint ping tool in application settings that sends HTTP GET requests from the
+  privileged helper and reports real-time latency in milliseconds and response status code.
+- Interactive webhook notification test action in the operations panel and real-time log search
+  filtering with a direct `.log` download button.
+- Toolchains Hub visual grid with version badges, build tool availability, and manual update checks.
+- Settings page categorized into tabs with 1-click Preset Profiles (Low-RAM VPS, Standard Server,
+  High Performance).
 - `bun run package` builds and verifies the installable zip in the root `dist/` directory
   through `python build.py --strict`, with matching build and release instructions.
 - Independently opt-in deployment history/audit with bounded logs, diagnostics and blocking
@@ -42,6 +68,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Changed
 
+- Reorganized Overview KPI cards into the sequence: Service, Runtime, Project Load, and Server Load,
+  with uniform dimensions and responsive layout across desktop and mobile screens.
+- Redesigned the domain management page from a monolithic vertical panel stack into modular tabs.
 - The domain form keeps Plesk's document root unless the user enables its change checkbox.
   API projects do not need an artificial `wwwroot` directory.
 - Maintain the privileged helper in source sections under `helper/` (one adapter per runtime,
@@ -54,6 +83,15 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Pass the `configured` flag to `appState()` in `HeroHeader.js` so that configured and running
+  applications display the correct green `RUNNING` status label instead of erroneously showing
+  `NOT CONFIGURED`.
+- Use explicit `Fragment` imports in `HeroHeader.js` instead of shorthand fragment syntax (`<> ... </>`)
+  to ensure robust compilation across build tooling without global `React` references.
+- Action button tooltips and accessibility: provide translated `tooltip` and `aria-label` attributes
+  on restart buttons and remove duplicate browser tooltips.
+- Localize service active and sub-state descriptions across all 32 supported panel languages in the
+  status panel.
 - Run the installed Plesk SDK explicitly with Bun for frontend builds and development,
   including when packaging invokes the build from Python on a system without Node.js.
 - Replace function-component `defaultProps` with JavaScript default parameters throughout the
