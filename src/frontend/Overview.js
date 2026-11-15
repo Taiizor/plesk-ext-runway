@@ -268,10 +268,11 @@ const Overview = ({ baseUrl }) => {
             render: row => (
                 <span style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                     {row.configured && row.state === 'running' && (
-                        <Tooltip content={<Translate content="Domain.actions.restart" />}>
+                        <Tooltip title={translate('Domain.actions.restart')}>
                             <Button
                                 ghost
                                 icon="reload"
+                                aria-label={translate('Domain.actions.restart')}
                                 state={restartingId === row.domainId ? 'loading' : undefined}
                                 disabled={Boolean(restartingId)}
                                 onClick={() => restartApp(row)}
