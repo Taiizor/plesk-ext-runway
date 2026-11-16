@@ -50,6 +50,7 @@ def cmd_reapply_all(_payload):
                                       % (domain_id, "" if unit == UNIT_APP % domain_id else " " + unit))
     systemctl("daemon-reload")
     sync_health_units()
+    sync_metrics_units()
     return {"count": count, "errors": errors}
 
 
@@ -64,6 +65,7 @@ def cmd_install(_payload):
 
 def cmd_uninstall(payload):
     keep_toolchains = bool((payload or {}).get("keep_toolchains"))
+    sync_metrics_units(enabled=False)
     removed = []
     for state in list(iter_app_states()):
         try:

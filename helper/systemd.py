@@ -567,6 +567,10 @@ def render_app_unit(state, pw):
         "RestrictSUIDSGID=yes",
         "RestrictRealtime=yes",
         "LockPersonality=yes",
+        "CPUAccounting=yes",
+        "MemoryAccounting=yes",
+        "IOAccounting=yes",
+        "BlockIOAccounting=yes",
         "IPAccounting=yes",
     ]
     if cached_systemd_version() >= 249:

@@ -34,6 +34,7 @@ artifact without changing any file. Change the version in `bootstrap.py`, then r
 | `commands.py`, `updater.py` | Toolchain/job API commands and extension updates |
 | `applications.py`, `app_control.py`, `app_queries.py`, `lifecycle.py` | Application state, controls, inspection, document roots, install/uninstall and reconciliation |
 | `health.py`, `health_watch.py` | Response matching and periodic health checks |
+| `metrics.py` | SQLite resource history, periodic collection and project totals |
 | `fetch.py`, `deploy.py` | Application downloads, builds and restarts |
 | `switching/` | Zero-downtime pointers, web server reloads, connections, convergence and traffic switching |
 | `operations/` | Opt-in history, diagnostics, isolated releases, HTTPS notifications and recovery metadata |
@@ -62,3 +63,32 @@ end-to-end suites exercise the packaged artifact as before. CodeQL analyzes a co
 copy of the assembled program, instead of treating the sections as independent modules.
 `scripts/helper_sarif.py` maps report locations back to the committed helper, with the same line
 numbers, so findings link to the repository file.
+
+## Resource monitoring
+
+Installation and upgrades enable `runway-metrics.timer`, which calls the installed helper's
+`_metrics` entry point every minute to collect server and configured application metrics even
+when the panel is closed. Uninstallation stops and removes both the timer and its service.
+Samples are stored in `/var/lib/runway/metrics.sqlite` for 14 days; disk scans share a persistent
+two-minute cache. Concurrent panel and timer samples share a lock, and requests less than ten
+seconds apart reuse their last measurement instead of replacing counter deltas with zeros.
+
+Project Load includes the current configured applications and all active deployment slots.
+Application CPU percentages use one logical CPU as 100%, so their sum can exceed 100% on a
+multi-core host. Application memory excludes reclaimable file cache when cgroup data is
+available. Stopped applications retain their disk usage. Charts use real timestamps and leave
+unmeasured intervals blank; existing missing history cannot be reconstructed.
+
+Both load cards show disk capacity and separate read/write rates. The application's Disk I/O
+chart plots both rates on the same scale. These are bytes per second averaged over the interval
+between counter samples, not cumulative bytes or logical application read/write calls. Cached
+reads may generate no block-device I/O. Applications use `IOReadBytes`/`IOWriteBytes`, with
+cgroup v2 `io.stat` and cgroup v1 blkio fallbacks; unit files enable I/O accounting. Host rates
+sum whole leaf devices from `/sys/block/*/stat`, excluding partitions, loop/RAM devices and
+stacked mapper/RAID views to avoid counting the same I/O twice. Initial, unavailable or reset
+counters remain NULL until another valid sample; the UI shows a dash for an unknown rate.
+
+Application network metrics are systemd IP accounting (IPv4/IPv6 ingress plus egress), not
+domain HTTP bandwidth. Unix socket traffic between nginx and an application is outside those
+counters, and IP accounting also depends on kernel BPF support. Check collection on the server
+with `systemctl status runway-metrics.timer` and `journalctl -u runway-metrics.service`.

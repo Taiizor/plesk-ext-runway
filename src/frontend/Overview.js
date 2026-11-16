@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import {
     Alert, Button, Icon, Input, Label, List, ListEmptyView, Panel, RouterLink, Text, Toolbar, ToolbarExpander, Translate, useTranslate,
 } from '@plesk/plesk-ext-sdk';
-import { formatBytes, formatTime, isolate, runtimeName } from './lib/format';
+import { formatByteRate, formatBytes, formatTime, isolate, runtimeName } from './lib/format';
 import { useApi, useApiData, usePolling } from './lib/hooks';
 import ErrorAlert from './components/ErrorAlert';
 import Facts from './components/Facts';
@@ -194,7 +194,7 @@ const Overview = ({ baseUrl }) => {
     }, 0);
 
     const projectSummary = (serverMetrics.data && serverMetrics.data.project_summary) || null;
-    const projectMemory = (projectSummary && typeof projectSummary.memory_used_bytes === 'number' && projectSummary.memory_used_bytes > 0)
+    const projectMemory = (projectSummary && typeof projectSummary.memory_used_bytes === 'number')
         ? projectSummary.memory_used_bytes
         : totalMemory;
 
@@ -389,13 +389,13 @@ const Overview = ({ baseUrl }) => {
                             <Icon name="server" size="16" intent="info" />
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 600 }}>
-                            <span>{projectSummary && typeof projectSummary.cpu_percent === 'number' ? `${projectSummary.cpu_percent}% CPU` : (formatBytes(projectMemory) || '0 B')}</span>
+                            <span>{projectSummary && typeof projectSummary.cpu_percent === 'number' ? `${projectSummary.cpu_percent}% CPU` : '—'}</span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                            <span>RAM: {formatBytes(projectMemory) || '0 B'}</span>
-                            <span>Disk: {projectSummary && projectSummary.disk_bytes ? formatBytes(projectSummary.disk_bytes) : '—'}</span>
+                            <span>{translate('Overview.loadMemory')}: {formatBytes(projectMemory) || '0 B'}</span>
+                            <span>{translate('Overview.loadDisk')}: {projectSummary && typeof projectSummary.disk_bytes === 'number' ? formatBytes(projectSummary.disk_bytes) : '—'} ({translate('Domain.metricsRead')}: {formatByteRate(projectSummary && projectSummary.disk_read_rate)} · {translate('Domain.metricsWrite')}: {formatByteRate(projectSummary && projectSummary.disk_write_rate)})</span>
                             {projectSummary && projectSummary.net_rate !== undefined && (
-                                <span>Net: {formatBytes(projectSummary.net_rate)}/s</span>
+                                <span>{translate('Overview.loadNetwork')}: {formatByteRate(projectSummary.net_rate)}</span>
                             )}
                         </div>
                     </div>
@@ -410,10 +410,10 @@ const Overview = ({ baseUrl }) => {
                                 <span>{serverMetrics.data.latest.cpu_percent || 0}% CPU</span>
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
-                                <span>RAM: {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)}</span>
-                                <span>Disk: {formatBytes(serverMetrics.data.latest.disk_used_bytes)} / {formatBytes(serverMetrics.data.latest.disk_total_bytes)}</span>
+                                <span>{translate('Overview.loadMemory')}: {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)}</span>
+                                <span>{translate('Overview.loadDisk')}: {formatBytes(serverMetrics.data.latest.disk_used_bytes)} / {formatBytes(serverMetrics.data.latest.disk_total_bytes)} ({translate('Domain.metricsRead')}: {formatByteRate(serverMetrics.data.latest.disk_read_rate)} · {translate('Domain.metricsWrite')}: {formatByteRate(serverMetrics.data.latest.disk_write_rate)})</span>
                                 {serverMetrics.data.latest.net_rx_rate !== undefined && (
-                                    <span>Net: ↓ {formatBytes(serverMetrics.data.latest.net_rx_rate)}/s  ↑ {formatBytes(serverMetrics.data.latest.net_tx_rate)}/s</span>
+                                    <span>{translate('Overview.loadNetwork')}: ↓ {formatByteRate(serverMetrics.data.latest.net_rx_rate)} ↑ {formatByteRate(serverMetrics.data.latest.net_tx_rate)}</span>
                                 )}
                             </div>
                         </div>

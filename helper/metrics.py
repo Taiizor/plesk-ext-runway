@@ -8,7 +8,152 @@ import sqlite3
 
 METRICS_DB_PATH = STATE_DIR + "/metrics.sqlite"
 _CPU_PREV_FILE = CACHE_DIR + "/cpu_prev.json"
-_DISK_CACHE = {}
+METRICS_INTERVAL = 60
+METRICS_MIN_INTERVAL = 10
+METRIC_PROPS = ["ActiveState", "MainPID", "ActiveEnterTimestampMonotonic", "MemoryCurrent",
+                "CPUUsageNSec", "NRestarts", "ControlGroup", "IPIngressBytes", "IPEgressBytes",
+                "IOReadBytes", "IOWriteBytes"]
+
+
+def unit_disk_counters(info):
+    """systemd counters with a cgroup fallback for older systemd and cgroup v1 hosts."""
+    counters = [memory_value(info.get(key)) for key in ("IOReadBytes", "IOWriteBytes")]
+    if all(value is not None for value in counters):
+        return counters
+    group = info.get("ControlGroup", "")
+    if not group or not RE_CONTROL_GROUP.match(group) or any(part in (".", "..") for part in group.split("/")):
+        return counters
+    for path, unified in (("/sys/fs/cgroup" + group + "/io.stat", True),
+                          ("/sys/fs/cgroup/blkio" + group + "/blkio.throttle.io_service_bytes_recursive", False),
+                          ("/sys/fs/cgroup/blkio" + group + "/blkio.io_service_bytes_recursive", False)):
+        try:
+            with open(path, "r") as stream:
+                text = stream.read(1024 * 1024)
+        except OSError:
+            continue
+        totals = [0, 0]
+        for line in text.splitlines():
+            fields = line.split()
+            if not fields or not re.match(r"^\d+:\d+$", fields[0]):
+                continue
+            if unified:
+                for field in fields[1:]:
+                    key, separator, value = field.partition("=")
+                    if separator and key in ("rbytes", "wbytes") and value.isdigit():
+                        totals[0 if key == "rbytes" else 1] += int(value)
+            elif len(fields) == 3 and fields[1] in ("Read", "Write") and fields[2].isdigit():
+                totals[0 if fields[1] == "Read" else 1] += int(fields[2])
+        return totals
+    return counters
+
+
+def metric_rate(current, previous, elapsed):
+    """Unknown, reset and warm-up counters are gaps, not zero throughput."""
+    if current is None or previous is None or elapsed <= 0 or current < previous:
+        return None
+    return round((current - previous) / elapsed, 2)
+
+
+def server_disk_counters():
+    """Count whole leaf block devices once, excluding partitions and stacked mapper/RAID views."""
+    counters = {}
+    try:
+        devices = os.listdir("/sys/block")
+        for device in devices:
+            if device.startswith(("loop", "ram", "zram")):
+                continue
+            base = "/sys/block/" + device
+            if os.listdir(base + "/slaves"):
+                continue
+            text = _read_text(base + "/stat", 4096)
+            fields = text.split() if text else []
+            if len(fields) < 7 or not fields[2].isdigit() or not fields[6].isdigit():
+                return None
+            # Linux block statistics always express sectors in 512-byte units.
+            counters[device] = [int(fields[2]) * 512, int(fields[6]) * 512]
+    except OSError:
+        return None
+    return counters or None
+
+
+def sync_metrics_units(enabled=True):
+    """Collect even when the panel is closed; install/upgrade and uninstall own the timer."""
+    service_path = os.path.join(UNIT_DIR, UNIT_METRICS)
+    timer_path = os.path.join(UNIT_DIR, UNIT_METRICS_TIMER)
+    if not enabled:
+        systemctl("disable", "--now", UNIT_METRICS_TIMER)
+        systemctl("stop", UNIT_METRICS)
+        remove_quietly(timer_path)
+        remove_quietly(service_path)
+        systemctl("daemon-reload")
+        systemctl("reset-failed", UNIT_METRICS, UNIT_METRICS_TIMER)
+        return
+    service = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]", "Description=Runway: collect server and application metrics", "",
+        "[Service]", "Type=oneshot", "ExecStart=%s _metrics" % HELPER_COPY,
+        "TimeoutStartSec=300", "",
+    ])
+    timer = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]", "Description=Runway: resource metrics every minute", "",
+        "[Timer]", "OnActiveSec=15", "OnUnitActiveSec=%d" % METRICS_INTERVAL,
+        "AccuracySec=1", "", "[Install]", "WantedBy=timers.target", "",
+    ])
+    changed = write_unit_file(service_path, service)
+    changed = write_unit_file(timer_path, timer) or changed
+    if changed:
+        systemctl("daemon-reload", check=True)
+    if changed or not unit_enabled(UNIT_METRICS_TIMER) or not unit_is_active(UNIT_METRICS_TIMER):
+        systemctl("enable", "--now", UNIT_METRICS_TIMER, check=True)
+
+
+def metric_app_units(domain_id, state):
+    """Include both deployment slots while they consume resources."""
+    if state.get("slot") in SLOTS or state.get("zero_downtime"):
+        return all_app_units(domain_id)
+    return [app_unit(domain_id)]
+
+
+def collect_metric_samples():
+    """Serialize counter baselines across the timer and concurrent panel requests."""
+    with FileLock("metrics"):
+        latest = _record_server_metric_sample()
+        states = list(iter_app_states())
+        units = list(dict.fromkeys(unit for state in states
+                                  for unit in metric_app_units(int(state["domain_id"]), state)))
+        shown = unit_show(units, METRIC_PROPS)
+        samples = []
+        errors = []
+        for state in states:
+            domain_id = int(state["domain_id"])
+            try:
+                samples.append(_record_app_metric_sample(domain_id, state, shown))
+            except Exception as exc:  # noqa: BLE001 - a broken app must not stop other samples
+                errors.append("#%d: %s" % (domain_id, exc))
+        db = _open_metrics_db()
+        try:
+            with db:
+                cutoff = int(time.time()) - 14 * 86400
+                db.execute("DELETE FROM app_metrics WHERE timestamp < ?", (cutoff,))
+                db.execute("DELETE FROM server_metrics WHERE timestamp < ?", (cutoff,))
+        finally:
+            db.close()
+        summary = None if errors else {
+            key: round(sum(sample[key] for sample in samples), 2)
+            for key in ("cpu_percent", "memory_used_bytes", "disk_bytes", "net_rate")
+        }
+        if summary is not None:
+            for key in ("disk_read_rate", "disk_write_rate"):
+                values = [sample[key] for sample in samples]
+                summary[key] = None if any(value is None for value in values) else round(sum(values), 2)
+        return {"latest": latest, "project_summary": summary, "errors": errors}
+
+
+def internal_metrics():
+    result = collect_metric_samples()
+    if result["errors"]:
+        raise HelperError("Metrics collection failed: " + "; ".join(result["errors"]))
 
 
 def _open_metrics_db():
@@ -28,6 +173,8 @@ def _open_metrics_db():
                 net_bytes INTEGER NOT NULL DEFAULT 0,
                 net_rate REAL NOT NULL DEFAULT 0.0,
                 restarts INTEGER NOT NULL,
+                disk_read_rate REAL,
+                disk_write_rate REAL,
                 PRIMARY KEY (domain_id, timestamp)
             );
         """)
@@ -41,29 +188,32 @@ def _open_metrics_db():
                 disk_used_bytes INTEGER NOT NULL,
                 disk_total_bytes INTEGER NOT NULL,
                 net_rx_rate REAL NOT NULL DEFAULT 0.0,
-                net_tx_rate REAL NOT NULL DEFAULT 0.0
+                net_tx_rate REAL NOT NULL DEFAULT 0.0,
+                disk_read_rate REAL,
+                disk_write_rate REAL
             );
         """)
         db.execute("CREATE INDEX IF NOT EXISTS idx_server_metrics_time ON server_metrics (timestamp);")
-    # Safely migrate existing tables if columns are missing
-    for col, col_def in (("net_bytes", "INTEGER NOT NULL DEFAULT 0"), ("net_rate", "REAL NOT NULL DEFAULT 0.0")):
-        try:
-            db.execute("ALTER TABLE app_metrics ADD COLUMN %s %s;" % (col, col_def))
-        except Exception:
-            pass
-    for col, col_def in (("net_rx_rate", "REAL NOT NULL DEFAULT 0.0"), ("net_tx_rate", "REAL NOT NULL DEFAULT 0.0")):
-        try:
-            db.execute("ALTER TABLE server_metrics ADD COLUMN %s %s;" % (col, col_def))
-        except Exception:
-            pass
+    # Preserve old samples; throughput before this upgrade remains unknown (NULL).
+    with db:
+        for table, extra in (("app_metrics", (("net_bytes", "INTEGER NOT NULL DEFAULT 0"),
+                                               ("net_rate", "REAL NOT NULL DEFAULT 0.0"))),
+                             ("server_metrics", (("net_rx_rate", "REAL NOT NULL DEFAULT 0.0"),
+                                                  ("net_tx_rate", "REAL NOT NULL DEFAULT 0.0")))):
+            columns = {row[1] for row in db.execute("PRAGMA table_info(%s)" % table)}
+            for col, definition in extra + (("disk_read_rate", "REAL"), ("disk_write_rate", "REAL")):
+                if col not in columns:
+                    db.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, col, definition))
     return db
 
 
 def _fast_dir_size(path):
     now = time.time()
-    cached = _DISK_CACHE.get(path)
-    if cached and now - cached[0] < 120:
-        return cached[1]
+    # Helpers are short-lived processes; an in-memory cache cannot reduce repeated du calls.
+    cache_path = os.path.join(CACHE_DIR, "disk-%s.json" % hashlib.sha256(path.encode("utf-8")).hexdigest())
+    cached = read_json(cache_path)
+    if isinstance(cached, dict) and 0 <= now - cached.get("time", 0) < 120:
+        return cached["bytes"]
     if not os.path.exists(path):
         return 0
     try:
@@ -71,7 +221,8 @@ def _fast_dir_size(path):
         out = proc.stdout.decode("utf-8", "replace").split()
         if out and out[0].isdigit():
             size = int(out[0]) * 1024
-            _DISK_CACHE[path] = (now, size)
+            ensure_dir(CACHE_DIR, 0o700)
+            write_json(cache_path, {"time": now, "bytes": size})
             return size
     except Exception:
         pass
@@ -90,65 +241,89 @@ def _save_cpu_prev(data):
 
 def record_app_metric_sample(domain_id, state=None):
     """Records a single metrics point for an application."""
+    with FileLock("metrics"):
+        return _record_app_metric_sample(domain_id, state)
+
+
+def _record_app_metric_sample(domain_id, state=None, shown=None):
     if state is None:
         raw = read_json(app_state_path(domain_id))
         state = raw if isinstance(raw, dict) else {}
     if not state:
         return None
 
-    unit = app_unit(domain_id, state.get("slot") or "")
-    props = ["ActiveState", "MainPID", "MemoryCurrent", "CPUUsageNSec", "NRestarts", "ControlGroup", "IPIngressBytes", "IPEgressBytes"]
-    shown = unit_show([unit], props).get(unit, {})
-    active = shown.get("ActiveState") == "active"
-
     now = int(time.time())
-    memory = unit_memory(shown) if active else {"memory_bytes": 0, "memory_used_bytes": 0}
-    restarts = int(shown.get("NRestarts") or 0) if (shown.get("NRestarts") or "").isdigit() else 0
-    raw_cpu_nsec = int(shown.get("CPUUsageNSec") or 0) if (shown.get("CPUUsageNSec") or "").isdigit() else 0
+    db = _open_metrics_db()
+    try:
+        row = db.execute("""SELECT timestamp, cpu_percent, memory_bytes, memory_used_bytes,
+                            disk_bytes, net_bytes, net_rate, restarts, disk_read_rate, disk_write_rate FROM app_metrics
+                            WHERE domain_id = ? AND timestamp > ? ORDER BY timestamp DESC LIMIT 1""",
+                         (domain_id, now - METRICS_MIN_INTERVAL)).fetchone()
+    finally:
+        db.close()
+    if row and row[0] <= now:
+        return dict(zip(("timestamp", "cpu_percent", "memory_bytes", "memory_used_bytes", "disk_bytes",
+                         "net_bytes", "net_rate", "restarts", "disk_read_rate", "disk_write_rate"), row))
 
-    raw_net_in = int(shown.get("IPIngressBytes") or 0) if (shown.get("IPIngressBytes") or "").isdigit() else 0
-    raw_net_out = int(shown.get("IPEgressBytes") or 0) if (shown.get("IPEgressBytes") or "").isdigit() else 0
-    total_net_bytes = raw_net_in + raw_net_out
-
+    units = metric_app_units(domain_id, state)
+    if shown is None:
+        shown = unit_show(units, METRIC_PROPS)
     cpu_prev = _load_cpu_prev()
-    prev_key = "app_%d" % domain_id
-    prev_entry = cpu_prev.get(prev_key)
+    memory = {"memory_bytes": 0, "memory_used_bytes": 0}
+    restarts = 0
+    total_net_bytes = 0
     cpu_percent = 0.0
     net_rate = 0.0
-
-    if active and prev_entry and isinstance(prev_entry, list) and len(prev_entry) >= 2:
-        prev_time = prev_entry[0]
-        prev_nsec = prev_entry[1]
-        dt = now - prev_time
-        dnsec = raw_cpu_nsec - prev_nsec
-        if dt > 0 and dnsec >= 0:
-            cpu_percent = min(100.0 * (os.cpu_count() or 1), max(0.0, (dnsec / (dt * 1e9)) * 100.0))
-        if len(prev_entry) >= 3 and dt > 0:
-            prev_net = prev_entry[2]
-            dnet = total_net_bytes - prev_net
-            if dnet >= 0:
-                net_rate = dnet / dt
-
-    if active:
-        cpu_prev[prev_key] = [now, raw_cpu_nsec, total_net_bytes]
-        _save_cpu_prev(cpu_prev)
-
-    disk_bytes = _fast_dir_size(state.get("app_dir", "")) if active else 0
+    disk_rates = [0.0, 0.0]
+    for unit in units:
+        info = shown.get(unit, {})
+        if not info:
+            raise HelperError("Unable to read metrics for %s" % unit)
+        prev_key = "metrics_" + unit
+        active = info.get("ActiveState") == "active"
+        if not active:
+            cpu_prev.pop(prev_key, None)
+            continue
+        for key, value in unit_memory(info).items():
+            if key in memory:
+                memory[key] += value or 0
+        counter = lambda key: memory_value(info.get(key)) or 0
+        raw_cpu_nsec = counter("CPUUsageNSec")
+        raw_net = counter("IPIngressBytes") + counter("IPEgressBytes")
+        io = unit_disk_counters(info)
+        total_net_bytes += raw_net
+        restarts += counter("NRestarts")
+        instance = "%s:%s" % (info.get("MainPID"), info.get("ActiveEnterTimestampMonotonic"))
+        prev_entry = cpu_prev.get(prev_key)
+        same_instance = isinstance(prev_entry, list) and len(prev_entry) >= 4 and prev_entry[3] == instance
+        if same_instance:
+            dt = now - prev_entry[0]
+            if dt > 0:
+                cpu_percent += max(0.0, (raw_cpu_nsec - prev_entry[1]) / (dt * 1e9) * 100.0)
+                net_rate += max(0.0, (raw_net - prev_entry[2]) / dt)
+        for i, value in enumerate(io):
+            previous = prev_entry[4 + i] if same_instance and len(prev_entry) == 6 else None
+            rate = metric_rate(value, previous, now - prev_entry[0] if same_instance else 0)
+            disk_rates[i] = disk_rates[i] + rate if disk_rates[i] is not None and rate is not None else None
+        cpu_prev[prev_key] = [now, raw_cpu_nsec, raw_net, instance] + io
+    _save_cpu_prev(cpu_prev)
+    cpu_percent = min(100.0 * (os.cpu_count() or 1), cpu_percent)
+    # Stopping an application does not remove its files.
+    disk_bytes = _fast_dir_size(state.get("app_dir", ""))
 
     try:
         db = _open_metrics_db()
         with db:
             db.execute("""
                 INSERT OR REPLACE INTO app_metrics
-                (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes, net_bytes, net_rate, restarts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes, net_bytes, net_rate, restarts,
+                 disk_read_rate, disk_write_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (domain_id, now, round(cpu_percent, 2), memory.get("memory_bytes") or 0,
-                  memory.get("memory_used_bytes") or 0, disk_bytes, total_net_bytes, round(net_rate, 2), restarts))
-            if now % 100 == 0:
-                db.execute("DELETE FROM app_metrics WHERE timestamp < ?", (now - 14 * 86400,))
+                  memory.get("memory_used_bytes") or 0, disk_bytes, total_net_bytes, round(net_rate, 2), restarts,
+                  disk_rates[0], disk_rates[1]))
+    finally:
         db.close()
-    except Exception:
-        pass
 
     return {
         "timestamp": now,
@@ -159,12 +334,31 @@ def record_app_metric_sample(domain_id, state=None):
         "net_bytes": total_net_bytes,
         "net_rate": round(net_rate, 2),
         "restarts": restarts,
+        "disk_read_rate": disk_rates[0],
+        "disk_write_rate": disk_rates[1],
     }
 
 
 def record_server_metric_sample():
     """Records server-wide CPU, memory, disk and network usage."""
+    with FileLock("metrics"):
+        return _record_server_metric_sample()
+
+
+def _record_server_metric_sample():
     now = int(time.time())
+    db = _open_metrics_db()
+    try:
+        row = db.execute("""SELECT timestamp, cpu_percent, memory_used_bytes, memory_total_bytes,
+                            disk_used_bytes, disk_total_bytes, net_rx_rate, net_tx_rate, disk_read_rate, disk_write_rate
+                            FROM server_metrics WHERE timestamp > ? ORDER BY timestamp DESC LIMIT 1""",
+                         (now - METRICS_MIN_INTERVAL,)).fetchone()
+    finally:
+        db.close()
+    if row and row[0] <= now:
+        return dict(zip(("timestamp", "cpu_percent", "memory_used_bytes", "memory_total_bytes",
+                         "disk_used_bytes", "disk_total_bytes", "net_rx_rate", "net_tx_rate",
+                         "disk_read_rate", "disk_write_rate"), row))
     cpu_percent = 0.0
 
     # CPU from /proc/stat
@@ -239,6 +433,21 @@ def record_server_metric_sample():
     except Exception:
         pass
 
+    io = server_disk_counters()
+    previous_io = cpu_prev.get("server_io")
+    disk_rates = [None, None]
+    if io is not None:
+        if isinstance(previous_io, dict) and set(previous_io.get("devices", {})) == set(io):
+            elapsed = now - previous_io["timestamp"]
+            for i in range(2):
+                rates = [metric_rate(values[i], previous_io["devices"][device][i], elapsed)
+                         for device, values in io.items()]
+                if all(rate is not None for rate in rates):
+                    disk_rates[i] = round(sum(rates), 2)
+        cpu_prev["server_io"] = {"timestamp": now, "devices": io}
+    else:
+        cpu_prev.pop("server_io", None)
+
     _save_cpu_prev(cpu_prev)
 
     try:
@@ -246,14 +455,13 @@ def record_server_metric_sample():
         with db:
             db.execute("""
                 INSERT OR REPLACE INTO server_metrics
-                (timestamp, cpu_percent, memory_used_bytes, memory_total_bytes, disk_used_bytes, disk_total_bytes, net_rx_rate, net_tx_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (now, round(cpu_percent, 2), mem_used, mem_total, disk_used, disk_total, round(net_rx_rate, 2), round(net_tx_rate, 2)))
-            if now % 100 == 0:
-                db.execute("DELETE FROM server_metrics WHERE timestamp < ?", (now - 14 * 86400,))
+                (timestamp, cpu_percent, memory_used_bytes, memory_total_bytes, disk_used_bytes, disk_total_bytes, net_rx_rate, net_tx_rate,
+                 disk_read_rate, disk_write_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (now, round(cpu_percent, 2), mem_used, mem_total, disk_used, disk_total, round(net_rx_rate, 2), round(net_tx_rate, 2),
+                  disk_rates[0], disk_rates[1]))
+    finally:
         db.close()
-    except Exception:
-        pass
 
     return {
         "timestamp": now,
@@ -264,6 +472,8 @@ def record_server_metric_sample():
         "disk_total_bytes": disk_total,
         "net_rx_rate": round(net_rx_rate, 2),
         "net_tx_rate": round(net_tx_rate, 2),
+        "disk_read_rate": disk_rates[0],
+        "disk_write_rate": disk_rates[1],
     }
 
 
@@ -288,8 +498,8 @@ def cmd_app_metrics(payload):
         step = 3600
 
     results = []
+    db = _open_metrics_db()
     try:
-        db = _open_metrics_db()
         cursor = db.cursor()
         query = """
             SELECT
@@ -300,7 +510,9 @@ def cmd_app_metrics(payload):
                 CAST(MAX(disk_bytes) AS INTEGER) AS disk,
                 ROUND(AVG(net_rate), 2) AS net_rate,
                 MAX(net_bytes) AS net_bytes,
-                MAX(restarts) AS restarts
+                MAX(restarts) AS restarts,
+                ROUND(AVG(disk_read_rate), 2) AS disk_read_rate,
+                ROUND(AVG(disk_write_rate), 2) AS disk_write_rate
             FROM app_metrics
             WHERE domain_id = ? AND timestamp >= ?
             GROUP BY t
@@ -317,43 +529,14 @@ def cmd_app_metrics(payload):
                 "net_rate": row[5] or 0.0,
                 "net_bytes": row[6] or 0,
                 "restarts": row[7] or 0,
+                "disk_read_rate": row[8],
+                "disk_write_rate": row[9],
             })
+    finally:
         db.close()
-    except Exception:
-        pass
 
-    if len(results) < 2 and latest:
-        base_mem = latest.get("memory_bytes") or 0
-        base_mem_used = latest.get("memory_used_bytes") or 0
-        base_disk = latest.get("disk_bytes") or 0
-        base_restarts = latest.get("restarts") or 0
-        base_net = latest.get("net_bytes") or 0
-        count = 10 if time_range == "1h" else 12
-        for i in range(count, 0, -1):
-            t = now - i * step
-            results.append({
-                "time": t,
-                "cpu": 0.0,
-                "memory": base_mem,
-                "memory_used": base_mem_used,
-                "disk": base_disk,
-                "net_rate": 0.0,
-                "net_bytes": base_net,
-                "restarts": base_restarts,
-            })
-        results.append({
-            "time": latest["timestamp"],
-            "cpu": latest["cpu_percent"],
-            "memory": base_mem,
-            "memory_used": base_mem_used,
-            "disk": base_disk,
-            "net_rate": latest.get("net_rate") or 0.0,
-            "net_bytes": base_net,
-            "restarts": base_restarts,
-        })
-        results.sort(key=lambda r: r["time"])
-
-    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest}
+    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest,
+            "start_time": since - since % step, "end_time": now}
 
 
 def cmd_server_metrics(payload):
@@ -362,7 +545,8 @@ def cmd_server_metrics(payload):
     if time_range not in ("1h", "24h", "7d"):
         time_range = "1h"
 
-    latest = record_server_metric_sample()
+    collected = collect_metric_samples()
+    latest = collected["latest"]
     now = int(time.time())
     if time_range == "1h":
         since = now - 3600
@@ -375,8 +559,8 @@ def cmd_server_metrics(payload):
         step = 3600
 
     results = []
+    db = _open_metrics_db()
     try:
-        db = _open_metrics_db()
         cursor = db.cursor()
         query = """
             SELECT
@@ -387,7 +571,9 @@ def cmd_server_metrics(payload):
                 CAST(AVG(disk_used_bytes) AS INTEGER) AS disk_used,
                 CAST(MAX(disk_total_bytes) AS INTEGER) AS disk_total,
                 ROUND(AVG(net_rx_rate), 2) AS net_rx_rate,
-                ROUND(AVG(net_tx_rate), 2) AS net_tx_rate
+                ROUND(AVG(net_tx_rate), 2) AS net_tx_rate,
+                ROUND(AVG(disk_read_rate), 2) AS disk_read_rate,
+                ROUND(AVG(disk_write_rate), 2) AS disk_write_rate
             FROM server_metrics
             WHERE timestamp >= ?
             GROUP BY t
@@ -404,71 +590,15 @@ def cmd_server_metrics(payload):
                 "disk_total": row[5] or 0,
                 "net_rx_rate": row[6] or 0.0,
                 "net_tx_rate": row[7] or 0.0,
+                "disk_read_rate": row[8],
+                "disk_write_rate": row[9],
             })
+    finally:
         db.close()
-    except Exception:
-        pass
 
-    if len(results) < 2 and latest:
-        count = 10 if time_range == "1h" else 12
-        for i in range(count, 0, -1):
-            t = now - i * step
-            results.append({
-                "time": t,
-                "cpu": latest["cpu_percent"],
-                "memory_used": latest["memory_used_bytes"],
-                "memory_total": latest["memory_total_bytes"],
-                "disk_used": latest["disk_used_bytes"],
-                "disk_total": latest["disk_total_bytes"],
-                "net_rx_rate": latest["net_rx_rate"],
-                "net_tx_rate": latest["net_tx_rate"],
-            })
-        results.append({
-            "time": latest["timestamp"],
-            "cpu": latest["cpu_percent"],
-            "memory_used": latest["memory_used_bytes"],
-            "memory_total": latest["memory_total_bytes"],
-            "disk_used": latest["disk_used_bytes"],
-            "disk_total": latest["disk_total_bytes"],
-            "net_rx_rate": latest["net_rx_rate"],
-            "net_tx_rate": latest["net_tx_rate"],
-        })
-        results.sort(key=lambda r: r["time"])
-
-    project_summary = {
-        "cpu_percent": 0.0,
-        "memory_used_bytes": 0,
-        "disk_bytes": 0,
-        "net_rate": 0.0,
-    }
-    try:
-        db = _open_metrics_db()
-        cursor = db.cursor()
-        cursor.execute("""
-            SELECT
-                ROUND(SUM(m.cpu_percent), 2),
-                CAST(SUM(m.memory_used_bytes) AS INTEGER),
-                CAST(SUM(m.disk_bytes) AS INTEGER),
-                ROUND(SUM(m.net_rate), 2)
-            FROM app_metrics m
-            INNER JOIN (
-                SELECT domain_id, MAX(timestamp) as max_t
-                FROM app_metrics
-                WHERE timestamp >= ?
-                GROUP BY domain_id
-            ) latest ON m.domain_id = latest.domain_id AND m.timestamp = latest.max_t;
-        """, (now - 3600,))
-        row = cursor.fetchone()
-        if row and any(x is not None for x in row):
-            project_summary["cpu_percent"] = row[0] or 0.0
-            project_summary["memory_used_bytes"] = row[1] or 0
-            project_summary["disk_bytes"] = row[2] or 0
-            project_summary["net_rate"] = row[3] or 0.0
-        db.close()
-    except Exception:
-        pass
-
-    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest, "project_summary": project_summary}
+    return {"ok": True, "range": time_range, "step": step, "metrics": results, "latest": latest,
+            "project_summary": collected["project_summary"], "collection_errors": collected["errors"],
+            "start_time": since - since % step, "end_time": now}
 
 
 def cmd_health_ping(payload):

@@ -101,6 +101,9 @@ def main(argv):
     if command == "_health" and (len(argv) == 2 or (len(argv) == 3 and argv[2] == "now")):
         internal_health(len(argv) == 3)
         return 0
+    if command == "_metrics" and len(argv) == 2:
+        internal_metrics()
+        return 0
 
     handler = COMMANDS.get(command)
     if handler is None:

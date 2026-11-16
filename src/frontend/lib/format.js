@@ -60,6 +60,11 @@ export const formatBytes = value => {
     return `${unit === 0 ? size : size.toFixed(size < 10 ? 1 : 0)} ${units[unit]}`;
 };
 
+export const formatByteRate = value => {
+    const bytes = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? formatBytes(value) : null;
+    return bytes === null ? '—' : `${bytes}/s`;
+};
+
 /**
  * Parses ISO 8601 times of the helper ("2026-11-11T14:27:27+00:00") and systemd timestamps
  * ("Wed 2026-11-11 14:27:27 UTC"). Returns a Date or null.

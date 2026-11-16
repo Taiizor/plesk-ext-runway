@@ -12,14 +12,19 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- Read/write throughput beside disk capacity in Project Load and Server Load, with a dual-series
+  Disk I/O chart in the application's four-chart grid. Rates are stored in SQLite, with systemd
+  and cgroup accounting for applications and leaf block-device statistics for the host. Unknown
+  and initial counter values remain gaps; existing history is preserved during schema upgrades.
+  Read/write labels are translated in all 32 panel languages.
 - Performance metrics and time-series monitoring system: pure SVG live area and line charts for
-  CPU (%), Memory (MiB), Disk (MiB), and Network Traffic (KB/s) in the application management tab
+  CPU (%), Memory (MiB), Disk I/O (read/write B/s), and Network Traffic (KB/s) in the application management tab
   with 1h, 24h, and 7d range toggles, interactive crosshair tooltips, time-stepped downsampling,
   rolling 14-day data retention in SQLite (`/var/lib/runway/metrics.sqlite`), and Min/Avg/Peak
   summary statistics.
 - Service network accounting through `IPAccounting=yes` on systemd application units to capture
   BPF `IPIngressBytes` and `IPEgressBytes`, and fast cached directory disk size calculation
-  (`du -sk`) with a 2-minute memory cache.
+  (`du -sk`) with a persistent 2-minute cache.
 - Overview dashboard KPI metric cards: a uniform 4-card grid featuring Service status, Runtime
   breakdown, Project Load (aggregate CPU %, RAM, Disk, and Network I/O rate of all Runway
   applications combined), and Server Load (host VPS metrics: CPU via `/proc/stat`, RAM via
@@ -93,6 +98,21 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Metric chart headers wrap as complete value/unit groups on narrow screens, and time-range
+  buttons have 44-pixel touch targets so read/write statistics stay readable on mobile.
+- Keep disk I/O translations beside the other metric keys. Localize memory, disk and network
+  labels in both load cards, and group capacity with read/write rates on one disk line.
+- Collect server and configured application metrics every minute through `runway-metrics.timer`,
+  independently of panel visits. Install/upgrade enables the timer and uninstall removes it.
+  Project Load refreshes all configured applications, excludes removed applications, preserves
+  stopped applications' disk usage, and displays zero disk usage correctly. CPU and memory
+  accounting are explicitly enabled; concurrent samples share a lock and restarted services
+  reset their counter baselines. Disk size caching persists across helper processes.
+- Resource graphs use timestamp spacing over the selected time window, leave missing intervals
+  blank, and display a single measurement as a point. Remove fabricated historical samples;
+  show the latest measurement separately from bucket averages and use application memory
+  without reclaimable cache consistently with the overview. Prune retention on every collection
+  pass instead of relying on a particular timestamp modulo.
 - Pass the `configured` flag to `appState()` in `HeroHeader.js` so that configured and running
   applications display the correct green `RUNNING` status label instead of erroneously showing
   `NOT CONFIGURED`.
