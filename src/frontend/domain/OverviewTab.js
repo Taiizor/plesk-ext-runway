@@ -2,12 +2,23 @@
 
 import { createElement, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Grid, GridCol, useTranslate } from '@plesk/plesk-ext-sdk';
+import { useTranslate } from '@plesk/plesk-ext-sdk';
 import MetricChart from '../components/MetricChart';
 import StatusPanel from './StatusPanel';
 import { formatByteRate } from '../lib/format';
 
-const metricColumnStyle = { display: 'flex', minWidth: 0 };
+const metricGridCss = `
+    .runway-metrics-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+        align-items: stretch;
+    }
+    @media (min-width: 1200px) {
+        .runway-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+`;
 
 const OverviewTab = ({
     api,
@@ -66,63 +77,56 @@ const OverviewTab = ({
     return (
         <div>
             {data && data.configured && (
-                <Grid xs={1} lg={2} gap="md" style={{ marginBottom: '16px' }}>
-                    <GridCol style={metricColumnStyle}>
-                        <MetricChart
-                            {...metricWindow}
-                            title={translate('Domain.metricsCpu')}
-                            data={metrics.cpu}
-                            latestValue={latest ? latest.cpu_percent : undefined}
-                            unit="%"
-                            color="#0070f3"
-                            range={range}
-                            onRangeChange={setRange}
-                            height={140}
-                        />
-                    </GridCol>
-                    <GridCol style={metricColumnStyle}>
-                        <MetricChart
-                            {...metricWindow}
-                            title={translate('Domain.metricsMemory')}
-                            data={metrics.mem}
-                            latestValue={latest ? (latest.memory_used_bytes ?? latest.memory_bytes ?? 0) / (1024 * 1024) : undefined}
-                            unit="MiB"
-                            color="#10b981"
-                            range={range}
-                            onRangeChange={setRange}
-                            height={140}
-                        />
-                    </GridCol>
-                    <GridCol style={metricColumnStyle}>
-                        <MetricChart
-                            {...metricWindow}
-                            title={translate('Domain.metricsDiskIO')}
-                            series={[
-                                { key: 'read', label: translate('Domain.metricsRead'), color: '#8b5cf6', data: metrics.read,
-                                    latestValue: latest ? (latest.disk_read_rate ?? null) : null },
-                                { key: 'write', label: translate('Domain.metricsWrite'), color: '#06b6d4', data: metrics.write,
-                                    latestValue: latest ? (latest.disk_write_rate ?? null) : null },
-                            ]}
-                            formatValue={formatByteRate}
-                            range={range}
-                            onRangeChange={setRange}
-                            height={140}
-                        />
-                    </GridCol>
-                    <GridCol style={metricColumnStyle}>
-                        <MetricChart
-                            {...metricWindow}
-                            title={translate('Domain.metricsNetwork')}
-                            data={metrics.net}
-                            latestValue={latest ? latest.net_rate / 1024 : undefined}
-                            unit="KB/s"
-                            color="#f59e0b"
-                            range={range}
-                            onRangeChange={setRange}
-                            height={140}
-                        />
-                    </GridCol>
-                </Grid>
+                <div className="runway-metrics-grid">
+                    <style>{metricGridCss}</style>
+                    <MetricChart
+                        {...metricWindow}
+                        title={translate('Domain.metricsCpu')}
+                        data={metrics.cpu}
+                        latestValue={latest ? latest.cpu_percent : undefined}
+                        unit="%"
+                        color="#0070f3"
+                        range={range}
+                        onRangeChange={setRange}
+                        height={140}
+                    />
+                    <MetricChart
+                        {...metricWindow}
+                        title={translate('Domain.metricsMemory')}
+                        data={metrics.mem}
+                        latestValue={latest ? (latest.memory_used_bytes ?? latest.memory_bytes ?? 0) / (1024 * 1024) : undefined}
+                        unit="MiB"
+                        color="#10b981"
+                        range={range}
+                        onRangeChange={setRange}
+                        height={140}
+                    />
+                    <MetricChart
+                        {...metricWindow}
+                        title={translate('Domain.metricsDiskIO')}
+                        series={[
+                            { key: 'read', label: translate('Domain.metricsRead'), color: '#8b5cf6', data: metrics.read,
+                                latestValue: latest ? (latest.disk_read_rate ?? null) : null },
+                            { key: 'write', label: translate('Domain.metricsWrite'), color: '#06b6d4', data: metrics.write,
+                                latestValue: latest ? (latest.disk_write_rate ?? null) : null },
+                        ]}
+                        formatValue={formatByteRate}
+                        range={range}
+                        onRangeChange={setRange}
+                        height={140}
+                    />
+                    <MetricChart
+                        {...metricWindow}
+                        title={translate('Domain.metricsNetwork')}
+                        data={metrics.net}
+                        latestValue={latest ? latest.net_rate / 1024 : undefined}
+                        unit="KB/s"
+                        color="#f59e0b"
+                        range={range}
+                        onRangeChange={setRange}
+                        height={140}
+                    />
+                </div>
             )}
 
             <StatusPanel

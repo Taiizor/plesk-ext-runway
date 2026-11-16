@@ -98,6 +98,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Give metric titles, range controls and statistics separate header areas, and use a shared CSS
+  grid so disk/network plot baselines stay aligned with translated labels and nonzero rates.
 - Round fractional byte rates to two decimal places, keep chart cards and plot baselines aligned,
   and constrain hover tooltips to their chart bounds using Plesk surface/text colors in both themes.
   Peak statistics use raw sample maxima rather than maxima of bucket averages, and include the

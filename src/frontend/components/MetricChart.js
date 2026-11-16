@@ -149,8 +149,8 @@ const MetricChart = ({
             flex: 1,
         }}>
             {/* Header: Title, Stats & Range Selector */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', flex: '1 1 260px', minWidth: 0, minHeight: '44px' }}>
                     <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--pul-color-text, #202020)' }}>
                         {title}
                     </span>
@@ -170,43 +170,41 @@ const MetricChart = ({
                     </span>)}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
-                    {/* Min / Avg / Peak badges */}
-                    <div style={{ fontSize: '11px', color: 'var(--pul-color-text-subtle, #737373)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {datasets.map(item => <div key={item.key} style={{ display: 'flex', gap: '2px 8px', flexWrap: 'wrap' }}>
-                            {item.label && <span style={{ color: item.color, whiteSpace: 'nowrap' }}>{item.label}</span>}
-                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsAvg')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.avg) : '—'}</strong></span>
-                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsPeak')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.max) : '—'}</strong></span>
-                        </div>)}
+                {/* Range Selector */}
+                {onRangeChange && (
+                    <div style={{ display: 'flex', flexShrink: 0, marginInlineStart: 'auto', background: 'var(--pul-color-background-subtle, #f3f4f6)', borderRadius: '6px', padding: '2px' }}>
+                        {['1h', '24h', '7d'].map(r => (
+                            <button
+                                key={r}
+                                type="button"
+                                onClick={() => onRangeChange(r)}
+                                style={{
+                                    border: 'none',
+                                    background: range === r ? 'var(--pul-color-bg-surface, #ffffff)' : 'transparent',
+                                    color: range === r ? 'var(--pul-color-text, #202020)' : 'var(--pul-color-text-subtle, #737373)',
+                                    fontWeight: range === r ? 600 : 400,
+                                    fontSize: '12px',
+                                    padding: '6px 10px',
+                                    minWidth: '44px',
+                                    minHeight: '44px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    boxShadow: range === r ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                                }}
+                            >
+                                {r}
+                            </button>
+                        ))}
                     </div>
+                )}
 
-                    {/* Range Selector */}
-                    {onRangeChange && (
-                        <div style={{ display: 'flex', flexShrink: 0, background: 'var(--pul-color-background-subtle, #f3f4f6)', borderRadius: '6px', padding: '2px' }}>
-                            {['1h', '24h', '7d'].map(r => (
-                                <button
-                                    key={r}
-                                    type="button"
-                                    onClick={() => onRangeChange(r)}
-                                    style={{
-                                        border: 'none',
-                                        background: range === r ? 'var(--pul-color-bg-surface, #ffffff)' : 'transparent',
-                                        color: range === r ? 'var(--pul-color-text, #202020)' : 'var(--pul-color-text-subtle, #737373)',
-                                        fontWeight: range === r ? 600 : 400,
-                                        fontSize: '12px',
-                                        padding: '6px 10px',
-                                        minWidth: '44px',
-                                        minHeight: '44px',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        boxShadow: range === r ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                                    }}
-                                >
-                                    {r}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                {/* Keep statistics on their own row so they cannot displace the range selector. */}
+                <div style={{ flexBasis: '100%', minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: '11px', color: 'var(--pul-color-text-subtle, #737373)' }}>
+                    {datasets.map(item => <div key={item.key} style={{ display: 'flex', gap: '2px 8px', flexWrap: 'wrap' }}>
+                        {item.label && <span style={{ color: item.color, whiteSpace: 'nowrap' }}>{item.label}</span>}
+                        <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsAvg')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.avg) : '—'}</strong></span>
+                        <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsPeak')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.max) : '—'}</strong></span>
+                    </div>)}
                 </div>
             </div>
 
