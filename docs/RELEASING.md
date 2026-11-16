@@ -148,8 +148,10 @@ README shows `docs/screenshots/admin-overview.png`, `admin-toolchains.png` and
 `build.py` prints a note when `src/_meta/screenshots/` is empty. To refresh them automatically:
 
    Run `bun run screenshots` (or `CONTAINER=grt-plesk bun run screenshots`). It uses headless
-   Chrome through `puppeteer-core` to capture all views in light and dark themes (1440x900 for
-   documentation, 1024x768 for the catalog) with the trial-license banner hidden.
+   Chrome through `puppeteer-core` to capture all views in light and dark themes with dynamic
+   viewport height scaling (1440x<dynamic> up to 3000px without inner scroll clipping for documentation,
+   1024x768 for the catalog) with trial-license and cookie banners hidden. It covers all tabs,
+   drawers, settings forms, toolchain runtimes, and customer views.
 
 ## Plesk extension catalog
 

@@ -45,18 +45,28 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 
 **Administrators**
 
-- Install, update and remove toolchain versions per runtime; release lists are cached for 6 hours
-  and the install runs as a background job with a live log.
-- One-click installation of build dependencies (C compiler, `pkg-config`, OpenSSL headers and
-  related packages) for runtimes that compile native code.
+- **Toolchains Hub**: interactive visual card grid per runtime showing installed versions, active
+  application counts, and one-click installation of official releases and build dependencies.
+- **Fleet dashboard**: 4 KPI metric cards displaying running services status, runtime distribution,
+  aggregated Project Load (CPU %, RAM, Disk, Net I/O of all Runway applications combined), and
+  host Server Load (CPU, RAM, Disk, Network RX/TX throughput).
 - Server-wide settings: port range, build timeout, default resource limits for applications and
   builds, maximum number of applications per subscription, zero-downtime deployments for
-  customers and their time limits.
+  customers and their time limits, with 1-click Preset Profiles (Low-RAM VPS, Standard Server,
+  High Performance).
 - Per-application memory, CPU and task limits that customers cannot change.
-- An overview of every application on the server with its state.
+- An overview of every application on the server with its state and host environment specifications.
 
 **Domains** (administrators, and customers with the permission)
 
+- **Performance monitoring**: live pure SVG area and line charts for CPU (%), Memory (MiB), Disk (MiB)
+  and Network Traffic (KB/s) with 1h, 24h, and 7d view toggles, crosshair tooltips, Min/Avg/Peak
+  summary statistics, and 14-day rolling retention in SQLite.
+- **Cloud-console management view**: modern Hero Header with instant control buttons (Start, Stop,
+  Restart, Build & restart), runtime and toolchain badges, and organized tabs (Status & Metrics,
+  Settings, Project & Files, Optional operations, Logs, Help).
+- **Visual Environment Editor**: interactive key-value table with secret masking/unmasking eye
+  toggles, inline adding/removing, and a synchronized raw `.env` editor.
 - Runtime, toolchain version, application directory, build and start commands with
   project-aware defaults (for example the Cargo package name or the Maven jar).
 - Environment variables, stored root-only on the server and never passed on a command line.

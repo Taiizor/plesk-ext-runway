@@ -36,6 +36,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Interactive webhook notification test action in the operations panel and real-time log search
   filtering with a direct `.log` download button.
 - Toolchains Hub visual grid with version badges, build tool availability, and manual update checks.
+- Toolchains Hub card-based tab navigation: replaced redundant duplicate horizontal text tabs with
+  interactive runtime cards that act as primary navigation and show installed version count and active
+  application usage.
 - Settings page categorized into tabs with 1-click Preset Profiles (Low-RAM VPS, Standard Server,
   High Performance).
 - Automated screenshot capture script (`scripts/capture-screenshots.ts`, `bun run screenshots`)

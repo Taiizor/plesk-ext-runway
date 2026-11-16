@@ -617,12 +617,15 @@ Routes (`extension.config.js`): `overview` (default), `toolchains`, `settings`, 
 `Section`, `Grid`, `Form*`, `Button`, `Toolbar`, `List`, `Tabs`, `Drawer`, `Alert`, `Status`/`Label`,
 `ProgressBar`, `Text`, `Heading`, `Toaster` via `withStatusMessages`, `Translate`). Pages:
 
-- **Overview**: toolbar (Toolchains, Settings for admins), list of apps/domains with status
-  labels and a link to the domain page; empty state explains the 3 steps. The memory column shows
-  `memoryUsedBytes` with "+ <size> file cache" below it (from 1 MiB of cache on).
-- **Toolchains**: tabs per runtime; each tab = installed list (version, used by, remove/update)
-  + install control (select for managed, instructions for detected); build dependencies card;
-  job panel with live log (poll every 2 s while busy).
+- **Overview**: toolbar (Toolchains, Settings for admins), 4 fleet KPI cards (Service status,
+  Runtime distribution, Project Load aggregate CPU/RAM/Disk/Net, host Server Load), list of
+  apps/domains with status labels and a link to the domain page; empty state explains the 3 steps.
+  The memory column shows `memoryUsedBytes` with "+ <size> file cache" below it (from 1 MiB of cache on).
+  The Server panel at the bottom shows host specifications, build tools and Runway versions.
+- **Toolchains**: card-based visual runtime hub (interactive cards acting as primary navigation with
+  version counts and active app counts); selected runtime displays installed list (version, used by,
+  remove/update) + install control (select for managed, instructions for detected); build dependencies
+  card; job panel with live log (poll every 2 s while busy).
 - **Settings**: form (port range, limits, applications per subscription, and "Updates": daily
   checks, automatic installation, disabled while checks are off).
 - **Updater** (overview, administrators): an available release shows an info alert with the
