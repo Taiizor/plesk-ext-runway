@@ -33,7 +33,7 @@ const OverviewTab = ({
 }) => {
     const translate = useTranslate();
     const [range, setRange] = useState('1h');
-    const [metrics, setMetrics] = useState({ cpu: [], mem: [], read: [], write: [], net: [] });
+    const [metrics, setMetrics] = useState({ cpu: [], mem: [], read: [], write: [], download: [], upload: [] });
     const [metricWindow, setMetricWindow] = useState({});
     const [latest, setLatest] = useState(null);
 
@@ -48,7 +48,8 @@ const OverviewTab = ({
                 const mem = [];
                 const read = [];
                 const write = [];
-                const net = [];
+                const download = [];
+                const upload = [];
 
                 res.metrics.forEach(m => {
                     cpu.push({ time: m.time, value: m.cpu || 0, peak: m.cpu_peak });
@@ -56,11 +57,11 @@ const OverviewTab = ({
                         peak: (m.memory_used_peak ?? m.memory_peak ?? m.memory_used ?? m.memory ?? 0) / (1024 * 1024) }); // bytes to MiB
                     read.push({ time: m.time, value: m.disk_read_rate ?? null, peak: m.disk_read_rate_peak });
                     write.push({ time: m.time, value: m.disk_write_rate ?? null, peak: m.disk_write_rate_peak });
-                    net.push({ time: m.time, value: (m.net_rate || 0) / 1024,
-                        peak: (m.net_rate_peak ?? m.net_rate ?? 0) / 1024 }); // bytes/s to KB/s
+                    download.push({ time: m.time, value: m.net_rx_rate ?? null, peak: m.net_rx_rate_peak });
+                    upload.push({ time: m.time, value: m.net_tx_rate ?? null, peak: m.net_tx_rate_peak });
                 });
 
-                setMetrics({ cpu, mem, read, write, net });
+                setMetrics({ cpu, mem, read, write, download, upload });
                 setMetricWindow({ startTime: res.start_time, endTime: res.end_time, step: res.step });
                 setLatest(res.latest || null);
             }).catch(() => {});
@@ -118,10 +119,13 @@ const OverviewTab = ({
                     <MetricChart
                         {...metricWindow}
                         title={translate('Domain.metricsNetwork')}
-                        data={metrics.net}
-                        latestValue={latest ? latest.net_rate / 1024 : undefined}
-                        unit="KB/s"
-                        color="#f59e0b"
+                        series={[
+                            { key: 'download', label: translate('Domain.metricsDownload'), color: '#f59e0b', data: metrics.download,
+                                latestValue: latest ? (latest.net_rx_rate ?? null) : null },
+                            { key: 'upload', label: translate('Domain.metricsUpload'), color: '#ec4899', data: metrics.upload,
+                                latestValue: latest ? (latest.net_tx_rate ?? null) : null },
+                        ]}
+                        formatValue={formatByteRate}
                         range={range}
                         onRangeChange={setRange}
                         height={140}

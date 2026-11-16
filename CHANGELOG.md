@@ -12,13 +12,18 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Added
 
+- Separate download/upload rates in Project Load, Server Load and the application's Network
+  Usage chart, including per-direction averages, peaks and hover values. Application accounting
+  now preserves each direction in SQLite; existing combined history is retained with unknown
+  directional values until fresh samples arrive. Download/upload labels are translated in all
+  32 languages, and load card CPU labels now use translations.
 - Read/write throughput beside disk capacity in Project Load and Server Load, with a dual-series
   Disk I/O chart in the application's four-chart grid. Rates are stored in SQLite, with systemd
   and cgroup accounting for applications and leaf block-device statistics for the host. Unknown
   and initial counter values remain gaps; existing history is preserved during schema upgrades.
   Read/write labels are translated in all 32 panel languages.
 - Performance metrics and time-series monitoring system: pure SVG live area and line charts for
-  CPU (%), Memory (MiB), Disk I/O (read/write B/s), and Network Traffic (KB/s) in the application management tab
+  CPU (%), Memory (MiB), Disk I/O (read/write B/s), and Network Usage (download/upload B/s) in the application management tab
   with 1h, 24h, and 7d range toggles, interactive crosshair tooltips, time-stepped downsampling,
   rolling 14-day data retention in SQLite (`/var/lib/runway/metrics.sqlite`), and Min/Avg/Peak
   summary statistics.
@@ -98,6 +103,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Align localized processor, memory, disk usage and network usage labels between load cards
+  and charts in all 32 languages. Restore Turkish memory labels to "Bellek" and clarify
+  download/upload terms where the previous translation was ambiguous.
 - Give metric titles, range controls and statistics separate header areas, and use a shared CSS
   grid so disk/network plot baselines stay aligned with translated labels and nonzero rates.
 - Round fractional byte rates to two decimal places, keep chart cards and plot baselines aligned,

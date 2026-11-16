@@ -389,14 +389,12 @@ const Overview = ({ baseUrl }) => {
                             <Icon name="server" size="16" intent="info" />
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 600 }}>
-                            <span>{projectSummary && typeof projectSummary.cpu_percent === 'number' ? `${projectSummary.cpu_percent}% CPU` : '—'}</span>
+                            <span>{projectSummary && typeof projectSummary.cpu_percent === 'number' ? `${projectSummary.cpu_percent}% ${translate('Overview.loadCpu')}` : '—'}</span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
                             <span>{translate('Overview.loadMemory')}: {formatBytes(projectMemory) || '0 B'}</span>
                             <span>{translate('Overview.loadDisk')}: {projectSummary && typeof projectSummary.disk_bytes === 'number' ? formatBytes(projectSummary.disk_bytes) : '—'} ({translate('Domain.metricsRead')}: {formatByteRate(projectSummary && projectSummary.disk_read_rate)} · {translate('Domain.metricsWrite')}: {formatByteRate(projectSummary && projectSummary.disk_write_rate)})</span>
-                            {projectSummary && projectSummary.net_rate !== undefined && (
-                                <span>{translate('Overview.loadNetwork')}: {formatByteRate(projectSummary.net_rate)}</span>
-                            )}
+                            <span>{translate('Overview.loadNetwork')}: {translate('Domain.metricsDownload')}: {formatByteRate(projectSummary && projectSummary.net_rx_rate)} · {translate('Domain.metricsUpload')}: {formatByteRate(projectSummary && projectSummary.net_tx_rate)}</span>
                         </div>
                     </div>
 
@@ -407,14 +405,12 @@ const Overview = ({ baseUrl }) => {
                                 <Icon name="dashboard" size="16" intent="info" />
                             </div>
                             <div style={{ fontSize: '18px', fontWeight: 600 }}>
-                                <span>{serverMetrics.data.latest.cpu_percent || 0}% CPU</span>
+                                <span>{serverMetrics.data.latest.cpu_percent || 0}% {translate('Overview.loadCpu')}</span>
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '2px' }}>
                                 <span>{translate('Overview.loadMemory')}: {formatBytes(serverMetrics.data.latest.memory_used_bytes)} / {formatBytes(serverMetrics.data.latest.memory_total_bytes)}</span>
                                 <span>{translate('Overview.loadDisk')}: {formatBytes(serverMetrics.data.latest.disk_used_bytes)} / {formatBytes(serverMetrics.data.latest.disk_total_bytes)} ({translate('Domain.metricsRead')}: {formatByteRate(serverMetrics.data.latest.disk_read_rate)} · {translate('Domain.metricsWrite')}: {formatByteRate(serverMetrics.data.latest.disk_write_rate)})</span>
-                                {serverMetrics.data.latest.net_rx_rate !== undefined && (
-                                    <span>{translate('Overview.loadNetwork')}: ↓ {formatByteRate(serverMetrics.data.latest.net_rx_rate)} ↑ {formatByteRate(serverMetrics.data.latest.net_tx_rate)}</span>
-                                )}
+                                <span>{translate('Overview.loadNetwork')}: {translate('Domain.metricsDownload')}: {formatByteRate(serverMetrics.data.latest.net_rx_rate)} · {translate('Domain.metricsUpload')}: {formatByteRate(serverMetrics.data.latest.net_tx_rate)}</span>
                             </div>
                         </div>
                     )}

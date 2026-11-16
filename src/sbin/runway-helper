@@ -6158,7 +6158,7 @@ def collect_metric_samples():
             for key in ("cpu_percent", "memory_used_bytes", "disk_bytes", "net_rate")
         }
         if summary is not None:
-            for key in ("disk_read_rate", "disk_write_rate"):
+            for key in ("disk_read_rate", "disk_write_rate", "net_rx_rate", "net_tx_rate"):
                 values = [sample[key] for sample in samples]
                 summary[key] = None if any(value is None for value in values) else round(sum(values), 2)
         return {"latest": latest, "project_summary": summary, "errors": errors}
@@ -6189,6 +6189,8 @@ def _open_metrics_db():
                 restarts INTEGER NOT NULL,
                 disk_read_rate REAL,
                 disk_write_rate REAL,
+                net_rx_rate REAL,
+                net_tx_rate REAL,
                 PRIMARY KEY (domain_id, timestamp)
             );
         """)
@@ -6211,7 +6213,8 @@ def _open_metrics_db():
     # Preserve old samples; throughput before this upgrade remains unknown (NULL).
     with db:
         for table, extra in (("app_metrics", (("net_bytes", "INTEGER NOT NULL DEFAULT 0"),
-                                               ("net_rate", "REAL NOT NULL DEFAULT 0.0"))),
+                                               ("net_rate", "REAL NOT NULL DEFAULT 0.0"),
+                                               ("net_rx_rate", "REAL"), ("net_tx_rate", "REAL"))),
                              ("server_metrics", (("net_rx_rate", "REAL NOT NULL DEFAULT 0.0"),
                                                   ("net_tx_rate", "REAL NOT NULL DEFAULT 0.0")))):
             columns = {row[1] for row in db.execute("PRAGMA table_info(%s)" % table)}
@@ -6270,14 +6273,16 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
     db = _open_metrics_db()
     try:
         row = db.execute("""SELECT timestamp, cpu_percent, memory_bytes, memory_used_bytes,
-                            disk_bytes, net_bytes, net_rate, restarts, disk_read_rate, disk_write_rate FROM app_metrics
+                            disk_bytes, net_bytes, net_rate, restarts, disk_read_rate, disk_write_rate,
+                            net_rx_rate, net_tx_rate FROM app_metrics
                             WHERE domain_id = ? AND timestamp > ? ORDER BY timestamp DESC LIMIT 1""",
                          (domain_id, now - METRICS_MIN_INTERVAL)).fetchone()
     finally:
         db.close()
     if row and row[0] <= now:
         return dict(zip(("timestamp", "cpu_percent", "memory_bytes", "memory_used_bytes", "disk_bytes",
-                         "net_bytes", "net_rate", "restarts", "disk_read_rate", "disk_write_rate"), row))
+                         "net_bytes", "net_rate", "restarts", "disk_read_rate", "disk_write_rate",
+                         "net_rx_rate", "net_tx_rate"), row))
 
     units = metric_app_units(domain_id, state)
     if shown is None:
@@ -6288,6 +6293,7 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
     total_net_bytes = 0
     cpu_percent = 0.0
     net_rate = 0.0
+    net_rates = [0.0, 0.0]
     disk_rates = [0.0, 0.0]
     for unit in units:
         info = shown.get(unit, {})
@@ -6303,7 +6309,8 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
                 memory[key] += value or 0
         counter = lambda key: memory_value(info.get(key)) or 0
         raw_cpu_nsec = counter("CPUUsageNSec")
-        raw_net = counter("IPIngressBytes") + counter("IPEgressBytes")
+        net = [memory_value(info.get(key)) for key in ("IPIngressBytes", "IPEgressBytes")]
+        raw_net = sum(value or 0 for value in net)
         io = unit_disk_counters(info)
         total_net_bytes += raw_net
         restarts += counter("NRestarts")
@@ -6316,10 +6323,14 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
                 cpu_percent += max(0.0, (raw_cpu_nsec - prev_entry[1]) / (dt * 1e9) * 100.0)
                 net_rate += max(0.0, (raw_net - prev_entry[2]) / dt)
         for i, value in enumerate(io):
-            previous = prev_entry[4 + i] if same_instance and len(prev_entry) == 6 else None
+            previous = prev_entry[4 + i] if same_instance and len(prev_entry) >= 6 else None
             rate = metric_rate(value, previous, now - prev_entry[0] if same_instance else 0)
             disk_rates[i] = disk_rates[i] + rate if disk_rates[i] is not None and rate is not None else None
-        cpu_prev[prev_key] = [now, raw_cpu_nsec, raw_net, instance] + io
+        for i, value in enumerate(net):
+            previous = prev_entry[6 + i] if same_instance and len(prev_entry) >= 8 else None
+            rate = metric_rate(value, previous, now - prev_entry[0] if same_instance else 0)
+            net_rates[i] = net_rates[i] + rate if net_rates[i] is not None and rate is not None else None
+        cpu_prev[prev_key] = [now, raw_cpu_nsec, raw_net, instance] + io + net
     _save_cpu_prev(cpu_prev)
     cpu_percent = min(100.0 * (os.cpu_count() or 1), cpu_percent)
     # Stopping an application does not remove its files.
@@ -6331,11 +6342,11 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
             db.execute("""
                 INSERT OR REPLACE INTO app_metrics
                 (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes, net_bytes, net_rate, restarts,
-                 disk_read_rate, disk_write_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 disk_read_rate, disk_write_rate, net_rx_rate, net_tx_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (domain_id, now, round(cpu_percent, 2), memory.get("memory_bytes") or 0,
                   memory.get("memory_used_bytes") or 0, disk_bytes, total_net_bytes, round(net_rate, 2), restarts,
-                  disk_rates[0], disk_rates[1]))
+                  disk_rates[0], disk_rates[1], net_rates[0], net_rates[1]))
     finally:
         db.close()
 
@@ -6350,6 +6361,8 @@ def _record_app_metric_sample(domain_id, state=None, shown=None):
         "restarts": restarts,
         "disk_read_rate": disk_rates[0],
         "disk_write_rate": disk_rates[1],
+        "net_rx_rate": net_rates[0],
+        "net_tx_rate": net_rates[1],
     }
 
 
@@ -6532,7 +6545,11 @@ def cmd_app_metrics(payload):
                 MAX(memory_bytes) AS memory_peak,
                 MAX(net_rate) AS net_rate_peak,
                 MAX(disk_read_rate) AS disk_read_rate_peak,
-                MAX(disk_write_rate) AS disk_write_rate_peak
+                MAX(disk_write_rate) AS disk_write_rate_peak,
+                ROUND(AVG(net_rx_rate), 2) AS net_rx_rate,
+                ROUND(AVG(net_tx_rate), 2) AS net_tx_rate,
+                MAX(net_rx_rate) AS net_rx_rate_peak,
+                MAX(net_tx_rate) AS net_tx_rate_peak
             FROM app_metrics
             WHERE domain_id = ? AND timestamp >= ?
             GROUP BY t
@@ -6557,6 +6574,10 @@ def cmd_app_metrics(payload):
                 "net_rate_peak": row[13],
                 "disk_read_rate_peak": row[14],
                 "disk_write_rate_peak": row[15],
+                "net_rx_rate": row[16],
+                "net_tx_rate": row[17],
+                "net_rx_rate_peak": row[18],
+                "net_tx_rate_peak": row[19],
             })
     finally:
         db.close()

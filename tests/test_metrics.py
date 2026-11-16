@@ -53,9 +53,9 @@ class MetricsTests(unittest.TestCase):
         for state in self.states:
             self.h.write_json(self.h.app_state_path(state["domain_id"]), state)
 
-    def info(self, memory=100, cpu=1000000000, net=500, instance="1", read=0, write=0):
+    def info(self, memory=100, cpu=1000000000, net=500, instance="1", read=0, write=0, sent=0):
         return {"ActiveState": "active", "MemoryCurrent": str(memory), "CPUUsageNSec": str(cpu),
-                "IPIngressBytes": str(net), "IPEgressBytes": "0", "NRestarts": "0",
+                "IPIngressBytes": str(net), "IPEgressBytes": str(sent), "NRestarts": "0",
                 "MainPID": instance, "ActiveEnterTimestampMonotonic": instance, "ControlGroup": "",
                 "IOReadBytes": str(read), "IOWriteBytes": str(write)}
 
@@ -135,6 +135,78 @@ class MetricsTests(unittest.TestCase):
             self.assertEqual(200.0, sample["net_tx_rate"])
             self.assertEqual(sample, self.h.record_server_metric_sample())
             self.assertEqual(2, len(self.rows("server_metrics")))
+
+    def test_download_and_upload_are_independent_rates_with_history_and_raw_peaks(self):
+        first = self.h.record_app_metric_sample(17)
+        self.assertIsNone(first["net_rx_rate"])
+        self.assertIsNone(first["net_tx_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=6500, sent=12000)
+        sample = self.h.record_app_metric_sample(17)
+        self.assertEqual(100, sample["net_rx_rate"])
+        self.assertEqual(200, sample["net_tx_rate"])
+        self.assertEqual(sample, self.h.record_app_metric_sample(17))
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=18500, sent=36000)
+        response = self.h.cmd_app_metrics({"domain_id": 17, "range": "7d"})
+        self.assertEqual(200, response["latest"]["net_rx_rate"])
+        self.assertEqual(400, response["latest"]["net_tx_rate"])
+        self.assertEqual(150, response["metrics"][0]["net_rx_rate"])
+        self.assertEqual(300, response["metrics"][0]["net_tx_rate"])
+        self.assertEqual(200, response["metrics"][0]["net_rx_rate_peak"])
+        self.assertEqual(400, response["metrics"][0]["net_tx_rate_peak"])
+
+    def test_directional_network_rates_handle_restarts_resets_and_unsupported_counters(self):
+        self.h.record_app_metric_sample(17)
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=6500, sent=12000, instance="2")
+        restarted = self.h.record_app_metric_sample(17)
+        self.assertIsNone(restarted["net_rx_rate"])
+        self.assertIsNone(restarted["net_tx_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=10, sent=24000, instance="2")
+        reset = self.h.record_app_metric_sample(17)
+        self.assertIsNone(reset["net_rx_rate"])
+        self.assertEqual(200, reset["net_tx_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=2 ** 64 - 1, sent=36000, instance="2")
+        unsupported = self.h.record_app_metric_sample(17)
+        self.assertIsNone(unsupported["net_rx_rate"])
+        self.assertEqual(200, unsupported["net_tx_rate"])
+
+    def test_network_upgrade_warms_new_counters_without_discarding_existing_disk_baselines(self):
+        self.h.record_app_metric_sample(17)
+        baseline = self.h._load_cpu_prev()
+        key = "metrics_" + self.h.app_unit(17)
+        baseline[key] = baseline[key][:6]
+        self.h._save_cpu_prev(baseline)
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=6500, sent=12000, read=6000, write=12000)
+        sample = self.h.record_app_metric_sample(17)
+        self.assertIsNone(sample["net_rx_rate"])
+        self.assertIsNone(sample["net_tx_rate"])
+        self.assertEqual(100, sample["disk_read_rate"])
+        self.assertEqual(200, sample["disk_write_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=12500, sent=24000, read=12000, write=24000)
+        sample = self.h.record_app_metric_sample(17)
+        self.assertEqual(100, sample["net_rx_rate"])
+        self.assertEqual(200, sample["net_tx_rate"])
+        self.assertEqual(100, sample["disk_read_rate"])
+
+    def test_project_totals_include_both_network_directions_and_preserve_unknown_values(self):
+        self.assertIsNone(self.h.cmd_server_metrics({})["project_summary"]["net_rx_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(17)] = self.info(net=6500, sent=12000)
+        self.infos[self.h.app_unit(18)] = self.info(net=12500, sent=18000)
+        summary = self.h.cmd_server_metrics({})["project_summary"]
+        self.assertEqual(300, summary["net_rx_rate"])
+        self.assertEqual(500, summary["net_tx_rate"])
+        self.now += 60
+        self.infos[self.h.app_unit(18)]["IPIngressBytes"] = "[not set]"
+        summary = self.h.cmd_server_metrics({})["project_summary"]
+        self.assertIsNone(summary["net_rx_rate"])
+        self.assertEqual(0, summary["net_tx_rate"])
 
     def test_application_disk_rates_are_bytes_per_second_and_history_preserves_unknown_warmup(self):
         first = self.h.record_app_metric_sample(17)
@@ -258,6 +330,7 @@ class MetricsTests(unittest.TestCase):
         db = self.h._open_metrics_db()
         for table in ("app_metrics", "server_metrics"):
             self.assertEqual([(None, None)], db.execute("SELECT disk_read_rate, disk_write_rate FROM " + table).fetchall())
+        self.assertEqual([(None, None)], db.execute("SELECT net_rx_rate, net_tx_rate FROM app_metrics").fetchall())
         db.close()
         self.assertEqual(1, len(self.rows("app_metrics")))
         self.assertEqual(1, len(self.rows("server_metrics")))
@@ -267,6 +340,8 @@ class MetricsTests(unittest.TestCase):
         stopped = self.h.record_app_metric_sample(17)
         self.assertEqual(1000, stopped["disk_bytes"])
         self.assertEqual(0, stopped["memory_used_bytes"])
+        self.assertEqual(0, stopped["net_rx_rate"])
+        self.assertEqual(0, stopped["net_tx_rate"])
         self.infos[self.h.app_unit(18)]["IPIngressBytes"] = str(2 ** 64 - 1)
         self.assertEqual(0, self.h.record_app_metric_sample(18)["net_bytes"])
 

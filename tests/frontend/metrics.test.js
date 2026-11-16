@@ -157,10 +157,11 @@ test('peak uses the raw bucket maximum and cannot fall below the latest measurem
 test('application overview keeps four charts and plots I/O rates instead of capacity', async () => {
     const api = { get: mock(() => Promise.resolve({
         start_time: 0, end_time: 60, step: 60,
-        metrics: [{ time: 60, cpu: 1, memory_used: 1048576, disk: 1099511627776, net_rate: 1024,
-            disk_read_rate: 2048, disk_write_rate: 4096 }],
+        metrics: [{ time: 0, net_rate: 987654321 },
+            { time: 60, cpu: 1, memory_used: 1048576, disk: 1099511627776, net_rate: 987654321,
+                disk_read_rate: 2048, disk_write_rate: 4096, net_rx_rate: 1024, net_tx_rate: 2048 }],
         latest: { cpu_percent: 1, memory_used_bytes: 1048576, disk_bytes: 1099511627776, net_rate: 1024,
-            disk_read_rate: 2048, disk_write_rate: 4096 },
+            disk_read_rate: 2048, disk_write_rate: 4096, net_rx_rate: 4096, net_tx_rate: 8192 },
     })) };
     await act(async () => root.render(createElement(OverviewTab, {
         api, siteId: '17', data: { configured: true }, status: { running: true }, onControl: mock(), onStop: mock(),
@@ -173,4 +174,31 @@ test('application overview keeps four charts and plots I/O rates instead of capa
     expect(document.body.textContent).toContain('Domain.metricsRead2.0 KiB/s');
     expect(document.body.textContent).toContain('Domain.metricsWrite4.0 KiB/s');
     expect(document.body.textContent).not.toContain('TiB');
+    const networkChart = document.querySelectorAll('svg')[3];
+    const paths = networkChart.querySelectorAll('path[stroke]');
+    expect(paths).toHaveLength(2);
+    expect(paths[0].getAttribute('d')).not.toContain('L ');
+    expect(paths[1].getAttribute('d')).not.toContain('L ');
+    expect(document.body.textContent).toContain('Domain.metricsDownload4.0 KiB/s');
+    expect(document.body.textContent).toContain('Domain.metricsUpload8.0 KiB/s');
+    const overlay = networkChart.parentElement.querySelector('[style*="crosshair"]');
+    overlay.getBoundingClientRect = () => ({ left: 0, width: 500 });
+    await act(async () => overlay.dispatchEvent(new dom.window.MouseEvent('mousemove', { clientX: 490, bubbles: true })));
+    const tooltip = networkChart.parentElement.querySelector('[style*="z-index"]');
+    expect(tooltip.textContent).toContain('Domain.metricsDownload1.0 KiB/s');
+    expect(tooltip.textContent).toContain('Domain.metricsUpload2.0 KiB/s');
+});
+
+test('legacy combined traffic is kept unknown for both network directions', async () => {
+    const api = { get: mock(() => Promise.resolve({
+        metrics: [{ time: 60, net_rate: 1024 }], latest: { net_rate: 2048 },
+    })) };
+    await act(async () => root.render(createElement(OverviewTab, {
+        api, siteId: '17', data: { configured: true }, onControl: mock(), onStop: mock(),
+    })));
+    const networkCard = document.querySelector('.runway-metrics-grid').lastElementChild;
+    expect(networkCard.textContent).toContain('Domain.metricsDownload—');
+    expect(networkCard.textContent).toContain('Domain.metricsUpload—');
+    expect(networkCard.textContent).toContain('Domain.metricsEmpty');
+    expect(networkCard.querySelector('svg')).toBeNull();
 });
