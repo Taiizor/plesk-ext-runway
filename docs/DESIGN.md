@@ -832,9 +832,11 @@ Status: implemented for 1.1.0. With the setting off, every contract of §3–§1
   capped by server settings (§12.9).
 - Setting off: units, environment files, sockets, web server snippets and behaviour are byte for
   byte those of 1.0.0, so existing installations upgrade without any change (tested against the
-  1.0.0 helper, §12.11). Two later exceptions, independent of this setting: all units get `IPAccounting=yes`
-  for network monitoring (§7, metrics), and on systemd 254 and later a unit with a memory or CPU limit gets
-  `MemoryPressureWatch=off` (§7, limits).
+  1.0.0 helper, §12.11). Later exceptions, independent of this setting: all units explicitly enable
+  `CPUAccounting=yes`, `MemoryAccounting=yes`, `IOAccounting=yes`, `BlockIOAccounting=yes` and
+  `IPAccounting=yes` for resource monitoring, and on systemd 254 and later a unit with a memory or
+  CPU limit gets `MemoryPressureWatch=off` (§7, limits). The comparison requires exactly one of
+  each accounting directive and removes only these documented additions before comparing files.
 - Setting on: "Build & restart", fetch and `tmp/deploy.txt` (build first, as today), Restart
   (button, `api/app/control`, CLI `--restart`), `tmp/restart.txt` and saving the settings (a 1.0
   save restarts the application) replace the running version without a gap. The new version

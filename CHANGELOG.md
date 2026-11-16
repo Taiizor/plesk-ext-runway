@@ -98,6 +98,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Update the 1.0.0 service-rendering regression check for explicit CPU, memory and disk I/O
+  accounting, requiring each documented directive exactly once while preserving byte-for-byte
+  comparison of all remaining service content.
 - Metric chart headers wrap as complete value/unit groups on narrow screens, and time-range
   buttons have 44-pixel touch targets so read/write statistics stay readable on mobile.
 - Keep disk I/O translations beside the other metric keys. Localize memory, disk and network
