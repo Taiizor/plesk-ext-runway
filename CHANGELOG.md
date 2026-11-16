@@ -103,9 +103,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
-- Align localized processor, memory, disk usage and network usage labels between load cards
-  and charts in all 32 languages. Restore Turkish memory labels to "Bellek" and clarify
-  download/upload terms where the previous translation was ambiguous.
+- Use concise localized resource names in Project Load and Server Load, with explicit usage
+  headings on all four charts, in all 32 languages. Restore Turkish memory labels to "Bellek"
+  and clarify download/upload terms where the previous translation was ambiguous.
 - Give metric titles, range controls and statistics separate header areas, and use a shared CSS
   grid so disk/network plot baselines stay aligned with translated labels and nonzero rates.
 - Round fractional byte rates to two decimal places, keep chart cards and plot baselines aligned,
