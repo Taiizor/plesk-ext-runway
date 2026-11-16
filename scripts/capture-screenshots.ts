@@ -11,7 +11,7 @@
  *   CONTAINER=grt-plesk PANEL_PORT=18880 bun run screenshots
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import puppeteer, { type Page, type Browser } from 'puppeteer-core';
@@ -38,9 +38,11 @@ if (!executablePath) {
 
 const getLoginUrl = (user = 'admin'): string => {
     try {
-        const userArg = user === 'admin' ? '' : `-user ${user}`;
-        const cmd = `docker exec ${CONTAINER} plesk bin admin --get-login-link -relative-url ${userArg}`;
-        const rel = execSync(cmd).toString().trim();
+        const args = ['exec', CONTAINER, 'plesk', 'bin', 'admin', '--get-login-link', '-relative-url'];
+        if (user !== 'admin') {
+            args.push('-user', user);
+        }
+        const rel = execFileSync('docker', args, { encoding: 'utf-8' }).trim();
         return `${BASE_URL}${rel}`;
     } catch (err) {
         throw new Error(`Failed to get login link for ${user} from container ${CONTAINER}: ${err}`);

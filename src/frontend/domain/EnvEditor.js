@@ -44,9 +44,10 @@ const serializeRowsToEnv = rows => {
         .map(r => {
             const k = r.key.trim();
             const v = r.val;
-            // Wrap in quotes if it contains spaces or quotes
-            if (v.includes(' ') || v.includes('\n') || v.includes('"')) {
-                return `${k}="${v.replace(/"/g, '\\"')}"`;
+            // Wrap in quotes if it contains spaces, newlines, quotes, or backslashes
+            if (v.includes(' ') || v.includes('\n') || v.includes('"') || v.includes('\\')) {
+                const escaped = v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+                return `${k}="${escaped}"`;
             }
             return `${k}=${v}`;
         })
