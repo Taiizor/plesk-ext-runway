@@ -118,7 +118,7 @@ const capture = async (
 
 const clickTabByText = async (page: Page, text: string): Promise<boolean> => {
     const found = await page.evaluate((targetText) => {
-        const links = Array.from(document.querySelectorAll('a.pul-tabs__link')) as HTMLElement[];
+        const links = Array.from(document.querySelectorAll('a.pul-tabs__link, [data-runtime-card]')) as HTMLElement[];
         const match = links.find(a => a.innerText && a.innerText.toLowerCase().includes(targetText.toLowerCase()));
         if (match) {
             match.click();

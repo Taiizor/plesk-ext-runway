@@ -3,7 +3,7 @@
 import { createElement, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
-    Alert, Button, Input, Label, List, ListEmptyView, Panel, Paragraph, RouterLink, Select, SelectOption, Tab, Tabs, Text,
+    Alert, Button, Input, Label, List, ListEmptyView, Panel, Paragraph, RouterLink, Select, SelectOption, Text,
     Toolbar, ToolbarExpander, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { helperText, isObject, isolate, jobTitle, runtimeName } from './lib/format';
@@ -372,7 +372,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
         );
     };
 
-    const activeIndex = Math.max(0, runtimes.findIndex(meta => meta.key === activeKey));
+    const activeMeta = runtimes.find(meta => meta.key === activeKey) || runtimes[0] || null;
 
     return (
         <div>
@@ -426,9 +426,18 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                     return (
                         <div
                             key={meta.key}
+                            data-runtime-card={meta.key}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setActive(meta.key)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setActive(meta.key);
+                                }
+                            }}
                             style={{
-                                background: 'var(--pul-color-background-surface, #ffffff)',
+                                background: isSelected ? 'var(--pul-color-background-surface, #ffffff)' : 'var(--pul-color-background-subtle, #f9fafb)',
                                 border: isSelected ? '2px solid var(--pul-color-primary, #0070f3)' : '1px solid var(--pul-color-border-subtle, #e5e7eb)',
                                 borderRadius: '8px',
                                 padding: '14px',
@@ -463,15 +472,8 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 })}
             </div>
 
-            <Tabs active={activeIndex + 1}>
-                {runtimes.map(meta => {
-                    return (
-                        <Tab key={meta.key} title={runtimeName(translate, meta)} onActivate={() => setActive(meta.key)}>
-                            {renderTab(meta)}
-                        </Tab>
-                    );
-                })}
-            </Tabs>
+            {/* Active Runtime Details */}
+            {activeMeta && renderTab(activeMeta)}
 
             <Panel title={<Translate content="Toolchains.buildDeps" />}>
                 <Paragraph>{DEP_TOOLS_HINT}</Paragraph>
