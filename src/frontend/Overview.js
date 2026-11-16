@@ -385,7 +385,7 @@ const Overview = ({ baseUrl }) => {
 
                     <div style={kpiCardStyle}>
                         <div style={kpiHeaderStyle}>
-                            <Text intent="muted" fontSize="sm">Project Load</Text>
+                            <Text intent="muted" fontSize="sm"><Translate content="Overview.projectLoad" /></Text>
                             <Icon name="server" size="16" intent="info" />
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 600 }}>
@@ -403,7 +403,7 @@ const Overview = ({ baseUrl }) => {
                     {isAdmin && serverMetrics.data && serverMetrics.data.latest && (
                         <div style={kpiCardStyle}>
                             <div style={kpiHeaderStyle}>
-                                <Text intent="muted" fontSize="sm">Server Load</Text>
+                                <Text intent="muted" fontSize="sm"><Translate content="Overview.serverLoad" /></Text>
                                 <Icon name="dashboard" size="16" intent="info" />
                             </div>
                             <div style={{ fontSize: '18px', fontWeight: 600 }}>

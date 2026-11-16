@@ -96,7 +96,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
                 buildCpuPercent: 50,
                 buildTasks: 1024,
             });
-            statusMessages.add({ intent: 'info', message: 'Applied "Low-RAM VPS" preset values to form.' });
+            statusMessages.add({ intent: 'info', message: translate('Settings.presetApplied', { name: translate('Settings.presetVps') }) });
         } else if (presetName === 'standard') {
             setValues({
                 ...current,
@@ -108,7 +108,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
                 buildCpuPercent: 100,
                 buildTasks: 2048,
             });
-            statusMessages.add({ intent: 'info', message: 'Applied "Standard Web Server" preset values to form.' });
+            statusMessages.add({ intent: 'info', message: translate('Settings.presetApplied', { name: translate('Settings.presetStandard') }) });
         } else if (presetName === 'high') {
             setValues({
                 ...current,
@@ -120,7 +120,7 @@ const Settings = ({ baseUrl, statusMessages }) => {
                 buildCpuPercent: 200,
                 buildTasks: 4096,
             });
-            statusMessages.add({ intent: 'info', message: 'Applied "High Performance" preset values to form.' });
+            statusMessages.add({ intent: 'info', message: translate('Settings.presetApplied', { name: translate('Settings.presetHigh') }) });
         }
     };
 
@@ -147,21 +147,21 @@ const Settings = ({ baseUrl, statusMessages }) => {
             }}>
                 <div>
                     <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--pul-color-text-primary, #111827)' }}>
-                        Quick Presets:
+                        <Translate content="Settings.quickPresets" />
                     </span>
                     <span style={{ fontSize: '12px', color: 'var(--pul-color-text-muted, #6b7280)', marginLeft: '8px' }}>
-                        Load recommended defaults for your server profile
+                        <Translate content="Settings.quickPresetsHint" />
                     </span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <Button size="small" onClick={() => applyPreset('vps')}>
-                        Low-RAM VPS
+                        <Translate content="Settings.presetVps" />
                     </Button>
                     <Button size="small" intent="primary" onClick={() => applyPreset('standard')}>
-                        Standard Server
+                        <Translate content="Settings.presetStandard" />
                     </Button>
                     <Button size="small" onClick={() => applyPreset('high')}>
-                        High Performance
+                        <Translate content="Settings.presetHigh" />
                     </Button>
                 </div>
             </div>

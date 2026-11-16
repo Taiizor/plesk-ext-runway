@@ -461,11 +461,15 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                                     background: count > 0 ? 'rgba(16, 185, 129, 0.1)' : 'var(--pul-color-background-subtle, #f3f4f6)',
                                     color: count > 0 ? '#10b981' : 'var(--pul-color-text-muted, #6b7280)',
                                 }}>
-                                    {count > 0 ? `${count} installed` : 'none'}
+                                    {count > 0 ? translate('Toolchains.cardInstalled', { count }) : translate('Toolchains.cardNone')}
                                 </span>
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--pul-color-text-muted, #6b7280)' }}>
-                                {allDomains.size > 0 ? `${allDomains.size} active app${allDomains.size > 1 ? 's' : ''}` : 'No apps using'}
+                                {allDomains.size === 0
+                                    ? translate('Toolchains.noAppsUsing')
+                                    : (allDomains.size === 1
+                                        ? translate('Toolchains.activeAppOne')
+                                        : translate('Toolchains.activeAppMany', { count: allDomains.size }))}
                             </div>
                         </div>
                     );

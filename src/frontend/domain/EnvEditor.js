@@ -2,7 +2,7 @@
 
 import { createElement, useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Button, Icon, Text } from '@plesk/plesk-ext-sdk';
+import { Button, Icon, Text, useTranslate } from '@plesk/plesk-ext-sdk';
 
 const monospace = { fontFamily: 'Menlo, Consolas, "Liberation Mono", monospace', fontSize: '12px' };
 
@@ -54,6 +54,7 @@ const serializeRowsToEnv = rows => {
 };
 
 const EnvEditor = ({ value = '', onChange, disabled = false }) => {
+    const translate = useTranslate();
     const [mode, setMode] = useState('table'); // 'table' | 'raw'
     const [rows, setRows] = useState(() => parseEnvToRows(value));
 
@@ -117,7 +118,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                 borderBottom: '1px solid var(--pul-color-border-subtle, #e5e7eb)',
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--pul-color-text-muted, #6b7280)' }}>
-                    <span>{mode === 'table' ? `${rows.filter(r => r.key.trim()).length} variables` : 'Raw text'}</span>
+                    <span>{mode === 'table' ? translate('Domain.envVariables', { count: rows.filter(r => r.key.trim()).length }) : translate('Domain.envRawText')}</span>
                 </div>
                 <div style={{ display: 'flex', background: 'var(--pul-color-background-surface, #ffffff)', border: '1px solid var(--pul-color-border-subtle, #d1d5db)', borderRadius: '4px', overflow: 'hidden' }}>
                     <button
@@ -134,7 +135,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                             cursor: disabled ? 'not-allowed' : 'pointer',
                         }}
                     >
-                        Table
+                        {translate('Domain.envTable')}
                     </button>
                     <button
                         type="button"
@@ -150,7 +151,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                             cursor: disabled ? 'not-allowed' : 'pointer',
                         }}
                     >
-                        Raw .env
+                        {translate('Domain.envRaw')}
                     </button>
                 </div>
             </div>
@@ -198,7 +199,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                                     <button
                                         type="button"
                                         onClick={() => handleRowChange(row.id, 'show', !row.show)}
-                                        title={row.show ? 'Hide value' : 'Show value'}
+                                        title={row.show ? translate('Domain.envHide') : translate('Domain.envShow')}
                                         style={{
                                             position: 'absolute',
                                             right: '6px',
@@ -218,7 +219,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                                     type="button"
                                     onClick={() => handleRemoveRow(row.id)}
                                     disabled={disabled}
-                                    title="Delete variable"
+                                    title={translate('Domain.envDelete')}
                                     style={{
                                         background: 'none',
                                         border: 'none',
@@ -236,7 +237,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                     </div>
                     <div style={{ marginTop: '10px' }}>
                         <Button size="small" icon="plus" onClick={handleAddRow} disabled={disabled}>
-                            Add Variable
+                            {translate('Domain.envAdd')}
                         </Button>
                     </div>
                 </div>

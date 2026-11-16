@@ -2,6 +2,7 @@
 
 import { createElement, useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
+import { useTranslate } from '@plesk/plesk-ext-sdk';
 
 /**
  * Modern SVG-based responsive metric chart (area + line) with time range selector,
@@ -17,6 +18,7 @@ const MetricChart = ({
     formatValue,
     height = 140,
 }) => {
+    const translate = useTranslate();
     const [hoverIndex, setHoverIndex] = useState(null);
 
     const values = useMemo(() => {
@@ -110,8 +112,8 @@ const MetricChart = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     {/* Min / Avg / Peak badges */}
                     <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', gap: '8px' }}>
-                        <span>Avg: <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{format(stats.avg)}</strong></span>
-                        <span>Peak: <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{format(stats.max)}</strong></span>
+                        <span>{translate('Domain.metricsAvg')} <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{format(stats.avg)}</strong></span>
+                        <span>{translate('Domain.metricsPeak')} <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{format(stats.max)}</strong></span>
                     </div>
 
                     {/* Range Selector */}
@@ -228,7 +230,7 @@ const MetricChart = ({
                 </div>
             ) : (
                 <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pul-color-text-muted, #9ca3af)', fontSize: '12px' }}>
-                    No metric data available yet
+                    {translate('Domain.metricsEmpty')}
                 </div>
             )}
         </div>

@@ -35,9 +35,9 @@ const HeroHeader = ({
     let listenerText = null;
     if (configured && status) {
         if (config && (config.mode === 'worker' || config.listen === 'none')) {
-            listenerText = 'Worker';
+            listenerText = translate('Overview.endpointWorker');
         } else if (status.socket || status.listen_mode === 'unix' || (config && config.listen === 'unix')) {
-            listenerText = 'Unix socket';
+            listenerText = translate('Overview.endpointSocket');
         } else if (status.port || (config && config.port)) {
             listenerText = `127.0.0.1:${status.port || config.port}`;
         }

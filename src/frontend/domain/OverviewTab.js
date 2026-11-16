@@ -2,7 +2,7 @@
 
 import { createElement, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Grid, GridCol } from '@plesk/plesk-ext-sdk';
+import { Grid, GridCol, useTranslate } from '@plesk/plesk-ext-sdk';
 import MetricChart from '../components/MetricChart';
 import StatusPanel from './StatusPanel';
 
@@ -17,6 +17,7 @@ const OverviewTab = ({
     onControl,
     onStop,
 }) => {
+    const translate = useTranslate();
     const [range, setRange] = useState('1h');
     const [metrics, setMetrics] = useState({ cpu: [], mem: [], disk: [], net: [] });
 
@@ -57,7 +58,7 @@ const OverviewTab = ({
                 <Grid xs={1} lg={2} gap="md" style={{ marginBottom: '16px' }}>
                     <GridCol>
                         <MetricChart
-                            title="CPU Usage"
+                            title={translate('Domain.metricsCpu')}
                             data={metrics.cpu}
                             unit="%"
                             color="#0070f3"
@@ -68,7 +69,7 @@ const OverviewTab = ({
                     </GridCol>
                     <GridCol>
                         <MetricChart
-                            title="Memory Usage"
+                            title={translate('Domain.metricsMemory')}
                             data={metrics.mem}
                             unit="MiB"
                             color="#10b981"
@@ -79,7 +80,7 @@ const OverviewTab = ({
                     </GridCol>
                     <GridCol>
                         <MetricChart
-                            title="Disk Usage"
+                            title={translate('Domain.metricsDisk')}
                             data={metrics.disk}
                             unit="MiB"
                             color="#8b5cf6"
@@ -90,7 +91,7 @@ const OverviewTab = ({
                     </GridCol>
                     <GridCol>
                         <MetricChart
-                            title="Network Traffic"
+                            title={translate('Domain.metricsNetwork')}
                             data={metrics.net}
                             unit="KB/s"
                             color="#f59e0b"
