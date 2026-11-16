@@ -832,8 +832,9 @@ Status: implemented for 1.1.0. With the setting off, every contract of §3–§1
   capped by server settings (§12.9).
 - Setting off: units, environment files, sockets, web server snippets and behaviour are byte for
   byte those of 1.0.0, so existing installations upgrade without any change (tested against the
-  1.0.0 helper, §12.11). One later exception, independent of this setting: on systemd 254 and
-  later a unit with a memory or CPU limit gets `MemoryPressureWatch=off` (§7, limits).
+  1.0.0 helper, §12.11). Two later exceptions, independent of this setting: all units get `IPAccounting=yes`
+  for network monitoring (§7, metrics), and on systemd 254 and later a unit with a memory or CPU limit gets
+  `MemoryPressureWatch=off` (§7, limits).
 - Setting on: "Build & restart", fetch and `tmp/deploy.txt` (build first, as today), Restart
   (button, `api/app/control`, CLI `--restart`), `tmp/restart.txt` and saving the settings (a 1.0
   save restarts the application) replace the running version without a gap. The new version
@@ -1401,7 +1402,7 @@ CLI (§9):
   without slot ports, as `app-apply` writes it); a 1.0 state renders byte-identical files compared
   with the 1.0.0 helper (copied from `git show v1.0.0:src/sbin/runway-helper` by
   `.github/scripts/plesk-e2e.sh`, skipped without it), without limits and with a memory limit,
-  whose unit differs only by the `MemoryPressureWatch=off` of §7 on systemd 254 and later.
+  whose unit differs only by `IPAccounting=yes` and the `MemoryPressureWatch=off` of §7 on systemd 254 and later.
 - Test-only fault flag `/var/lib/runway/test-switch-fault` (root-owned regular file younger than one
   hour, content `<kill|term>:<point>`, points: the phases of §12.4 plus `moved` after the traffic
   moved and `committed` after the commit): the switch job sends itself SIGKILL or SIGTERM there.

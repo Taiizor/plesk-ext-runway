@@ -1369,9 +1369,11 @@ new = load("helper_new", "/opt/runway/bin/runway-helper")
 user, home = sys.argv[1], sys.argv[2]
 pw = pwd.getpwnam(user)
 diffs = []
-# The one later change of a 1.0 unit: a unit with a memory or CPU limit gets this line on systemd
-# 254 and later (docs/DESIGN.md section 7, limits).
+# Later additions to a 1.0 unit: a unit with a memory or CPU limit gets MemoryPressureWatch=off
+# on systemd 254+ (docs/DESIGN.md section 7, limits), and all units get IPAccounting=yes for
+# network monitoring.
 watch = "MemoryPressureWatch=off\n"
+ipacc = "IPAccounting=yes\n"
 for listen in ("tcp", "unix", "none"):
     for limits in ({}, {"memory_mb": 256}):
         payload = {"domain_id": 996, "domain": "same.test", "sysuser": user, "app_root": "apps/smoke-zd", "runtime": "go",
@@ -1384,7 +1386,7 @@ for listen in ("tcp", "unix", "none"):
             diffs.append("%s %s render_env_file" % (listen, limits))
         unit_old, unit_new = old.render_app_unit(s_old, pw), new.render_app_unit(s_new, pw)
         expected = bool(limits) and new.cached_systemd_version() >= 254
-        if unit_new.count(watch) != int(expected) or unit_new.replace(watch, "") != unit_old:
+        if unit_new.count(watch) != int(expected) or unit_new.count(ipacc) != 1 or unit_new.replace(watch, "").replace(ipacc, "") != unit_old:
             diffs.append("%s %s render_app_unit" % (listen, limits))
         for name in ("render_deploy_service", "render_deploy_path"):
             if getattr(old, name)(s_old) != getattr(new, name)(s_new):
@@ -1408,7 +1410,7 @@ for listen in ("tcp", "unix", "none"):
 print("same" if not diffs else "different: " + ", ".join(diffs))
 PYEOF
 )
-    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off; an expected response content and a document root change no file)" || bad "1.0 rendering: $res"
+    [ "$res" = "same" ] && ok "applications without the setting render the files of the 1.0.0 helper byte for byte (with a memory limit and systemd 254+: plus MemoryPressureWatch=off; plus IPAccounting=yes; an expected response content and a document root change no file)" || bad "1.0 rendering: $res"
 else
     echo "SKIP  byte-identical 1.0 rendering (no /root/runway-helper-1.0.0; plesk-e2e.sh smoke copies it from git)"
 fi
