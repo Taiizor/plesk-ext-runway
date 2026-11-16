@@ -166,6 +166,31 @@ class MetricsTests(unittest.TestCase):
         self.infos[self.h.app_unit(18)]["IOReadBytes"] = str(2 ** 64 - 1)
         self.assertIsNone(self.h.cmd_server_metrics({})["project_summary"]["disk_read_rate"])
 
+    def test_downsampling_preserves_raw_peaks_separately_from_averages(self):
+        self.now += 45
+        db = self.h._open_metrics_db()
+        with db:
+            db.executemany("""INSERT INTO app_metrics
+                (domain_id, timestamp, cpu_percent, memory_bytes, memory_used_bytes, disk_bytes,
+                 restarts, net_rate, disk_read_rate, disk_write_rate)
+                VALUES (17, ?, ?, ?, ?, 1000, 0, ?, ?, ?)""", [
+                    (self.now - 20, 0.1, 100, 80, 100, 1000, 0),
+                    (self.now - 10, 0.6, 300, 240, 600, 6000, 2000),
+                    (self.now, 0.2, 200, 160, 200, 2000, 1000),
+                ])
+        db.close()
+        response = self.h.cmd_app_metrics({"domain_id": 17, "range": "1h"})
+        self.assertEqual(1, len(response["metrics"]))
+        sample = response["metrics"][0]
+        self.assertEqual(0.3, sample["cpu"])
+        self.assertEqual(0.6, sample["cpu_peak"])
+        self.assertEqual(240, sample["memory_used_peak"])
+        self.assertEqual(300, sample["memory_peak"])
+        self.assertEqual(600, sample["net_rate_peak"])
+        self.assertEqual(3000, sample["disk_read_rate"])
+        self.assertEqual(6000, sample["disk_read_rate_peak"])
+        self.assertEqual(2000, sample["disk_write_rate_peak"])
+
     def test_disk_rates_reset_after_service_restart_and_counter_reset(self):
         self.h.record_app_metric_sample(17)
         self.now += 60

@@ -7,6 +7,8 @@ import MetricChart from '../components/MetricChart';
 import StatusPanel from './StatusPanel';
 import { formatByteRate } from '../lib/format';
 
+const metricColumnStyle = { display: 'flex', minWidth: 0 };
+
 const OverviewTab = ({
     api,
     siteId,
@@ -38,11 +40,13 @@ const OverviewTab = ({
                 const net = [];
 
                 res.metrics.forEach(m => {
-                    cpu.push({ time: m.time, value: m.cpu || 0 });
-                    mem.push({ time: m.time, value: (m.memory_used ?? m.memory ?? 0) / (1024 * 1024) }); // bytes to MiB
-                    read.push({ time: m.time, value: m.disk_read_rate ?? null });
-                    write.push({ time: m.time, value: m.disk_write_rate ?? null });
-                    net.push({ time: m.time, value: (m.net_rate || 0) / 1024 }); // bytes/s to KB/s
+                    cpu.push({ time: m.time, value: m.cpu || 0, peak: m.cpu_peak });
+                    mem.push({ time: m.time, value: (m.memory_used ?? m.memory ?? 0) / (1024 * 1024),
+                        peak: (m.memory_used_peak ?? m.memory_peak ?? m.memory_used ?? m.memory ?? 0) / (1024 * 1024) }); // bytes to MiB
+                    read.push({ time: m.time, value: m.disk_read_rate ?? null, peak: m.disk_read_rate_peak });
+                    write.push({ time: m.time, value: m.disk_write_rate ?? null, peak: m.disk_write_rate_peak });
+                    net.push({ time: m.time, value: (m.net_rate || 0) / 1024,
+                        peak: (m.net_rate_peak ?? m.net_rate ?? 0) / 1024 }); // bytes/s to KB/s
                 });
 
                 setMetrics({ cpu, mem, read, write, net });
@@ -63,7 +67,7 @@ const OverviewTab = ({
         <div>
             {data && data.configured && (
                 <Grid xs={1} lg={2} gap="md" style={{ marginBottom: '16px' }}>
-                    <GridCol>
+                    <GridCol style={metricColumnStyle}>
                         <MetricChart
                             {...metricWindow}
                             title={translate('Domain.metricsCpu')}
@@ -76,7 +80,7 @@ const OverviewTab = ({
                             height={140}
                         />
                     </GridCol>
-                    <GridCol>
+                    <GridCol style={metricColumnStyle}>
                         <MetricChart
                             {...metricWindow}
                             title={translate('Domain.metricsMemory')}
@@ -89,7 +93,7 @@ const OverviewTab = ({
                             height={140}
                         />
                     </GridCol>
-                    <GridCol>
+                    <GridCol style={metricColumnStyle}>
                         <MetricChart
                             {...metricWindow}
                             title={translate('Domain.metricsDiskIO')}
@@ -105,7 +109,7 @@ const OverviewTab = ({
                             height={140}
                         />
                     </GridCol>
-                    <GridCol>
+                    <GridCol style={metricColumnStyle}>
                         <MetricChart
                             {...metricWindow}
                             title={translate('Domain.metricsNetwork')}

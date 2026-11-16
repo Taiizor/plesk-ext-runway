@@ -1,6 +1,6 @@
 // Copyright 2026 Taiizor. Licensed under the MIT License.
 
-import { createElement, Fragment, useState, useMemo } from 'react';
+import { createElement, Fragment, useState, useMemo, useRef, useLayoutEffect } from 'react';
 import PropTypes from 'prop-types';
 import { useTranslate } from '@plesk/plesk-ext-sdk';
 
@@ -25,6 +25,10 @@ const MetricChart = ({
 }) => {
     const translate = useTranslate();
     const [hoverIndex, setHoverIndex] = useState(null);
+    const [tooltipLeft, setTooltipLeft] = useState(8);
+    const [tooltipWidth, setTooltipWidth] = useState(0);
+    const plotRef = useRef(null);
+    const tooltipRef = useRef(null);
 
     const datasets = useMemo(() => (series || [{ key: 'value', data, color, latestValue }]).map(item => {
         const samples = (Array.isArray(item.data) ? item.data : [])
@@ -33,7 +37,8 @@ const MetricChart = ({
         const values = samples.map(d => d.value);
         return { ...item, samples, stats: {
             min: values.length ? Math.min(...values) : 0,
-            max: values.length ? Math.max(...values) : 0,
+            max: Math.max(0, ...values, ...samples.map(d => d.peak).filter(Number.isFinite),
+                Number.isFinite(item.latestValue) ? item.latestValue : 0),
             avg: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0,
             last: values[values.length - 1],
         } };
@@ -85,6 +90,28 @@ const MetricChart = ({
             w, h, innerW, innerH, padX, padY, firstTime, lastTime };
     }, [datasets, height, startTime, endTime, step, range]);
 
+    const hoveredPoint = hoverIndex !== null ? chartPoints?.pts[hoverIndex] : null;
+    useLayoutEffect(() => {
+        if (!hoveredPoint || !plotRef.current || !tooltipRef.current) return undefined;
+        const position = () => {
+            if (!plotRef.current || !tooltipRef.current) return;
+            const width = plotRef.current.getBoundingClientRect().width;
+            const tipWidth = tooltipRef.current.getBoundingClientRect().width;
+            const anchor = hoveredPoint.x / chartPoints.w * width;
+            setTooltipWidth(tipWidth);
+            setTooltipLeft(Math.max(8, Math.min(width - tipWidth - 8, anchor - tipWidth / 2)));
+        };
+        position();
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(position) : null;
+        observer?.observe(plotRef.current);
+        observer?.observe(tooltipRef.current);
+        window.addEventListener('resize', position);
+        return () => {
+            observer?.disconnect();
+            window.removeEventListener('resize', position);
+        };
+    }, [hoveredPoint, chartPoints]);
+
     const format = val => {
         if (formatValue) return formatValue(val);
         if (val >= 100) return Math.round(val) + (unit ? ' ' + unit : '');
@@ -108,7 +135,7 @@ const MetricChart = ({
 
     return (
         <div style={{
-            background: 'var(--pul-color-background-surface, #ffffff)',
+            background: 'var(--pul-color-bg-surface, #ffffff)',
             border: '1px solid var(--pul-color-border-subtle, #e5e7eb)',
             borderRadius: '8px',
             padding: '14px 16px',
@@ -117,11 +144,14 @@ const MetricChart = ({
             minWidth: 0,
             maxWidth: '100%',
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
         }}>
             {/* Header: Title, Stats & Range Selector */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--pul-color-text-primary, #111827)' }}>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--pul-color-text, #202020)' }}>
                         {title}
                     </span>
                     {datasets.map(item => <span key={item.key} style={{
@@ -142,11 +172,11 @@ const MetricChart = ({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px 12px', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%' }}>
                     {/* Min / Avg / Peak badges */}
-                    <div style={{ fontSize: '11px', color: 'var(--pul-color-text-muted, #6b7280)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--pul-color-text-subtle, #737373)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         {datasets.map(item => <div key={item.key} style={{ display: 'flex', gap: '2px 8px', flexWrap: 'wrap' }}>
                             {item.label && <span style={{ color: item.color, whiteSpace: 'nowrap' }}>{item.label}</span>}
-                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsAvg')} <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{item.samples.length ? format(item.stats.avg) : '—'}</strong></span>
-                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsPeak')} <strong style={{ color: 'var(--pul-color-text-primary, #374151)' }}>{item.samples.length ? format(item.stats.max) : '—'}</strong></span>
+                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsAvg')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.avg) : '—'}</strong></span>
+                            <span style={{ whiteSpace: 'nowrap' }}>{translate('Domain.metricsPeak')} <strong style={{ color: 'var(--pul-color-text, #202020)' }}>{item.samples.length ? format(item.stats.max) : '—'}</strong></span>
                         </div>)}
                     </div>
 
@@ -160,8 +190,8 @@ const MetricChart = ({
                                     onClick={() => onRangeChange(r)}
                                     style={{
                                         border: 'none',
-                                        background: range === r ? 'var(--pul-color-background-surface, #ffffff)' : 'transparent',
-                                        color: range === r ? 'var(--pul-color-text-primary, #111827)' : 'var(--pul-color-text-muted, #6b7280)',
+                                        background: range === r ? 'var(--pul-color-bg-surface, #ffffff)' : 'transparent',
+                                        color: range === r ? 'var(--pul-color-text, #202020)' : 'var(--pul-color-text-subtle, #737373)',
                                         fontWeight: range === r ? 600 : 400,
                                         fontSize: '12px',
                                         padding: '6px 10px',
@@ -182,7 +212,7 @@ const MetricChart = ({
 
             {/* SVG Chart */}
             {chartPoints ? (
-                <div style={{ position: 'relative', width: '100%', height: `${height}px`, marginBottom: '18px' }}>
+                <div ref={plotRef} style={{ position: 'relative', width: '100%', height: `${height}px`, flexShrink: 0, marginTop: 'auto', marginBottom: '18px' }}>
                     <svg
                         viewBox={`0 0 ${chartPoints.w} ${chartPoints.h}`}
                         preserveAspectRatio="none"
@@ -214,7 +244,8 @@ const MetricChart = ({
                                     y1={chartPoints.padY}
                                     x2={chartPoints.pts[hoverIndex].x}
                                     y2={chartPoints.padY + chartPoints.innerH}
-                                    stroke={color}
+                                    stroke="currentColor"
+                                    strokeOpacity="0.4"
                                     strokeWidth="1.2"
                                     strokeDasharray="2 2"
                                 />
@@ -224,7 +255,7 @@ const MetricChart = ({
                                     cy={entry.y}
                                     r="4.5"
                                     fill={entry.color}
-                                    stroke="#ffffff"
+                                    stroke="var(--pul-color-bg-surface, #ffffff)"
                                     strokeWidth="2"
                                 />)}
                             </g>
@@ -245,7 +276,7 @@ const MetricChart = ({
                         }}
                         onMouseLeave={() => setHoverIndex(null)}
                     />
-                    <div style={{ position: 'absolute', top: '100%', left: '2%', right: '2%', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--pul-color-text-muted, #6b7280)' }}>
+                    <div style={{ position: 'absolute', top: '100%', left: '2%', right: '2%', display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--pul-color-text-subtle, #737373)' }}>
                         {[chartPoints.firstTime, (chartPoints.firstTime + chartPoints.lastTime) / 2, chartPoints.lastTime].map((t, i) => (
                             <span key={i}>{formatTime(t)}</span>
                         ))}
@@ -253,31 +284,33 @@ const MetricChart = ({
 
                     {/* Hover tooltip */}
                     {hoverIndex !== null && chartPoints.pts[hoverIndex] && (
-                        <div style={{
+                        <div ref={tooltipRef} role="tooltip" style={{
                             position: 'absolute',
-                            left: `${Math.min(85, Math.max(15, (chartPoints.pts[hoverIndex].x / chartPoints.w) * 100))}%`,
-                            top: '4px',
-                            transform: 'translateX(-50%)',
-                            background: 'rgba(17, 24, 39, 0.92)',
-                            color: '#ffffff',
-                            padding: '4px 8px',
+                            left: `clamp(8px, ${tooltipLeft}px, max(8px, calc(100% - ${tooltipWidth}px - 8px)))`,
+                            ...(hoveredPoint.entries.some(entry => entry.y < height / 2) ? { bottom: '8px' } : { top: '4px' }),
+                            maxWidth: 'calc(100% - 16px)',
+                            boxSizing: 'border-box',
+                            background: 'var(--pul-color-bg-surface-overlay, #ffffff)',
+                            color: 'var(--pul-color-text, #202020)',
+                            border: '1px solid var(--pul-color-border-subtle, #b5b5b5)',
+                            padding: '6px 8px',
                             borderRadius: '4px',
                             fontSize: '11px',
                             pointerEvents: 'none',
-                            whiteSpace: 'nowrap',
+                            overflowWrap: 'anywhere',
                             boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                             zIndex: 10,
                         }}>
-                            <span style={{ opacity: 0.75, marginRight: '6px' }}>{formatTime(chartPoints.pts[hoverIndex].time)}</span>
-                            {chartPoints.pts[hoverIndex].entries.map(entry => <div key={entry.key}>
+                            <div style={{ color: 'var(--pul-color-text-subtle, #737373)', marginBottom: '3px' }}>{formatTime(hoveredPoint.time)}</div>
+                            {hoveredPoint.entries.map(entry => <div key={entry.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                                 {entry.label && <span style={{ color: entry.color, marginRight: '6px' }}>{entry.label}</span>}
-                                <strong>{format(entry.value)}</strong>
+                                <strong style={{ whiteSpace: 'nowrap' }}>{format(entry.value)}</strong>
                             </div>)}
                         </div>
                     )}
                 </div>
             ) : (
-                <div style={{ height: `${height}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pul-color-text-muted, #9ca3af)', fontSize: '12px' }}>
+                <div style={{ height: `${height}px`, flexShrink: 0, marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pul-color-text-subtle, #737373)', fontSize: '12px' }}>
                     {translate('Domain.metricsEmpty')}
                 </div>
             )}
@@ -290,6 +323,7 @@ MetricChart.propTypes = {
     data: PropTypes.arrayOf(PropTypes.shape({
         time: PropTypes.number.isRequired,
         value: PropTypes.number.isRequired,
+        peak: PropTypes.number,
     })),
     unit: PropTypes.string,
     color: PropTypes.string,
@@ -305,7 +339,7 @@ MetricChart.propTypes = {
         key: PropTypes.string.isRequired,
         label: PropTypes.string,
         color: PropTypes.string.isRequired,
-        data: PropTypes.arrayOf(PropTypes.shape({ time: PropTypes.number.isRequired, value: PropTypes.number })),
+        data: PropTypes.arrayOf(PropTypes.shape({ time: PropTypes.number.isRequired, value: PropTypes.number, peak: PropTypes.number })),
         latestValue: PropTypes.number,
     })),
 };

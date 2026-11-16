@@ -98,6 +98,10 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Round fractional byte rates to two decimal places, keep chart cards and plot baselines aligned,
+  and constrain hover tooltips to their chart bounds using Plesk surface/text colors in both themes.
+  Peak statistics use raw sample maxima rather than maxima of bucket averages, and include the
+  latest measurement so a displayed peak cannot be lower than the current value.
 - Update the 1.0.0 service-rendering regression check for explicit CPU, memory and disk I/O
   accounting, requiring each documented directive exactly once while preserving byte-for-byte
   comparison of all remaining service content.

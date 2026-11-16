@@ -141,6 +141,17 @@ test('throughput formatting distinguishes unknown counters, zero and binary unit
     expect(formatByteRate(0)).toBe('0 B/s');
     expect(formatByteRate(1536)).toBe('1.5 KiB/s');
     expect(formatByteRate(1048576)).toBe('1.0 MiB/s');
+    expect(formatByteRate(595.1466666666666)).toBe('595.15 B/s');
+    expect(formatByteRate(0.3333333333333)).toBe('0.33 B/s');
+});
+
+test('peak uses the raw bucket maximum and cannot fall below the latest measurement', async () => {
+    let chart = await render({ data: [{ time: 60, value: 0.2, peak: 0.6 }], latestValue: 0.3 });
+    expect(chart.querySelectorAll('strong')[0].textContent).toBe('0.2 %');
+    expect(chart.querySelectorAll('strong')[1].textContent).toBe('0.6 %');
+    chart = await render({ data: [{ time: 60, value: 0.2, peak: 0.6 }], latestValue: 0.8 });
+    expect(chart.querySelectorAll('strong')[0].textContent).toBe('0.2 %');
+    expect(chart.querySelectorAll('strong')[1].textContent).toBe('0.8 %');
 });
 
 test('application overview keeps four charts and plots I/O rates instead of capacity', async () => {

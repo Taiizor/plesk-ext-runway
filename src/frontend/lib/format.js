@@ -61,7 +61,9 @@ export const formatBytes = value => {
 };
 
 export const formatByteRate = value => {
-    const bytes = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? formatBytes(value) : null;
+    const bytes = typeof value === 'number' && Number.isFinite(value) && value >= 0
+        ? formatBytes(Number(value.toFixed(2)))
+        : null;
     return bytes === null ? '—' : `${bytes}/s`;
 };
 

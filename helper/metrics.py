@@ -512,7 +512,13 @@ def cmd_app_metrics(payload):
                 MAX(net_bytes) AS net_bytes,
                 MAX(restarts) AS restarts,
                 ROUND(AVG(disk_read_rate), 2) AS disk_read_rate,
-                ROUND(AVG(disk_write_rate), 2) AS disk_write_rate
+                ROUND(AVG(disk_write_rate), 2) AS disk_write_rate,
+                MAX(cpu_percent) AS cpu_peak,
+                MAX(memory_used_bytes) AS memory_used_peak,
+                MAX(memory_bytes) AS memory_peak,
+                MAX(net_rate) AS net_rate_peak,
+                MAX(disk_read_rate) AS disk_read_rate_peak,
+                MAX(disk_write_rate) AS disk_write_rate_peak
             FROM app_metrics
             WHERE domain_id = ? AND timestamp >= ?
             GROUP BY t
@@ -531,6 +537,12 @@ def cmd_app_metrics(payload):
                 "restarts": row[7] or 0,
                 "disk_read_rate": row[8],
                 "disk_write_rate": row[9],
+                "cpu_peak": row[10],
+                "memory_used_peak": row[11],
+                "memory_peak": row[12],
+                "net_rate_peak": row[13],
+                "disk_read_rate_peak": row[14],
+                "disk_write_rate_peak": row[15],
             })
     finally:
         db.close()
