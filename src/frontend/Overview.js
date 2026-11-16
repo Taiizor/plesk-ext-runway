@@ -319,7 +319,7 @@ const Overview = ({ baseUrl }) => {
                         <div style={{ width: '220px', maxWidth: '100%', marginInlineEnd: '8px' }}>
                             <Input
                                 size="fill"
-                                placeholder="Search domains..."
+                                placeholder={translate('Overview.searchPlaceholder')}
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                                 prefix={<Icon name="search" size="12" />}

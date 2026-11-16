@@ -165,7 +165,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                                 <input
                                     type="text"
                                     value={row.key}
-                                    placeholder="KEY"
+                                    placeholder={translate('Domain.envKey')}
                                     disabled={disabled}
                                     onChange={e => handleRowChange(row.id, 'key', e.target.value)}
                                     style={{
@@ -183,7 +183,7 @@ const EnvEditor = ({ value = '', onChange, disabled = false }) => {
                                     <input
                                         type={row.show ? 'text' : 'password'}
                                         value={row.val}
-                                        placeholder="value"
+                                        placeholder={translate('Domain.envVal')}
                                         disabled={disabled}
                                         onChange={e => handleRowChange(row.id, 'val', e.target.value)}
                                         style={{

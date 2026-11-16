@@ -170,7 +170,7 @@ const HeroHeader = ({
                         {stopped ? (
                             <Button
                                 intent="primary"
-                                icon="play"
+                                icon="start"
                                 disabled={!enabled || deploying || Boolean(busyOp)}
                                 state={busyOp === 'start' ? 'loading' : undefined}
                                 onClick={() => onControl('start')}

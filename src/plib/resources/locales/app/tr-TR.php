@@ -220,6 +220,7 @@ return [
         ],
         'projectLoad' => 'Proje Yükü',
         'serverLoad' => 'Sunucu Yükü',
+        'searchPlaceholder' => 'Alan adlarında ara...',
     ],
     'Toolchains' => [
         'title' => 'Araç zincirleri',
@@ -334,6 +335,8 @@ return [
         'envRawText' => 'Ham metin',
         'envTable' => 'Tablo',
         'envRaw' => 'Ham .env',
+        'envKey' => 'ANAHTAR',
+        'envVal' => 'değer',
         'envAdd' => 'Değişken Ekle',
         'envHide' => 'Değeri gizle',
         'envShow' => 'Değeri göster',
@@ -565,6 +568,7 @@ return [
         'logs' => [
             'title' => 'Günlükler',
             'autoRefresh' => 'Otomatik yenile',
+            'filterPlaceholder' => 'Günlüğü filtrele...',
             'slotsHint' => 'Geçiş sırasında iki sürüm de buraya yazar; her satırın öneki örneği belirtir (runway-app-<id>-a veya -b).',
         ],
         'help' => [

@@ -56,7 +56,7 @@ const LogsPanel = ({
                         type="text"
                         value={filter}
                         onChange={e => setFilter(e.target.value)}
-                        placeholder="Filter log..."
+                        placeholder={translate('Domain.logs.filterPlaceholder')}
                         style={{
                             width: '100%',
                             boxSizing: 'border-box',

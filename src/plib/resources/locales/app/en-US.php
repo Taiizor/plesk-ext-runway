@@ -220,6 +220,7 @@ return [
         ],
         'projectLoad' => 'Project Load',
         'serverLoad' => 'Server Load',
+        'searchPlaceholder' => 'Search domains...',
     ],
     'Toolchains' => [
         'title' => 'Toolchains',
@@ -334,6 +335,8 @@ return [
         'envRawText' => 'Raw text',
         'envTable' => 'Table',
         'envRaw' => 'Raw .env',
+        'envKey' => 'KEY',
+        'envVal' => 'value',
         'envAdd' => 'Add Variable',
         'envHide' => 'Hide value',
         'envShow' => 'Show value',
@@ -565,6 +568,7 @@ return [
         'logs' => [
             'title' => 'Logs',
             'autoRefresh' => 'Auto-refresh',
+            'filterPlaceholder' => 'Filter log...',
             'slotsHint' => 'Both versions write here during a switch; the prefix of each line names the instance (runway-app-<id>-a or -b).',
         ],
         'help' => [
