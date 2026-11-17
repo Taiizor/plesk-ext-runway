@@ -10,6 +10,16 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-17
+
+Continuous resource monitoring, redesigned management pages and optional deployment operations.
+Deployment history, diagnostics, preflight, isolated releases, rollback, signed webhooks and
+recovery features remain independently opt-in and default off.
+
+Application network charts measure the application's IP traffic. Static files served directly
+by nginx/Apache and HTTP traffic over Unix sockets are outside these application counters;
+the charts do not represent total website bandwidth.
+
 ### Added
 
 - Separate download/upload rates in Project Load, Server Load and the application's Network
@@ -25,7 +35,7 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Performance metrics and time-series monitoring system: pure SVG live area and line charts for
   CPU (%), Memory (MiB), Disk I/O (read/write B/s), and Network Usage (download/upload B/s) in the application management tab
   with 1h, 24h, and 7d range toggles, interactive crosshair tooltips, time-stepped downsampling,
-  rolling 14-day data retention in SQLite (`/var/lib/runway/metrics.sqlite`), and Min/Avg/Peak
+  rolling 14-day data retention in SQLite (`/var/lib/runway/metrics.sqlite`), and Avg/Peak
   summary statistics.
 - Service network accounting through `IPAccounting=yes` on systemd application units to capture
   BPF `IPIngressBytes` and `IPEgressBytes`, and fast cached directory disk size calculation
@@ -425,7 +435,8 @@ Hardening from the pre-release security review (no released version was affected
   release workflow fails when the tag and `src/meta.xml` differ. CI runs customer-smoke and the
   Go runtime matrix and fails on every shell syntax error.
 
-[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Taiizor/plesk-ext-runway/releases/tag/v1.0.0

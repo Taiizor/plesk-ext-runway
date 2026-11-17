@@ -1,3 +1,16 @@
+# 1.3.0-1 (17 November 2026)
+
+* [+] Continuous application and server resource monitoring, with a background collector, 1-hour/24-hour/7-day charts and 14-day history retained while the panel is closed.
+* [+] Separate disk read/write and network download/upload rates in the load cards and charts, with current values, averages, peaks and interactive tooltips.
+* [+] Optional deployment history, diagnostics, blocking preflight, isolated releases and rollback, signed HTTPS webhook events, recovery metadata import/export and service-plan runtime/resource policies; each feature defaults off.
+* [+] Visual environment variable editor, live health endpoint checks, webhook test action, and searchable/downloadable application logs.
+* [*] Redesigned application management tabs, overview load cards, toolchain navigation and categorized settings with server presets, including responsive layouts and refreshed screenshots.
+* [*] Preserve Plesk's document root unless its change is explicitly enabled; make public files in a document root inside the application readable by the web server after successful builds and downloads.
+* [-] Collect metrics independently of panel visits, preserve existing history on upgrades, reset restarted-service counters and distinguish missing measurements from zero usage.
+* [-] Plot real timestamps and leave gaps in unmeasured history; align chart headers, axes and tooltips across screen sizes and both themes, with consistent translations in all 32 panel languages.
+* [-] Recover polling after API timeouts and show the last successful status update when a refresh fails.
+* [-] Retry transient HTTP 500/502/503/504 download failures with bounded backoff while retaining redirect validation, size limits and checksum verification.
+
 # 1.2.0-1 (13 November 2026)
 
 * [+] Runway in the navigation of the Power User view, of resellers and of the customer panel, and Runway's mark among the icons of a domain row for domains with an enabled application.
