@@ -103,6 +103,10 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Retry HTTP 500/502/503/504 responses up to three attempts, with 1- and 2-second backoff,
+  when retrieving download metadata or opening archives. Transient Go release API failures no
+  longer abort installation immediately; redirect validation, byte limits and checksum checks
+  stay in effect, and permanent HTTP errors or checksum failures are not retried.
 - Warm the helper E2E job's GitHub toolchain release caches through authenticated runner
   requests before smoke tests. Bun, uv/Python and FrankenPHP installs retain real download
   and checksum checks while surviving an exhausted shared anonymous API quota; only public

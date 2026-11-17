@@ -4,9 +4,22 @@
 # Network downloads (toolchains)
 # ---------------------------------------------------------------------------
 
+def http_open(request, timeout=HTTP_TIMEOUT, opener=None):
+    """Retry transient server errors before a GET response starts, at most three attempts."""
+    urlopen = opener.open if opener else urllib.request.urlopen
+    for attempt in range(3):
+        try:
+            return urlopen(request, timeout=timeout)  # nosec - callers validate URLs and redirects
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (500, 502, 503, 504) or attempt == 2:
+                raise
+            exc.close()
+            time.sleep(2 ** attempt)
+
+
 def http_get(url, timeout=HTTP_TIMEOUT):
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=timeout) as resp:  # nosec - fixed https URLs
+    with http_open(request, timeout=timeout) as resp:
         return resp.read()
 
 
@@ -19,8 +32,7 @@ def download(url, dest, sha256, log, algo="sha256", limit=None, opener=None):
     digest = hashlib.new(algo)
     total = 0
     too_large = "%s is larger than %d KiB" % (url, (limit or 0) // 1024)
-    urlopen = opener.open if opener else urllib.request.urlopen
-    with urlopen(request, timeout=HTTP_TIMEOUT) as resp, open(dest, "wb") as out:  # nosec
+    with http_open(request, opener=opener) as resp, open(dest, "wb") as out:
         length = resp.headers.get("Content-Length") or ""
         if limit is not None and length.isdigit() and int(length) > limit:
             raise HelperError(too_large)
