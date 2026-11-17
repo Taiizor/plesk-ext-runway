@@ -760,6 +760,13 @@ docker exec runway-plesk plesk bin admin --get-login-link -relative-url   # open
 
 On Windows with Git Bash prefix `docker` commands with `MSYS_NO_PATHCONV=1`.
 
+The CI helper job runs `python3 scripts/cache_toolchain_releases.py --container runway-plesk`
+before its smoke tests. It uses the runner's authenticated `gh` CLI to fetch public Bun, uv
+and FrankenPHP release metadata and seeds the installed helper's normal cache. This keeps
+forced refreshes usable when GitHub's shared anonymous quota is exhausted; downloads and
+checksum verification still run normally. The workflow token stays on the runner. The same
+command works locally with an authenticated `gh` CLI and a disposable Plesk container.
+
 ### Building
 
 ```sh

@@ -69,8 +69,8 @@ jobs:
       - name: pyflakes
         run: |
           python -m pip install --disable-pip-version-check --quiet pyflakes
-          python -m pyflakes src/sbin/runway-helper build.py scripts/build_helper.py scripts/helper_sarif.py \
-            tests/test_helper_build.py tests/test_helper_contract.py tests/test_helper_sarif.py tests/test_operations.py tests/check_locales.py \
+          python -m pyflakes src/sbin/runway-helper build.py scripts/build_helper.py scripts/helper_sarif.py scripts/cache_toolchain_releases.py \
+            tests/test_helper_build.py tests/test_helper_contract.py tests/test_helper_sarif.py tests/test_operations.py tests/test_toolchain_release_cache.py tests/check_locales.py \
             examples/python-hello/app.py examples/python-fastapi/main.py
 
       - name: Helper syntax is Python 3.8 compatible
@@ -211,6 +211,14 @@ jobs:
 
       - name: Install the package
         run: bash .github/scripts/plesk-e2e.sh install "dist/${{ needs.build.outputs.package }}"
+
+      - name: Cache GitHub toolchain releases
+        if: matrix.name == 'helper'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Seed public metadata through gh; the workflow token stays on the runner. Forced
+        # helper refreshes can use this cache even when the shared anonymous API quota is empty.
+        run: python3 scripts/cache_toolchain_releases.py --container "$CONTAINER"
 
       - name: Subscription, Go toolchain and sample app
         run: bash .github/scripts/plesk-e2e.sh prepare

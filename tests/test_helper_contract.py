@@ -42,6 +42,33 @@ class HelperContractTests(unittest.TestCase):
         for item in metadata:
             self.assertTrue({"key", "version_re", "toolchain", "default_listen", "unix_toolchain_re"} <= item.keys())
 
+    def test_seeded_toolchain_metadata_survives_rate_limited_forced_refresh(self):
+        helper = self.helper
+        cases = [
+            ("oven-sh/bun", "bun-v1.2.3", ["SHASUMS256.txt", "bun-linux-x64.zip"]),
+            ("astral-sh/uv", "0.9.0", ["uv-x86_64-unknown-linux-gnu.tar.gz"]),
+            ("php/frankenphp", "v1.13.5", ["frankenphp-linux-x86_64"]),
+        ]
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(helper, "CACHE_DIR", directory):
+            for repo, tag, assets in cases:
+                raw = [{"tag_name": tag, "prerelease": False, "assets": [
+                    {"name": asset, "browser_download_url": "https://github.com/%s/releases/download/%s/%s" % (repo, tag, asset),
+                     "digest": "sha256:" + "a" * 64, "size": 123}
+                    for asset in assets
+                ]}]
+                with mock.patch.object(helper, "http_json", return_value=raw):
+                    seeded = helper.github_releases(repo, force=True)
+                error = helper.urllib.error.HTTPError("https://api.github.com/", 403, "rate limited", {}, None)
+                with mock.patch.object(helper, "http_json", side_effect=error) as refresh:
+                    self.assertEqual(seeded, helper.github_releases(repo, force=True))
+                    refresh.assert_called_once()
+                self.assertEqual("a" * 64, seeded[0]["assets"][assets[-1]]["sha256"])
+            # Installers force a refresh too; both adapters must keep using the seeded data.
+            with mock.patch.object(helper, "http_json", side_effect=error), \
+                    mock.patch.object(helper, "machine_arch", return_value="x86_64"):
+                self.assertEqual("1.2.3", helper.RUNTIMES["bun"].releases(force=True)[0]["version"])
+                self.assertEqual("1.13.5", helper.RUNTIMES["php"].releases(force=True)[0]["version"])
+
     def test_project_aware_defaults_resolve_across_source_sections(self):
         fixtures = [
             ("go", {}, "./bin/app"),

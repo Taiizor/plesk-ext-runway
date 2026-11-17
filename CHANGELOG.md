@@ -103,6 +103,10 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ### Fixed
 
+- Warm the helper E2E job's GitHub toolchain release caches through authenticated runner
+  requests before smoke tests. Bun, uv/Python and FrankenPHP installs retain real download
+  and checksum checks while surviving an exhausted shared anonymous API quota; only public
+  release metadata enters the disposable Plesk container.
 - Use concise localized resource names in Project Load and Server Load, with explicit usage
   headings on all four charts, in all 32 languages. Restore Turkish memory labels to "Bellek"
   and clarify download/upload terms where the previous translation was ambiguous.
