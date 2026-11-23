@@ -18,6 +18,7 @@ import LogsPanel from './domain/LogsPanel';
 import OperationsPanel from './domain/OperationsPanel';
 import ProjectPanel from './domain/ProjectPanel';
 import SettingsForm from './domain/SettingsForm';
+import IsolationPanel from './domain/IsolationPanel';
 
 const LOG_LINES = 300;
 
@@ -297,6 +298,7 @@ const Domain = ({ baseUrl, statusMessages }) => {
                         api={api}
                         siteId={siteId}
                     />
+                    {configured && <IsolationPanel api={api} siteId={siteId} deploying={deploying} onChanged={() => { poke(); refreshStatus(); }} />}
                 </Tab>
 
                 <Tab title={<Translate content="Domain.project.title" />} onActivate={() => setActiveTab('project')}>

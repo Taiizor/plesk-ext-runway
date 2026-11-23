@@ -42,6 +42,21 @@ class HelperContractTests(unittest.TestCase):
         for item in metadata:
             self.assertTrue({"key", "version_re", "toolchain", "default_listen", "unix_toolchain_re"} <= item.keys())
 
+    def test_default_site_marker_uses_the_active_nginx_configuration(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(self.helper, "vhosts_dir", return_value=directory):
+            conf = Path(directory) / "system/sample.test/conf"
+            conf.mkdir(parents=True)
+            (conf / "nginx.conf").write_text("# Generated placeholder\n")
+            default = "server {\n# Runway: zero-downtime #17\n}\n"
+            (conf / "nginx_ip_default.conf").write_text(default)
+            state = {"domain": "sample.test"}
+            self.assertEqual(default, self.helper.generated_config(state, "nginx")[0])
+            self.assertTrue(self.helper.config_references(state, "zero-downtime #17"))
+            normal = "server {\n# Ordinary active vhost\n}\n"
+            (conf / "nginx.conf").write_text(normal)
+            self.assertEqual(normal, self.helper.generated_config(state, "nginx")[0])
+            self.assertFalse(self.helper.config_references(state, "zero-downtime #17"))
+
     def test_seeded_toolchain_metadata_survives_rate_limited_forced_refresh(self):
         helper = self.helper
         cases = [

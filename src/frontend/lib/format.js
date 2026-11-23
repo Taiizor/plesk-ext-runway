@@ -186,7 +186,7 @@ export const helperText = (translate, key, params, fallback) => {
 };
 
 /** Title of a job in the user's language (helper title_key + title_params, English title as fallback). */
-// i18n-keys: Common.jobTitle.install Common.jobTitle.update Common.jobTitle.build_deps
+// i18n-keys: Common.jobTitle.install Common.jobTitle.update Common.jobTitle.build_deps Common.jobTitle.isolation_deps
 // i18n-keys: Common.jobTitle.deploy_build Common.jobTitle.deploy_restart Common.jobTitle.deploy_fetch
 // i18n-keys: Common.jobTitle.deploy_build_only Common.jobTitle.deploy_restart_skipped Common.jobTitle.deploy_fetch_only
 // i18n-keys: Common.jobTitle.self_update

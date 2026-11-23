@@ -17,27 +17,22 @@ def cmd_reapply_all(_payload):
             state, pw = validate_app(raw)
             state["port"] = raw.get("port", 0)
             state.update(helper_fields(raw))
-            if zd_has_slots(state):
-                # Zero-downtime slots: the units and env files of both slots; the pointer only
-                # while no deployment holds the deploy lock (docs/DESIGN.md section 12.8).
-                ensure_converge_unit()
-                lock = FileLock("deploy-%d" % state["domain_id"])
-                if lock.acquire(blocking=False):
-                    try:
+            lock = FileLock("deploy-%d" % state["domain_id"])
+            if not lock.acquire(blocking=False):
+                errors.append("#%s: an operation is running; its units were not re-rendered" % domain_id)
+                continue
+            try:
+                state, pw = load_app_state(state["domain_id"])
+                if zd_has_slots(state):
+                    ensure_converge_unit()
+                    if state["switch"]:
+                        zd_converge_locked(state, pw)
                         state, pw = load_app_state(state["domain_id"])
-                        if state["switch"]:
-                            # An interrupted switch is settled from the pointer first (§12.8).
-                            zd_converge_locked(state, pw)
-                            state, pw = load_app_state(state["domain_id"])
-                        write_units(state, pw)
-                        if pointer_wanted(state):
-                            write_pointer(state, pw, state["slot"])
-                    finally:
-                        lock.release()
-                else:
-                    errors.append("#%s: a deployment is running; its units were not re-rendered" % domain_id)
-            else:
                 write_units(state, pw)
+                if pointer_wanted(state):
+                    write_pointer(state, pw, state["slot"])
+            finally:
+                lock.release()
             if state["listen"] == "unix":
                 ensure_socket_dir(state["domain_id"], pw)
             sync_public_files_units(state)

@@ -147,24 +147,26 @@ def job_update_rust(toolchain, log):
 
 
 def job_build_deps(log):
-    if shutil.which("apt-get", path=ROOT_PATH):
-        env = root_env({"DEBIAN_FRONTEND": "noninteractive"})
-        code = stream_process(["apt-get", "update"], log, 900, env)
-        if code != 0:
-            raise HelperError("apt-get update failed")
-        code = stream_process(["apt-get", "install", "-y", "--no-install-recommends",
-                               "build-essential", "pkg-config", "libssl-dev", "cmake", "git", "unzip",
-                               "zlib1g-dev", "libgmp-dev", "libyaml-dev", "libffi-dev"], log, 1800, env)
-    elif shutil.which("dnf", path=ROOT_PATH):
-        # strict=0: packages missing from the enabled repositories (e.g. CRB) are skipped.
-        code = stream_process(["dnf", "install", "-y", "--setopt=strict=0", "gcc", "gcc-c++", "make",
-                               "pkgconf-pkg-config", "openssl-devel", "cmake", "git", "unzip", "zlib-devel",
-                               "gmp-devel", "libyaml-devel", "libffi-devel"], log, 1800, root_env())
-    else:
-        raise HelperError("No supported package manager (apt-get or dnf) found")
-    if code != 0:
-        raise HelperError("Package installation failed with exit code %d" % code)
+    manager = dependency_manager()
+    packages = BUILD_PACKAGES[manager]
+    installed = dependency_versions(manager)
+    if any(not dependency_version(installed, package) for package in packages):
+        dependency_refresh(manager, log)
+    dependency_install(manager, packages, log)
+    missing = [name for name, available in build_deps_status().items() if not available]
+    if missing:
+        raise HelperError("Build dependencies are unavailable: %s. Repair the installed packages separately, then retry."
+                          % ", ".join(missing))
+    log.line("Build dependencies ready; compatible installed versions were kept")
 
 
 def build_deps_status():
-    return {name: bool(shutil.which(name, path=ROOT_PATH)) for name in ("cc", "pkg-config", "cmake", "git")}
+    result = {name: bool(shutil.which(name, path=ROOT_PATH))
+              for name in ("cc", "c++", "make", "pkg-config", "cmake", "git", "unzip")}
+    manager = dependency_manager(required=False)
+    if manager:
+        installed = dependency_versions(manager)
+        for package in BUILD_PACKAGES[manager]:
+            available = bool(dependency_version(installed, package))
+            result[package] = result.get(package, True) and available
+    return result

@@ -212,13 +212,24 @@ def generated_config(state, kind):
     except (UnicodeError, ValueError):
         pass
     name = "nginx.conf" if kind == "nginx" else "httpd.conf"
-    path = os.path.join(vhosts_dir(), "system", domain, "conf", name)
-    try:
-        st = os.stat(path)
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read(4 * 1024 * 1024), st.st_mtime
-    except OSError:
-        return None, 0.0
+    directory = os.path.join(vhosts_dir(), "system", domain, "conf")
+    # Plesk moves the default site's nginx server blocks into nginx_ip_default.conf,
+    # leaving nginx.conf as a comment-only placeholder. Do not use an old default-site
+    # file when the normal vhost already contains the active server blocks.
+    candidates = (name, "nginx_ip_default.conf") if kind == "nginx" else (name,)
+    fallback = (None, 0.0)
+    for candidate in candidates:
+        try:
+            path = os.path.join(directory, candidate)
+            st = os.stat(path)
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read(4 * 1024 * 1024)
+            fallback = (text, st.st_mtime)
+            if kind != "nginx" or re.search(r"^\s*server\s*\{", text, re.MULTILINE):
+                return fallback
+        except OSError:
+            pass
+    return fallback
 
 
 def pointer_reference(state, kind):

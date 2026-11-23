@@ -86,6 +86,15 @@ check "overview: only the customer's domains, no server facts" \
 APP=$(get "app?site_id=$SITE_ID")
 check "app: readable with the permission, no limits editing, no usage lists" \
     "d['status'] == 'success' and d['data']['isAdmin'] is False and all(not isinstance(t, dict) or 'in_use' not in t for v in d['data']['toolchains'].values() for t in v)" "$APP"
+if [ "$(echo "$APP" | jexpr "d['data']['configured']")" = "True" ]; then
+    ISO=$(get "app/isolation?site_id=$SITE_ID")
+    check "isolation: a customer can read but cannot edit the policy" \
+        "d['status'] == 'success' and d['data']['canEdit'] is False" "$ISO"
+    check "isolation: a customer cannot disable the administrator policy" "d['status'] == 'error'" \
+        "$(post app/isolation "{\"site_id\": $SITE_ID, \"options\": {\"enabled\": false}}")"
+    check "isolation: a refused customer write leaves policy unchanged" \
+        "d['data']['options'] == $(echo "$ISO" | jexpr "repr(d['data']['options'])")" "$(get "app/isolation?site_id=$SITE_ID")"
+fi
 for path in toolchains settings "job?job=admin" update; do
     check "admin endpoint $path is refused" "d['status'] == 'error'" "$(get "$path")"
 done
@@ -94,6 +103,7 @@ check "POST update/install is refused (access denied)" "d['status'] == 'error' a
 check "POST settings is refused" "d['status'] == 'error'" "$(post settings '{"portMin": 20000}')"
 check "POST toolchain is refused" "d['status'] == 'error'" "$(post toolchain '{"runtime": "go", "op": "remove", "version": "1.27.4"}')"
 check "POST build-deps is refused" "d['status'] == 'error'" "$(post build-deps '{}')"
+check "POST isolation-deps is refused" "d['status'] == 'error'" "$(post isolation-deps '{}')"
 check "unknown site id is refused" "d['status'] == 'error'" "$(get 'app?site_id=999999')"
 if [ "$(echo "$APP" | jexpr "d['data']['configured'] and d['data']['config']['enabled']")" = "True" ]; then
     check "app/control restart works with the permission" "d['status'] == 'success'" \
@@ -121,10 +131,17 @@ if [ "$(echo "$APP" | jexpr "d['data']['configured'] and d['data']['config']['en
     echo "$WEB" | grep -o '"extensionButton_[0-9]*_[0-9]*_runway"[^}]*' | grep 'header\.svg' | grep -q "site_id=$SITE_ID\"" \
         && ok "customer panel: Runway's icon in the row of $DOMAIN" || bad "customer panel: no Runway icon for $DOMAIN"
 fi
-check "zero-downtime deployments: not offered to customers while the server setting is off (default)" \
-    "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is False" "$(get "app?site_id=$SITE_ID")"
-check "a customer cannot turn zero-downtime deployments on (field error)" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntime']" \
-    "$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": true}")"
+if [ "$(echo "$APP" | jexpr "d['data']['zeroDowntimeAllowed']")" = "False" ]; then
+    check "zero-downtime deployments: not offered while the administrator policy is off" \
+        "d['status'] == 'success' and d['data']['zeroDowntimeAllowed'] is False" "$(get "app?site_id=$SITE_ID")"
+    check "a customer cannot turn zero-downtime deployments on (field error)" "d['status'] == 'error' and list(d['errors']) == ['zeroDowntime']" \
+        "$(post app/save "{\"site_id\": $SITE_ID, \"zeroDowntime\": true}")"
+else
+    # Respect an existing administrator grant instead of changing the app to test a denial
+    # that does not apply on this server (which would also queue an unexpected switch).
+    check "zero-downtime availability follows the administrator's existing grant" \
+        "d['data']['zeroDowntimeAllowed'] is True" "$APP"
+fi
 check "customer cannot change admin-only limits" \
     "d['status'] == 'success' and d['data']['limits'] == $(echo "$APP" | jexpr "json.dumps(d['data']['limits'])")" \
     "$(post app/save "{\"site_id\": $SITE_ID, \"memoryMb\": 1, \"cpuPercent\": 1, \"tasks\": 1}")"
@@ -169,6 +186,8 @@ permission false
 check "app: access denied without the permission" "d['status'] == 'error' and 'denied' in str(d['errors']).lower()" "$(get "app?site_id=$SITE_ID")"
 check "app/control: access denied without the permission" "d['status'] == 'error'" \
     "$(post app/control "{\"site_id\": $SITE_ID, \"op\": \"restart\"}")"
+check "isolation: access denied without the application permission" "d['status'] == 'error'" \
+    "$(get "app/isolation?site_id=$SITE_ID")"
 check "overview: the domain is no longer listed" "d['status'] == 'success' and $SITE_ID not in [a['domainId'] for a in d['data']['apps']]" "$(get overview)"
 WEB=$(curl -s -L -b "$JAR" "$PANEL/smb/web/view")
 if ! echo "$WEB" | grep -q '"headerCustomButtons"'; then

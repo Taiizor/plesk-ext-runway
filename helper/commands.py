@@ -26,6 +26,7 @@ def cmd_info(_payload):
         "arch": arch[0],
         "rust_target": arch[1],
         "build_deps": build_deps_status(),
+        "isolation_deps": isolation_dependencies_status(),
         "installed": os.path.isfile(HELPER_COPY),
         "fetch_insecure": fetch_insecure_allowed(),
         "selinux": selinux_mode(),
@@ -75,6 +76,7 @@ def cmd_toolchains(_payload):
         "runtimes": runtimes,
         "build_deps": build_deps_status(),
         "job": job_get_status("admin"),
+        "isolation_deps": isolation_dependencies_status(),
     }
 
 
@@ -97,7 +99,8 @@ def start_admin_job(action, args, title=None, title_key=None, title_params=None)
     """Starts the administrator's background job (toolchains, build dependencies, self-update)
     in runway-job-admin.service. title_key + title_params let the panel translate the title
     (title stays the English text); by default they follow the action and its runtime."""
-    title = title or {"build-deps": "Install build dependencies"}.get(action, action)
+    title = title or {"build-deps": "Install build dependencies",
+                      "isolation-deps": "Install isolation dependencies"}.get(action, action)
     rt = RUNTIMES.get(args.get("runtime")) if args.get("runtime") else None
     if title_key is None:
         title_key = action.replace("-", "_")
@@ -177,19 +180,16 @@ def rerender_runtime_apps(runtime, log=None):
             state, pw = validate_app(raw)
             state["port"] = raw.get("port", 0)
             state.update(helper_fields(raw))
-            if zd_has_slots(state):
-                lock = FileLock("deploy-%d" % state["domain_id"])
-                if not lock.acquire(blocking=False):
-                    if log:
-                        log.line("App #%s is being deployed; its environment follows with its next apply." % state["domain_id"])
-                    continue
-                try:
-                    state, pw = load_app_state(state["domain_id"])
-                    write_units(state, pw)
-                finally:
-                    lock.release()
-            else:
+            lock = FileLock("deploy-%d" % state["domain_id"])
+            if not lock.acquire(blocking=False):
+                if log:
+                    log.line("App #%s has an operation in progress; its environment follows with its next apply." % state["domain_id"])
+                continue
+            try:
+                state, pw = load_app_state(state["domain_id"])
                 write_units(state, pw)
+            finally:
+                lock.release()
             count += 1
         except Exception as exc:  # noqa: BLE001
             if log:
@@ -204,6 +204,10 @@ def rerender_runtime_apps(runtime, log=None):
 
 def cmd_build_deps_install(_payload):
     return start_admin_job("build-deps", {})
+
+
+def cmd_isolation_deps_install(_payload):
+    return start_admin_job("isolation-deps", {})
 
 
 def cmd_job_status(payload):
@@ -236,6 +240,8 @@ def internal_admin_job():
             rerender_runtime_apps(rt.key, log)
         elif action == "build-deps":
             job_build_deps(log)
+        elif action == "isolation-deps":
+            job_isolation_deps(log)
         elif action == "self-update":
             job_self_update(args, log)
         else:

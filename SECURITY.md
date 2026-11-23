@@ -53,12 +53,70 @@ What Runway protects:
 | internal services | "Fetch from URL" used to reach the server's loopback/private network (SSRF), including DNS rebinding | https only (PHP and helper), the download runs as the customer; every address of the host must be public, and the connection goes to exactly the address that was checked (the lookup is pinned, TLS still verifies the host name), with the same check for every redirect; no proxies; 500 MB cap |
 | the extension itself | a tampered or corrupted package installed by the built-in updater | see [Updates](#updates) below: HTTPS from the repository's GitHub releases only, SHA-256 from the same release, `meta.xml` and version checks, no downgrades, administrators only, automatic installation is opt-in |
 
+### Optional application isolation
+
+An administrator can enable the same bubblewrap namespace policy for all nine Runway runtimes,
+their build/start commands, workers and slots. The initial policy is disabled; ordinary systemd
+hardening alone is not a per-application filesystem boundary. Enabling requires a maintained,
+root-owned, non-setuid bubblewrap 0.10+ at `/usr/bin/bwrap` or `/opt/runway/bin/bwrap`, system `libseccomp2` and working
+unprivileged user namespaces on x86_64 or aarch64.
+The helper probes the selected mounts/namespaces as the subscription user before stopping the
+previous service. Setup failures never trigger an unconfined fallback.
+
+Only administrators can request dependency installation through Toolchains. The shared admin
+job lock serializes it with other toolchain/package jobs. A compatible distribution executable
+is preferred; the fallback uses a pinned upstream source URL and SHA-256, a private build
+directory, bounded downloads/builds and validation before atomic publication. It is never setuid
+and never replaces `/usr/bin/bwrap`. The installer changes no application policy, sysctl or
+container security profile. Application startup performs no dependency downloads.
+
+Application roots, private caches, writable directories and release shared storage are pinned
+with no-follow directory descriptors after dropping privileges. Runtime source is read-only;
+only declared directories, the private dependency home and temporary storage are writable.
+Builds can write their own source/release tree. Socket grants accept only pinned Unix socket
+files under `/run`, never directories, symlinks or regular files. PID, IPC, UTS and user namespaces
+and `NoNewPrivileges` apply in both phases; nested user namespaces are disabled. The subscription
+UID is retained for file ownership. This is not a separate host UID or a VM boundary.
+
+A native-ABI libseccomp filter is passed through a private descriptor and installed by
+bubblewrap before application code. It denies `unshare`, `setns` and `clone(CLONE_NEWUSER)`;
+`clone3` returns `ENOSYS` to allow libc's ordinary `clone` fallback. Other syscall ABIs fail
+closed. No namespace sysctl is changed, so Docker/systemd's read-only `/proc/sys` protection
+stays in force. Build-only system headers are mounted read-only for native dependencies.
+
+The unprivileged `_isolate` entry point accepts no root operations. Its bootstrap receives only
+trusted environment keys and an opaque payload from the private environment file/build parent.
+Customer loader, crypto and interpreter settings are restored only inside the namespace.
+Private file descriptors carry bubblewrap options and the command so environment values and
+shell text do not enter public unit text or the wrapper's process arguments. Application saves,
+starts, policy changes, runtime re-renders and deploys share the per-domain deployment lock.
+Policy changes stop every old slot and queue a build. Policies remain root-owned and survive
+customer removal/recreation and recovery imports; uninstalling Runway removes them.
+
+The namespace exposes selected read-only system/toolchain trees and the application's own
+data. Administrators must keep secrets out of those system trees. A compromised application
+retains its credentials and writable data. Shared networking includes localhost/private
+services; offline mode blocks IP networking for builds and runtime and requires Unix mode or
+a worker. Explicit Unix socket grants remain reachable in offline mode and confer that
+service's authority. Never expose Docker/container-engine or other privileged management sockets.
+Resource limits bound memory, CPU and tasks, not persistent disk usage.
+
+The policy covers Runway-managed processes. External Plesk PHP-FPM handlers, SSH, cron and the
+web server remain outside it. Static-path guards deny hidden files and common interpreter
+suffixes; Apache forces static handling, disables CGI/SSI and symlink following, and restricts
+`.htaccess` overrides to authentication/access rules. nginx retains Plesk's existing access
+controls and symlink settings. Static guards cover configured prefixes while the application
+is proxied, not unrelated Plesk paths or arbitrary custom interpreter mappings. Namespace
+isolation shares the kernel: separate VMs/hosts are appropriate for stronger tenant boundaries.
+See [Application isolation](README.md#application-isolation) for operation and resource defaults.
+
 Out of scope (by design):
 
 - Anything the administrator configures or installs: administrators are root-equivalent in
   Plesk.
-- The security of the customer's own application (its dependencies, authentication, data). It
-  runs with the customer's privileges, exactly like PHP code of the same subscription.
+- The security of the customer's own application (its dependencies, authentication, data).
+  It runs with the customer's privileges; optional isolation limits the files and processes
+  reachable from Runway-managed builds and services as described above.
 - In **TCP mode**, any local user can connect to `127.0.0.1:<port>`, bypassing nginx (and
   anything nginx enforces, such as client IP restrictions). Use the **Unix socket** mode on
   shared servers; see the README section "Listen modes". With zero-downtime deployments the
@@ -133,6 +191,10 @@ clicking *Update now*.
 ## Hardening checklist for administrators
 
 - Prefer the Unix socket listen mode for customer applications.
+- Enable application isolation for workloads that need filesystem/process confinement. Grant
+  only necessary writable directories and service sockets; choose offline mode where possible.
+- Disable unrelated Plesk interpreters for Runway-only domains and keep application sources
+  and secrets outside document roots. Apply disk quotas and database privileges separately.
 - On AlmaLinux/RHEL with SELinux in enforcing mode, nginx/Apache may need policy changes to
   reach the applications (README, Requirements); the overview shows the SELinux mode.
 - Set default memory, CPU and task limits and build limits under *Runway > Settings*.

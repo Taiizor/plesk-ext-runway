@@ -26,7 +26,7 @@ Node.js is deliberately not a Runway runtime: Plesk ships its own Node.js suppor
 [Screenshots](#screenshots) · [Features](#features) · [Requirements](#requirements) ·
 [Installation](#installation) · [Updating](#updating) · [Quick start](#quick-start) · [Runtimes](#runtimes) ·
 [Listen modes](#listen-modes) · [Static files and the document root](#static-files-and-the-document-root) ·
-[Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
+[Application isolation](#application-isolation) · [Zero-downtime deployments](#zero-downtime-deployments) · [Memory](#memory) ·
 [When an application fails](#when-an-application-fails) ·
 [Deploying with Git](#deploying-with-git) · [Command line](#command-line) · [Configuration reference](#configuration-reference) ·
 [How it works](#how-it-works) · [Uninstalling](#uninstalling) · [Development](#development) ·
@@ -108,6 +108,12 @@ other locales until translations are contributed.
   emitted only for those versions).
 - systemd 249 or newer for the per-port bind restriction (`SocketBindAllow=`); older versions
   work without it.
+- Optional application isolation requires a root-owned, non-setuid executable from
+  **bubblewrap 0.10+**, the system `libseccomp2` library, and working unprivileged Linux user
+  namespaces on x86_64 or aarch64. Install it from **Toolchains > Application isolation
+  dependencies**. Runway uses a compatible `/usr/bin/bwrap` or installs its verified fallback
+  at `/opt/runway/bin/bwrap` when the distribution package is too old.
+  AppArmor, SELinux, sysctl settings and a container host's security profile must permit it.
 - Outbound HTTPS from the server to the toolchain sources (go.dev, static.rust-lang.org,
   github.com, api.adoptium.net, builds.dotnet.microsoft.com, ...) and, during builds, to the
   package registries your applications use.
@@ -390,6 +396,83 @@ the document root, for example `public` with `STATIC_ROOT` set to `public/static
   application, as every save does); when Plesk refuses the path, nothing else is saved, and when
   applying the settings fails afterwards, the error says that the document root was changed. Removing the application never changes the document root: it is a setting of the
   domain, so set it back yourself (for example to `httpdocs`) when the folder goes away.
+
+Configured static paths also deny dotfiles and common server-side script extensions (including
+PHP, Python, Ruby, CGI, JSP and ASP variants), including path-info requests. Apache forces its
+static handler, disables CGI, SSI, directory indexes and symlink traversal, and permits only
+authentication/access `.htaccess` overrides (`AuthConfig Limit`). nginx keeps Plesk's existing
+static locations and password protection; its symlink policy remains a Plesk setting. These
+guards apply to configured static prefixes while Runway proxies the application. Other Plesk
+sites and paths outside a path-mode mount need their own hosting policy.
+
+## Application isolation
+
+The domain page's **Application isolation** panel lets an administrator confine each application
+with the same Linux namespace boundary for **Go, Rust, Bun, Java, .NET, Python, Ruby, PHP and
+prebuilt binaries**. It covers build commands, start commands, workers and deployment slots.
+It starts disabled for compatibility. Customers can view the policy but cannot change it,
+including by removing/recreating the application or importing recovery metadata.
+
+First use **Toolchains > Application isolation dependencies > Install isolation dependencies**.
+The card shows the compatible bubblewrap version and libseccomp status. The administrator's
+background job installs missing system packages with apt/dnf. Compatible installed versions
+are kept even when newer releases exist, including an older compatible managed bubblewrap.
+Only an incompatible bubblewrap is replaced. The build dependencies card follows the same
+missing-only policy and checks development packages as well as executables. Package plans
+that require changing other installed packages fail with instructions to update the system
+separately; missing headers are never silently skipped. If the repository offers
+an older bubblewrap, it downloads the pinned official source release, verifies its SHA-256,
+installs the compiler prerequisites and builds a private copy in `/opt/runway/bin/bwrap`.
+Fallback builds keep the distribution executable; installation preserves application policies. Kernel/LSM/container
+permissions remain a separate prerequisite.
+
+Enable isolation in the domain settings afterwards. Runway probes the namespace setup
+as the subscription user before changing policy. A missing backend or rejected namespace fails
+the operation; an enabled application never falls back to an unconfined start. A policy change
+stops all old slots, rewrites their units and queues a build to populate the application's
+private dependency home. It interrupts traffic. An explicitly stopped application stays stopped.
+
+For a **development Plesk container**, Docker's default seccomp profile can reject bubblewrap's
+`pivot_root`. Set `RUNWAY_E2E_ISOLATION=1` when creating it through `scripts/plesk-dev.sh up` or
+`scripts/plesk-dev.ps1 up`; this opts only that test container into `seccomp=unconfined`. Existing
+containers retain their original profile and need a preserved-data recreation to change it.
+Install the dependencies from Toolchains inside the test panel. These are nested-container test settings,
+not a recommendation to disable production security profiles.
+
+- Runtime source code is read-only. List the application-relative directories that may change
+  at runtime, for example `uploads`, `storage`, or `wwwroot/media`; the initial list is `tmp`,
+  `logs`, `storage`, `uploads`. Missing listed folders are created as the subscription user.
+  Builds may write anywhere within their own source/release directory. Neither phase sees
+  sibling applications, the subscription's real home contents, Plesk secrets or host sockets.
+- Each application has a private persistent `HOME` and dependency caches below
+  `<subscription home>/.runway/isolation/<domain id>/home`, and private temporary directories.
+  Rebuild dependencies installed in the previous home. Filesystem components must be real
+  directories; links in source roots, caches or writable paths are rejected. Release shared
+  storage is mounted explicitly and is writable at runtime only when also declared writable.
+- **Shared network** preserves normal IP connectivity, including localhost and internal
+  services. **Offline** creates a separate network namespace for both builds and runtime; use
+  Unix socket mode or a worker. Packages must already be available locally for offline builds.
+  A database can be exposed with up to eight administrator-selected Unix socket files below
+  `/run` or `/var/run`. Directory, regular-file and symlink grants are rejected. Never grant
+  a container-engine or other privileged management socket.
+- Where no explicit resource limit exists, isolated builds and services receive **1024 MiB
+  memory, 100% CPU and 1024 tasks**. Existing administrator/plan limits take precedence. Each
+  deployment slot has its own limits, so overlapping slots can consume twice those amounts.
+- Processes keep the subscription UID for Plesk file ownership, but get separate mount, user,
+  PID, IPC and UTS namespaces, no additional privileges, and no further user namespaces.
+  A native-ABI seccomp filter denies namespace entry/creation and makes `clone3` return `ENOSYS`
+  so ordinary thread/process creation can use `clone`. It needs no writable `/proc/sys` and
+  keeps `ProtectKernelTunables=yes`. Toolchains, system libraries and build headers are mounted
+  read-only. Custom tools
+  or certificates outside those locations must be placed in the application directory.
+
+This confines **Runway-managed** commands. Plesk's separate PHP-FPM handlers, SSH sessions,
+scheduled tasks and other independently launched processes do not enter it. Keep unrelated
+interpreters disabled for a domain that should only serve a Runway application. The web server
+also runs outside the boundary: keep secrets out of its document root and use static prefixes
+only for public files. An application compromise can still read its own credentials and change
+its writable data; shared networking retains access to reachable services. Linux namespaces
+share the host kernel. Use separate VMs/hosts when that remaining trust is unacceptable.
 
 ## Zero-downtime deployments
 
@@ -687,6 +770,9 @@ browser ── Plesk panel (React UI) ── JSON API (PHP, psaadm)
   `RestrictSUIDSGID`, `RestrictRealtime`, `LockPersonality`, the per-port bind restriction and
   the configured `MemoryMax`/`CPUQuota`/`TasksMax` (with a memory or CPU limit on systemd 254 and
   later also `MemoryPressureWatch=off`, see *Memory*). Builds always have a task limit.
+- Administrator-controlled [application isolation](#application-isolation) adds a filesystem
+  allowlist, private processes/caches and optional offline networking to builds and services.
+  It is separate from ordinary systemd hardening and defaults off.
 - Suspending a domain, subscription, customer or reseller stops its applications and any
   running build; a deployment re-checks the state before it restarts anything.
 - Toolchains are downloaded over HTTPS from the official sources only and verified against the

@@ -170,11 +170,16 @@ function Invoke-Up {
         }
         'absent' {
             & docker rm -f $Container *> $null
+            $securityOptions = @('--security-opt', 'apparmor=unconfined')
+            if ($env:RUNWAY_E2E_ISOLATION -eq '1') {
+                # Nested bubblewrap needs pivot_root, which Docker's default profile denies.
+                $securityOptions += @('--security-opt', 'seccomp=unconfined')
+            }
             # The same flags as the documented local test environment (README.md, "Development").
             & docker run -d --name $Container --hostname plesk.runway.test `
                 --tmpfs /tmp --tmpfs /run --tmpfs /run/lock `
                 -v /sys/fs/cgroup:/sys/fs/cgroup --cgroupns=host `
-                --cap-add SYS_ADMIN --security-opt apparmor=unconfined `
+                --cap-add SYS_ADMIN @securityOptions `
                 -p "${PanelPort}:8880" -p "${PanelSslPort}:8443" -p "${HttpPort}:80" $Image | Out-Null
             Assert-Exit 'docker run'
             Wait-Panel

@@ -368,7 +368,7 @@ def _sanitize_stored_env(raw):
     env = raw.get("env")
     if not isinstance(env, dict):
         return []
-    dropped = sorted(key for key in env if key in RESERVED_ENV or key in LOADER_ENV)
+    dropped = sorted(key for key in env if key in RESERVED_ENV or key in LOADER_ENV or key.startswith("RUNWAY_ISOLATION_"))
     if dropped and isinstance(raw.get("domain_id"), int):
         for key in dropped:
             env.pop(key, None)

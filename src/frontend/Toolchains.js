@@ -213,6 +213,10 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
         setConfirm(null);
         startJob(api.post('build-deps', {}), 'build-deps');
     };
+    const installIsolationDeps = () => {
+        setConfirm(null);
+        startJob(api.post('isolation-deps', {}), 'isolation-deps');
+    };
     const remove = (runtime, version) => {
         poke();
         setPending(`remove-${runtime}-${version}`);
@@ -234,6 +238,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
 
     const buildDeps = isObject(data.buildDeps) ? data.buildDeps : {};
     const missingDeps = Object.keys(buildDeps).filter(tool => !buildDeps[tool]);
+    const isolationDeps = isObject(data.isolationDeps) ? data.isolationDeps : {};
 
     const removable = (meta, item) => (item.kind ? item.kind === 'managed' : meta.toolchain === 'managed');
 
@@ -481,6 +486,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
 
             <Panel title={<Translate content="Toolchains.buildDeps" />}>
                 <Paragraph>{DEP_TOOLS_HINT}</Paragraph>
+                <Paragraph><Text intent="muted"><Translate content="Toolchains.dependencyPolicy" /></Text></Paragraph>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
                     {Object.keys(buildDeps).map(tool => (
                         <Label key={tool} intent={buildDeps[tool] ? 'success' : 'warning'} view="light">
@@ -498,6 +504,28 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                     onClick={() => setConfirm({ type: 'build-deps' })}
                 >
                     <Translate content="Toolchains.installBuildDeps" />
+                </Button>
+            </Panel>
+
+            <Panel title={<Translate content="Toolchains.isolationDeps" />}>
+                <Paragraph><Translate content="Toolchains.isolationDepsHint" /></Paragraph>
+                <Paragraph><Text intent="muted"><Translate content="Toolchains.dependencyPolicy" /></Text></Paragraph>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                    <Label intent={isolationDeps.bubblewrap ? 'success' : 'warning'} view="light">
+                        {'bubblewrap ≥ 0.10: '}
+                        {isolationDeps.bubblewrap ? isolate(isolationDeps.version) : <Translate content="Toolchains.depMissing" />}
+                    </Label>
+                    <Label intent={isolationDeps.libseccomp ? 'success' : 'warning'} view="light">
+                        {'libseccomp: '}
+                        <Translate content={isolationDeps.libseccomp ? 'Toolchains.depFound' : 'Toolchains.depMissing'} />
+                    </Label>
+                </div>
+                {isolationDeps.reason && <Paragraph><Text intent="muted">{isolationDeps.reason}</Text></Paragraph>}
+                <Button icon="tools" intent={isolationDeps.available ? undefined : 'primary'}
+                    disabled={jobBusy || pending === 'isolation-deps'}
+                    state={pending === 'isolation-deps' ? 'loading' : undefined}
+                    onClick={() => setConfirm({ type: 'isolation-deps' })}>
+                    <Translate content="Toolchains.installIsolationDeps" />
                 </Button>
             </Panel>
 
@@ -530,6 +558,15 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                 onClose={() => setConfirm(null)}
             >
                 <Paragraph><Translate content="Toolchains.confirmBuildDeps" /></Paragraph>
+            </ConfirmDialog>
+
+            <ConfirmDialog
+                isOpen={Boolean(confirm && confirm.type === 'isolation-deps')}
+                title={<Translate content="Toolchains.installIsolationDeps" />}
+                confirmText={<Translate content="Toolchains.installBuildDepsConfirm" />}
+                onConfirm={installIsolationDeps}
+                onClose={() => setConfirm(null)}>
+                <Paragraph><Translate content="Toolchains.confirmIsolationDeps" /></Paragraph>
             </ConfirmDialog>
         </div>
     );

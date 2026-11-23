@@ -657,6 +657,7 @@ class Modules_Runway_App
                 'mode' => $mode === self::MODE_PATH ? self::MODE_PATH : self::MODE_WEB,
                 'mountPath' => $mode === self::MODE_PATH && isset($data['mountPath']) ? (string)$data['mountPath'] : '',
                 'staticPaths' => isset($data['staticPaths']) && is_array($data['staticPaths']) ? array_values($data['staticPaths']) : [],
+                'documentRoot' => (string)$domain->getDocumentRoot(),
                 // Zero-downtime deployments: the snippet uses the helper's pointer (root link or include).
                 'switchable' => !empty($data['switchable']),
                 'domainId' => (int)$domain->getId(),

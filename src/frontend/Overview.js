@@ -163,6 +163,7 @@ const Overview = ({ baseUrl }) => {
     const configured = apps.filter(row => row.configured).length;
     const server = data.server || null;
     const buildDeps = server && server.build_deps && typeof server.build_deps === 'object' ? server.build_deps : {};
+    const isolationDeps = server && server.isolationDeps && typeof server.isolationDeps === 'object' ? server.isolationDeps : null;
 
     const [restartingId, setRestartingId] = useState(null);
     const [actionError, setActionError] = useState(null);
@@ -459,10 +460,28 @@ const Overview = ({ baseUrl }) => {
                                 key: 'deps',
                                 label: <Translate content="Overview.serverBuildDeps" />,
                                 value: Object.keys(buildDeps).length ? (
-                                    <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '4px' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
                                         {Object.keys(buildDeps).map(tool => (
                                             <Label key={tool} intent={buildDeps[tool] ? 'success' : 'warning'} view="light">{tool}</Label>
                                         ))}
+                                        <RouterLink to="/toolchains"><Translate content="Overview.toolchains" /></RouterLink>
+                                    </span>
+                                ) : null,
+                            },
+                            {
+                                key: 'isolationDeps',
+                                label: <Translate content="Overview.serverIsolationDeps" />,
+                                value: isolationDeps ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
+                                        <Label intent={isolationDeps.bubblewrap ? 'success' : 'warning'} view="light">
+                                            {'bubblewrap ≥ 0.10: '}
+                                            {isolationDeps.bubblewrap ? isolate(isolationDeps.version) : <Translate content="Toolchains.depMissing" />}
+                                        </Label>
+                                        <Label intent={isolationDeps.libseccomp ? 'success' : 'warning'} view="light">
+                                            {'libseccomp: '}
+                                            <Translate content={isolationDeps.libseccomp ? 'Toolchains.depFound' : 'Toolchains.depMissing'} />
+                                        </Label>
+                                        <RouterLink to="/toolchains"><Translate content="Overview.toolchains" /></RouterLink>
                                     </span>
                                 ) : null,
                             },

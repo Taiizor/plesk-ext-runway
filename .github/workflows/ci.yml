@@ -70,7 +70,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check --quiet pyflakes
           python -m pyflakes src/sbin/runway-helper build.py scripts/build_helper.py scripts/helper_sarif.py scripts/cache_toolchain_releases.py \
-            tests/test_helper_build.py tests/test_helper_contract.py tests/test_helper_sarif.py tests/test_operations.py tests/test_toolchain_release_cache.py tests/test_downloads.py tests/check_locales.py \
+            tests/test_helper_build.py tests/test_helper_contract.py tests/test_helper_sarif.py tests/test_operations.py tests/test_isolation.py tests/test_dependencies.py tests/test_isolation_dependencies.py tests/isolation-e2e.py scripts/test_isolation.py tests/test_toolchain_release_cache.py tests/test_downloads.py tests/check_locales.py \
             examples/python-hello/app.py examples/python-fastapi/main.py
 
       - name: Helper syntax is Python 3.8 compatible
@@ -124,6 +124,7 @@ jobs:
               done
               [ "$rc" = 0 ] && echo "all PHP files OK"
               php tests/php/operations.php || rc=1
+              php tests/php/isolation.php || rc=1
               exit $rc'
           done
 

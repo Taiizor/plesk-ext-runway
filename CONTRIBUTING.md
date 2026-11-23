@@ -53,6 +53,8 @@ bun run test:frontend                         # API deadlines, status freshness 
 scripts/plesk-dev.sh test                     # everything CI runs, against the local container
 bash tests/api-smoke.sh                       # against the local Plesk container
 bash tests/runtime-e2e.sh                     # every runtime's sample app through nginx (local only)
+RUNWAY_E2E_ISOLATION=1 bash tests/runtime-e2e.sh # opt-in isolated builds/starts; needs bubblewrap 0.10+
+python tests/isolation-e2e.py                 # confinement, offline Unix service grants, rejected-policy continuity
 bash tests/customer-smoke.sh                  # customer permission checks
 docker cp tests/helper-smoke.sh runway-plesk:/root/ && docker exec runway-plesk bash /root/helper-smoke.sh
 ```
@@ -62,7 +64,7 @@ CI (`.github/workflows/ci.yml`):
 1. **Lint**: helper assembly check, source/build and Linux contract tests (also on Python 3.8 in
    Docker, without Plesk), pyflakes, Python 3.8 grammar check of the helper, `bash -n`, locale keys, the
    frontend regression tests and build, `build.py --check`, `php -l` and optional-operation PHP
-   contracts (`php tests/php/operations.php`) with PHP 7.4 and 8.2.
+   contracts (`php tests/php/operations.php`, `php tests/php/isolation.php`) with PHP 7.4 and 8.2.
 2. **Package**: `bun run package` (`python build.py --strict`), uploads the zip as the `runway-package` artifact.
 3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
    the zip, creating the subscription `gotest.local` and (when the license allows customer
@@ -88,6 +90,20 @@ When you change behaviour, extend `tests/helper-smoke.sh` (helper), `tests/api-s
 or `tests/runtime-e2e.sh` (runtimes, web server) and, for UI changes, check the four pages in the
 panel in the light and the dark theme (no console errors).
 
+For security fixtures, use `python3 scripts/test_isolation.py` on Linux. The runner keeps
+sources and tools read-only, supplies an explicit environment, disables networking and bounds
+CPU, memory, processes, descriptors, file size, scratch space and wall time. It requires locally
+installed bubblewrap 0.10+, `libseccomp2`, `prlimit` and permitted unprivileged user namespaces; it never
+installs tools or contacts Plesk. Windows contributors can invoke it through WSL with the
+checkout's `/mnt/...` path. Real namespace fixtures in `tests/test_isolation.py` run only through
+this runner; policy/rendering tests run in the regular Linux suite too.
+
+Plesk isolation E2E is separate and opt-in. Run it only on a disposable test subscription with
+the needed toolchains installed. It interrupts applications, changes their policy, builds
+samples and restores the previous settings. Validate backend/kernel support in that environment
+before using it for customer workloads. Apache/nginx configuration and the panel require live
+Plesk verification even when offline namespace fixtures pass.
+
 ## Adding a runtime
 
 1. Write `docs/runtimes/<key>.md` (version discovery, download and checksums, install layout,
@@ -97,6 +113,8 @@ panel in the light and the dark theme (no console errors).
    in `helper/runtimes/registry.py` (interface in DESIGN 5.1); regenerate the helper. PHP and the UI
    pick up the metadata from the `runtimes` command.
 3. Add `examples/<key>-hello`, a row to the README runtime table and helper smoke tests.
+4. Add its read-only installation paths to `ISOLATION_RUNTIME_PATHS` in `helper/isolation.py`
+   and check isolated builds/starts. Keep dependency caches under the supplied per-app home.
 
 ## Pull requests
 

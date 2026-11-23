@@ -107,10 +107,10 @@ def _link_inside(name, linkname, hard=False):
 
 
 def safe_extract(archive, dest, skip=None):
-    """Extracts a .tar.gz after checking every member (no absolute paths, no '..', no devices,
+    """Extracts a tar archive after checking every member (no absolute paths, no '..', no devices,
     no links leaving the tree). Returns the member names (without a leading './')."""
     names = []
-    with tarfile.open(archive, "r:gz") as tar:
+    with tarfile.open(archive, "r:*") as tar:
         members = []
         for member in tar.getmembers():
             name = member.name

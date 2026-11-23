@@ -156,6 +156,7 @@ USER_AGENT = "plesk-runway/" + VERSION
 RESERVED_ENV = frozenset([
     "PORT", "HOST", "LISTEN_ADDR", "RUNWAY_APP_ROOT", "RUNWAY_START_CMD",
     "RUNWAY_SOCKET", "RUNWAY_LISTEN",
+    "RUNWAY_ISOLATION_COMMAND",
     "HOME", "USER", "LOGNAME",
 ])
 # Variables of the dynamic loader and the C library that change what a process loads. They are

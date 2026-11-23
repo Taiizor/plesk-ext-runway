@@ -10,12 +10,48 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Added
+
+- Toolchains can install application isolation dependencies in the existing administrator job
+  and log UI. The card reports compatible bubblewrap and libseccomp status. It prefers supported
+  distribution packages and builds the pinned, SHA-256-verified bubblewrap 0.13.1 release into
+  `/opt/runway/bin/bwrap` when needed, preserving the system binary and application policies.
+- Administrator-owned optional application isolation for every runtime: Go, Rust, Bun, Java,
+  .NET, Python, Ruby, PHP and prebuilt binaries, including builds, workers and deployment slots.
+  bubblewrap 0.10+ confines filesystem/process access, keeps runtime source read-only, exposes
+  explicit writable folders and Unix sockets, gives each application private caches and supports
+  offline networking. Unset isolated resource limits default to 1024 MiB, 100% CPU, 1024 tasks.
+  Policy changes stop old slots and rebuild; customers cannot disable policy through application
+  removal or recovery. New isolation UI strings are English and Turkish, with English text in
+  the remaining locales pending translation.
+- Offline Linux namespace regression runner and an opt-in isolated runtime E2E matrix
+  (`RUNWAY_E2E_ISOLATION=1`); live Plesk verification remains separate.
+
 ### Fixed
 
+- Dependency installation now checks development packages as well as build executables, skips
+  complete installations without refreshing repositories, and keeps compatible installed versions
+  even when newer releases exist. Only an incompatible bubblewrap can be updated. APT transaction
+  checks and DNF exclusions prevent unrelated installed packages from being upgraded as dependencies;
+  unavailable development packages are reported instead of silently skipped.
 - Files and folders uploaded into an application's document root after a build now get periodic
   permission checks, including uploads created by running .NET applications in `wwwroot`.
   Enabled web applications check again 60 seconds after the previous check completes, without
   rebuilding or restarting; existing ownership, symlink, hidden-file and scan limits still apply.
+- Configured static paths reject hidden files and common server interpreter extensions.
+  Apache forces static handling, disables CGI/SSI and symlink following, and keeps authentication
+  overrides. nginx retains Plesk's existing static access controls.
+- Classic and slot-based configuration/start operations share the deployment lock so an
+  isolation policy change cannot race a stale unit writer. Private command/environment payloads
+  are restored inside the namespace, after the trusted unprivileged launcher has started.
+- Isolation keeps Docker/systemd's read-only kernel settings: a native-ABI libseccomp filter
+  prevents namespace creation/entry without writing `/proc/sys`. Native build headers are
+  available read-only for cgo and other compiled dependencies.
+- Zero-downtime marker checks follow Plesk's `nginx_ip_default.conf` when the domain is the
+  default site and `nginx.conf` is a placeholder. Runtime integration tests restore the full
+  application configuration/environment and wait for scheduled path-routing reloads.
+- Isolation form controls use distinct DOM IDs and policy actions wake status polling, including
+  its background-tab grace period, so deployment completion clears the form's busy state.
 
 ## [1.3.0] - 2026-11-17
 

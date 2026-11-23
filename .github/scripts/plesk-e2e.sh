@@ -56,6 +56,11 @@ site_id() { in_c plesk db -Ne "select id from domains where name='$DOMAIN'" | tr
 
 cmd_start() {
     local -a publish=()
+    local -a security=(--security-opt apparmor=unconfined)
+    if [ "${RUNWAY_E2E_ISOLATION:-0}" = "1" ]; then
+        # Development containers only: permit bubblewrap's nested pivot_root/user namespaces.
+        security+=(--security-opt seccomp=unconfined)
+    fi
     local mapping
     for mapping in $PUBLISH; do publish+=(-p "$mapping"); done
     dock rm -f "$CONTAINER" >/dev/null 2>&1 || true
@@ -63,7 +68,7 @@ cmd_start() {
     dock run -d --name "$CONTAINER" --hostname plesk.runway.test \
         --tmpfs /tmp --tmpfs /run --tmpfs /run/lock \
         -v /sys/fs/cgroup:/sys/fs/cgroup --cgroupns=host \
-        --cap-add SYS_ADMIN --security-opt apparmor=unconfined \
+        --cap-add SYS_ADMIN "${security[@]}" \
         -p "$PANEL_PORT:8880" ${publish[@]+"${publish[@]}"} "$PLESK_IMAGE" >/dev/null
     cmd_wait
 }

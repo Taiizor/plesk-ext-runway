@@ -95,7 +95,7 @@ NGINX;
             $label = '127.0.0.1:' . self::port($target);
             $proxy = '    proxy_pass http://' . $label . ';';
         }
-        return str_replace(['{SCOPE}', '{TARGET}', '{MARKER}', '{REGEX}', '{PROXY}'], [$scope, $label, $marker, $regex, $proxy], $template);
+        return self::staticGuard($target, false) . str_replace(['{SCOPE}', '{TARGET}', '{MARKER}', '{REGEX}', '{PROXY}'], [$scope, $label, $marker, $regex, $proxy], $template);
     }
 
     /**
@@ -207,11 +207,45 @@ APACHE;
             // Pooled backend connections would keep reaching the old version after a switch.
             $template = str_replace(' retry=0', ' retry=0 disablereuse=On', $template);
         }
-        return str_replace(
+        return self::staticGuard($target, true) . str_replace(
             ['{SCOPE}', '{TARGET}', '{MARKER}', '{EXCLUSIONS}', '{PREFIX}', '{UPSTREAM}', '{REVERSE}'],
             [$scope, $label, $marker, implode("\n", $lines), $prefix, $upstream, $reverse],
             $template
         );
+    }
+
+    /** Keep static exclusions out of host interpreters without replacing Plesk's access controls. */
+    private static function staticGuard(array $target, $apache)
+    {
+        list($mode, $mount, $static) = self::scope($target);
+        if ($mode === null || !$static) {
+            return '';
+        }
+        $paths = array_map(function ($path) use ($mount) { return $mount . '/' . $path; }, $static);
+        $scope = '(?!/(?:' . self::NGINX_RESERVED . '))(?:' . implode('|', array_map([__CLASS__, 'regexQuote'], $paths)) . ')(?:/|$)';
+        $scripts = 'php[0-9]*|phtml|pht|phar|cgi|fcgi|pl|py|rb|asp|aspx|jsp|jspx|shtml|shtm';
+        $blocked = '^(?=' . $scope . ')(?:.*/\.|.*\.(?i:' . $scripts . ')(?:/|$))';
+        if (!$apache) {
+            // A server rewrite guard also precedes ^~ locations. Do not introduce a generic
+            // static location: doing so could bypass Plesk's password-protected directories.
+            return "# Runway: deny hidden files and server-side scripts in static paths\n"
+                . 'if ($uri ~ "' . $blocked . "\") { return 403; }\n";
+        }
+        $root = isset($target['documentRoot']) && is_string($target['documentRoot']) ? rtrim($target['documentRoot'], '/') : '';
+        $validRoot = strlen($root) <= 1024 && preg_match('#^/[A-Za-z0-9._@+ /-]+$#D', $root)
+            && !in_array('..', explode('/', $root), true);
+        if (!$validRoot) {
+            return '<LocationMatch "^' . $scope . "\">\n    Require all denied\n</LocationMatch>\n";
+        }
+        $result = "# Runway: static files cannot invoke host interpreters or override access policy\n";
+        foreach ($paths as $path) {
+            $result .= '<Directory "' . $root . $path . "\">\n"
+                . "    Options -ExecCGI -Includes -FollowSymLinks -SymLinksIfOwnerMatch -Indexes\n"
+                . "    AllowOverride AuthConfig Limit\n</Directory>\n";
+        }
+        $result .= '<LocationMatch "^' . $scope . "\">\n    SetHandler default-handler\n</LocationMatch>\n";
+        $result .= '<LocationMatch "' . $blocked . "\">\n    Require all denied\n</LocationMatch>\n";
+        return $result;
     }
 
     /**

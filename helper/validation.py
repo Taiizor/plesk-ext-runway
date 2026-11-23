@@ -141,7 +141,7 @@ def v_env(value):
     for key, val in value.items():
         if not isinstance(key, str) or not RE_ENV_KEY.match(key):
             raise HelperError("Invalid environment variable name '%s'" % key)
-        if key in RESERVED_ENV:
+        if key in RESERVED_ENV or key.startswith("RUNWAY_ISOLATION_"):
             raise HelperError("Environment variable %s is managed by Runway" % key)
         if key in LOADER_ENV:
             raise HelperError("Environment variable %s cannot be set here; put it in the start command" % key)
@@ -243,6 +243,9 @@ def validate_app(payload):
         raise HelperError("Port must be 1024 or higher")
     if state["tampered"]:
         state["stopped"] = True
+    isolation = isolation_options(state["domain_id"])
+    if isolation["enabled"] and isolation["network"] == "offline" and listen == "tcp":
+        raise HelperError("Offline isolation requires Unix socket mode or a worker")
     state.update(helper_fields({}))
     return state, pw
 

@@ -219,9 +219,10 @@ customer with permission and access). Admin-only actions check `Access::requireA
 |---|---|---|---|
 | `api/context` | GET | all | `{isAdmin, locale, runtimes:[meta...], urls:{api,...}, limits:{maxStaticPaths}}` |
 | `api/overview` | GET | all | `{server:{os,arch,systemd,python,build_deps,helperVersion,selinux (enforcing\|permissive\|null)} (null for customers), apps:[{domainId, domain, displayName, configured, runtime, toolchain, listen, mode, port (tcp only), enabled, state, memoryBytes, memoryUsedBytes, memoryCacheBytes, url, appUrl}], errors:[...]}` (customers: only domains with hosting they may manage); `memoryBytes` = helper `memory_bytes` (MemoryCurrent), `memoryUsedBytes` = `memory_used_bytes` (falls back to `memoryBytes`), `memoryCacheBytes` = `memory_cache_bytes` (§7); `state` ∈ `notConfigured\|disabled\|suspended\|tampered\|running\|starting\|stopping\|failed\|stopped`; `url` = site root, `appUrl` = site URL plus the mount path, null for workers (the overview links it); both `https://` when the domain's hosting has SSL/TLS support (`pm_Domain::hasSsl()`), else `http://` |
-| `api/toolchains` | GET | admin | `[?runtime=<key>][&available=0][&force=1]` → `{runtimes:{<key>:{installed:[{id,label,path,version?,kind?}], available:[{id,label}], availableError, inUse:{ver:[domains]}, toolchainKind}}, buildDeps:{cc:bool,...}, job:{...}}` |
+| `api/toolchains` | GET | admin | `[?runtime=<key>][&available=0][&force=1]` → `{runtimes:{<key>:{installed:[{id,label,path,version?,kind?}], available:[{id,label}], availableError, inUse:{ver:[domains]}, toolchainKind}}, buildDeps:{cc:bool,...}, isolationDeps:{available,bubblewrap,libseccomp,version,path,reason}, job:{...}}` |
 | `api/toolchain` | POST | admin | body `{runtime, op: install\|remove\|update, version}` → `{job}` or `{removed}` |
 | `api/build-deps` | POST | admin | → `{job}` |
+| `api/isolation-deps` | POST | admin | → `{job}`; optional isolation packages and compatible bubblewrap installation |
 | `api/job` | GET | admin | `?job=admin\|deploy-<id>` → `{state,title,message,log,...}` |
 | `api/settings` | GET/POST | admin | all server settings (`portMin, portMax, buildTimeout, memoryMb, cpuPercent, tasks, buildMemoryMb, buildCpuPercent, buildTasks, maxAppsPerSubscription, zeroDowntimeMaxReady` (5–900, default 120), `zeroDowntimeMaxDrain` (0–300, default 30) integers, `updateCheck` (default true), `updateAuto` (default false) and `zeroDowntimeCustomers` (default false) booleans: JSON booleans, 0/1 or "true"/"false", else field error); `maxAppsPerSubscription` limits the **enabled** apps of one system user and is checked when an app is enabled (field error `enabled`) |
 | `api/update` | GET | admin | built-in updater, no network: `{installed: "X.Y.Z-R", latest: {version, release, full, tag, htmlUrl, publishedAt} \| null, available, checkedAt, error, updateSource, lastFailedVersion, job: {admin job status}, updateCheck, updateAuto}` (helper `update-status` plus the two settings) |
@@ -1473,3 +1474,117 @@ The document-root form now starts with **Change the Plesk document root** unchec
 explicit opt-in plus a changed value sends `documentRoot`; backend validation/hosting permissions
 stay the same. An API with no static assets can retain Plesk's current root without creating
 `wwwroot`. Optional release mode does not change Plesk static-path routing.
+
+## 14. Administrator-owned application isolation
+
+`helper/isolation.py` implements one optional execution boundary for all runtime keys, builds,
+workers and slots. No runtime-specific language restrictions are treated as a boundary.
+`GET api/app/isolation` requires domain access and returns `{options, available, reason, canEdit}`.
+POST requires domain access, CSRF and administrator rights; PHP forces the authorized domain ID
+and sends `{domain_id, action: "save", options}` to the helper's `isolation` command. Status uses
+`action: "status"`. General app saves, recovery imports and customer removal cannot change policy.
+
+Options are `{enabled: false, network: "shared", writable_paths: ["tmp", "logs", "storage",
+"uploads"], socket_paths: []}` initially. Paths reuse the bounded relative-path validator;
+absolute paths, traversal, `.git` and `.runway` writable roots are rejected. At most eight Unix
+socket grants may name absolute paths under `/run` or `/var/run`; every component is opened
+without following links and the final descriptor must name a socket. Root stores each policy
+as `/etc/runway/isolation/<id>.json` (0600 in a 0700 directory). A malformed existing policy
+fails closed. Customer app removal preserves it; extension uninstall removes `/etc/runway`.
+
+The backend must be a root-owned, non-setuid, non-group/world-writable `/usr/bin/bwrap` or
+`/opt/runway/bin/bwrap` with
+`--bind-fd`, `--ro-bind-fd` and `--seccomp` (bubblewrap 0.10+), plus system `libseccomp2`.
+The supported native syscall ABIs are x86_64 and aarch64. Application starts never download
+dependencies or use a setuid fallback. Before changing an enabled policy, the helper prepares customer
+directories and probes the actual namespace/mount plan as the subscription user. Kernel, LSM
+and container-host restrictions may reject the probe. Policies never fall back to a plain start.
+
+Toolchains returns `isolationDeps: {available, bubblewrap, libseccomp, version, path, reason}`
+from helper `toolchains.isolation_deps`. Administrator-only `POST api/isolation-deps` starts
+`isolation-deps-install`, routed to `job_isolation_deps` through the existing shared admin job.
+The default title key is `Common.jobTitle.isolation_deps`. The UI uses the same confirmation,
+job polling and log panel as toolchain/build-dependency installation.
+
+The installer accepts no URL, version or destination from the request. It installs libseccomp
+using apt/dnf and checks the repository's bubblewrap candidate against 0.10. Compatible system
+packages are preferred. Older/missing candidates use the pinned official bubblewrap 0.13.1
+source archive with a fixed SHA-256, a 4 MiB download cap, validated tar.xz extraction and a
+private build/cache directory. Required compiler packages are installed, Meson/Ninja commands
+have deadlines, and a bounded ELF output is checked for root ownership, safe mode, exact version
+and required features before atomic publication to `/opt/runway/bin/bwrap` (0755, never setuid).
+The fallback preserves the distribution executable. Existing compatible system installations need no
+download or package changes; older managed copies are updated to the pinned release.
+Application policies, kernel settings and container security profiles are left to their
+existing administration flows. The per-app namespace probe remains authoritative.
+
+Application service/environment writers and starts share the per-domain deploy lock, including classic apps, upgrade
+re-renders and toolchain re-renders. Policy saves reject active deploys, converge an interrupted
+switch, stop all old units, persist policy, render units, reload systemd and queue an isolated
+build. A stopped app builds but stays stopped. An error after saving policy leaves the app
+stopped. A failed candidate probe leaves the prior policy and processes alone. This operation
+intentionally interrupts traffic; it is not a rolling policy change.
+
+Runtime `ExecStart` invokes the helper copy's `_isolate <base64 metadata>` after systemd drops
+to the subscription UID. Build execution uses the same entry point after `_build_preexec`
+drops privileges. `_isolate` is the sole public-dispatch exception to the normal root check:
+it rejects root/effective-UID mismatches and never reads root state or invokes root commands.
+The plan contains paths, runtime, identity, slot endpoint and policy, without commands or
+environment values. The root-only service environment file/build parent supplies a bounded
+base64 payload, split into 48,000-character `RUNWAY_ISOLATION_DATA_<n>` variables. The bootstrap
+gets safe `PATH`, `HOME`, `LANG` only. Actual customer environment and commands take effect only
+inside the namespace, via private `bwrap --args` options and a fixed in-namespace Python
+trampoline; the command transport variable is removed before exec. This avoids pre-confinement
+loader/interpreter injection and secrets in public unit text or wrapper argv. All
+`RUNWAY_ISOLATION_` user variables are reserved; stale stored variables are sanitized.
+
+After `PR_SET_NO_NEW_PRIVS`, the unprivileged launcher pins application/cache/shared/writable
+directories with no-follow descriptors and verifies ownership. bubblewrap consumes the mount
+descriptors; unrelated inherited descriptors are closed. System binaries, libraries, selected
+certificates/configuration and the selected runtime's toolchain are read-only. Synthetic
+passwd/group/NSS files contain only the application identity; only the service's cgroup leaf is
+exposed for managed-runtime resource discovery. Mount/user/PID/IPC/UTS namespaces, an empty
+capability set and disabled nested user namespaces apply to every launch. The UID is retained
+for Plesk ownership. `/proc`, `/dev`, `/tmp` and `/var/tmp` are private.
+
+The launcher uses libseccomp through stdlib ctypes to export a native-ABI BPF filter into a
+private descriptor consumed by bubblewrap. It denies `unshare`, `setns`, and `clone` with
+`CLONE_NEWUSER`; `clone3` returns `ENOSYS` so ordinary threads/processes can use `clone`.
+Other ABIs fail closed. This replaces bubblewrap's sysctl-based nested-namespace restriction,
+which cannot write through Docker/systemd's protected `/proc/sys`. Existing
+`ProtectKernelTunables=yes` remains enabled. Build-only `/usr/include` and
+`/usr/local/include` mounts are read-only for cgo and other native dependencies.
+
+At runtime, source is read-only with explicit writable submounts. Builds may write their own
+source/release root. Dependency HOME is persistent below `.runway/isolation/<id>/home` and is
+passed to every adapter's environment builder. Release shared paths are mounted from their
+source descriptor and become writable at runtime only when the isolation list grants them.
+Only the app's own Runway socket directory and explicitly granted service socket files appear.
+Shared networking includes localhost/internal services. Offline mode unshares the network for
+both builds and starts and rejects TCP-listening apps (workers and Unix listeners are allowed).
+Existing explicit limits take precedence; otherwise isolated services/builds use MemoryMax=1024M,
+CPUQuota=100%, TasksMax=1024. Each slot receives its own caps.
+
+External Plesk interpreters, SSH/cron and nginx/Apache remain outside this boundary. Configured
+static prefixes reject dot paths and common script extensions including PATH_INFO. nginx uses
+a server rewrite guard without replacing locations/authentication; symlink policy remains
+Plesk's. Apache uses `SetHandler default-handler`, disables CGI/SSI/indexes and symlink following,
+and limits `.htaccess` to `AuthConfig Limit`. Invalid document-root text fails closed for static
+scope. These guards do not govern unrelated Plesk paths or arbitrary administrator handlers.
+Application credentials/writable data, granted sockets, shared-network services and the shared
+host kernel remain trust boundaries; see SECURITY.md.
+
+`tests/test_isolation.py` covers policy validation, every runtime's common wrapper, resource
+defaults, private environments, secret transport, release mounts, forbidden symlinks, socket
+grants, policy retention, failure behavior and locking. `scripts/test_isolation.py` runs the
+Python suite offline with read-only sources/tools, bounded scratch/resources and an explicit
+environment; it enables real nested namespace fixtures for sibling-file/process hiding,
+read-only code, writable uploads, offline networking and the full unprivileged launcher.
+`tests/php/isolation.php` covers authorization/domain binding and generated static guards.
+`tests/isolation-e2e.py` runs a disposable isolated worker on Plesk, checks code/data/process/
+network boundaries and rejected-policy continuity, and tests both web servers' static guards
+and Plesk password protection. It restores configuration/policy and removes its nonce-named
+fixtures. `tests/customer-smoke.sh` checks real customer isolation authorization as well.
+`RUNWAY_E2E_ISOLATION=1 bash tests/runtime-e2e.sh` opts the installed-runtime matrix into isolated
+builds/starts; it backs up/restores policy and checks wrapped units. Live Plesk integration,
+native web-server parsing and the panel are separate from offline fixture results.

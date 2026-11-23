@@ -13,6 +13,7 @@ COMMANDS = {
     "toolchain-update": cmd_toolchain_update,
     "toolchain-remove": cmd_toolchain_remove,
     "build-deps-install": cmd_build_deps_install,
+    "isolation-deps-install": cmd_isolation_deps_install,
     "job-status": cmd_job_status,
     "update-status": cmd_update_status,
     "update-check": cmd_update_check,
@@ -36,6 +37,7 @@ COMMANDS = {
     "install": cmd_install,
     "uninstall": cmd_uninstall,
     "operations": cmd_operations,
+    "isolation": cmd_isolation,
     "app-metrics": cmd_app_metrics,
     "server-metrics": cmd_server_metrics,
     "health-ping": cmd_health_ping,
@@ -79,6 +81,13 @@ def parse_payload(argv):
 
 
 def main(argv):
+    if len(argv) == 3 and argv[1] == "_isolate":
+        try:
+            internal_isolate(argv[2])
+        except Exception as exc:
+            print("Runway isolation failed: %s" % exc, file=sys.stderr)
+            return 1
+        return 0
     os.umask(0o022)
     os.environ.clear()
     os.environ.update(root_env())

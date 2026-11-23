@@ -37,6 +37,9 @@ artifact without changing any file. Change the version in `bootstrap.py`, then r
 | `metrics.py` | SQLite resource history, periodic collection and project totals |
 | `fetch.py`, `deploy.py` | Application downloads, builds and restarts |
 | `public_files.py` | Periodic permission checks for files uploaded into the document root after a build |
+| `isolation.py` | Administrator-owned all-runtime namespace policy, private environments and pinned filesystem/socket mounts |
+| `dependencies.py` | Local package/header checks and missing dependency installation without upgrading compatible installed packages |
+| `isolation_dependencies.py` | Optional dependency status, apt/dnf installation and a verified managed bubblewrap fallback |
 | `switching/` | Zero-downtime pointers, web server reloads, connections, convergence and traffic switching |
 | `operations/` | Opt-in history, diagnostics, isolated releases, HTTPS notifications and recovery metadata |
 | `entrypoint.py` | Public command dispatch, internal systemd entry points and JSON protocol |
@@ -64,6 +67,13 @@ end-to-end suites exercise the packaged artifact as before. CodeQL analyzes a co
 copy of the assembled program, instead of treating the sections as independent modules.
 `scripts/helper_sarif.py` maps report locations back to the committed helper, with the same line
 numbers, so findings link to the repository file.
+
+For offline Linux verification, `python3 scripts/test_isolation.py` runs the complete Python
+suite with read-only sources/tools, isolated networking, an allowlisted environment and bounded
+scratch storage/resources. It needs installed bubblewrap 0.10+, `libseccomp2` and `prlimit`, with unprivileged
+user namespaces available. It also enables real namespace fixtures that ordinary unit-test
+runs skip. On Windows, invoke it through `wsl -d Ubuntu -- python3` followed by the checkout's
+actual WSL path, for example `/mnt/e/MyProject/Mix/Runway/scripts/test_isolation.py`.
 
 ## Resource monitoring
 

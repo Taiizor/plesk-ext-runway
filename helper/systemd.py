@@ -126,7 +126,7 @@ def toolchain_env(state, pw):
     env = {}
     if rt is not None:
         if state["toolchain"] and rt.toolchain != "none":
-            spec = dict(rt.env(pw.pw_dir, state["toolchain"], state["app_dir"]))
+            spec = dict(rt.env(isolation_environment_home(state, pw), state["toolchain"], state["app_dir"]))
             paths = list(spec.pop("PATH", []))
             env.update(spec)
         # A zero-downtime slot of a unix application may have no port of its own (slot b): its
@@ -432,6 +432,7 @@ def prepare_start(state, pw):
     no root lines): the socket directory in unix mode, and files that Runway manages inside the
     application root (as the user). Called by every path that starts or restarts the unit."""
     state = ops_execution_state(state)
+    isolation_prepare(state, pw)
     if state.get("listen") == "unix":
         ensure_socket_dir(state["domain_id"], pw)
         # e.g. the socket of the previous system user after a subscription change; only the
@@ -503,12 +504,17 @@ def merged_env(state, pw):
         else:
             env[key] = val
     env.update(forced_env(state))
+    if isolation_options(state["domain_id"])["enabled"]:
+        env["HOME"] = isolation_home(state, pw)
+        env["TMPDIR"] = "/tmp"
     return env
 
 
 def render_env_file(state, pw):
     env = merged_env(state, pw)
     env["RUNWAY_START_CMD"] = state["start_cmd"] or "echo 'No start command configured' >&2; exit 1"
+    if isolation_options(state["domain_id"])["enabled"]:
+        env = isolation_outer_environment(env, ["/bin/bash", "-c", env["RUNWAY_START_CMD"]])
     lines = ["# Managed by the Plesk Runway extension. Do not edit."]
     for key in sorted(env):
         lines.append("%s=%s" % (key, env_quote(env[key])))
@@ -549,7 +555,8 @@ def render_app_unit(state, pw):
         lines.append("ExecStartPre=/bin/rm -f %s" % endpoint_socket(state))
     lines += [
         # ${VAR} as a separate word expands to exactly one argument (no word splitting).
-        "ExecStart=/bin/bash -c ${RUNWAY_START_CMD}",
+        ("ExecStart=" + " ".join(isolation_command(state, pw, ["/bin/bash", "-c", state["start_cmd"]])))
+        if isolation_options(domain_id)["enabled"] else "ExecStart=/bin/bash -c ${RUNWAY_START_CMD}",
         "Restart=always",
         "RestartSec=3",
         "TimeoutStopSec=30",
@@ -580,7 +587,7 @@ def render_app_unit(state, pw):
             lines.append("SocketBindDeny=any")
         else:
             lines += ["SocketBindAllow=tcp:%d" % int(state["port"]), "SocketBindDeny=any"]
-    limits = state["limits"]
+    limits = isolation_limits(state)
     if limits["memory_mb"]:
         lines.append("MemoryMax=%dM" % limits["memory_mb"])
     if limits["cpu_percent"]:
@@ -641,7 +648,7 @@ def render_deploy_service(state):
 
 def build_limit_lines(state):
     """Builds run customer code: always cap tasks, and apply the admin's build limits."""
-    limits = state.get("build_limits") or {}
+    limits = isolation_limits(state, build=True)
     lines = ["TasksMax=%d" % (int(limits.get("tasks") or 0) or DEFAULT_BUILD_TASKS)]
     if limits.get("memory_mb"):
         lines.append("MemoryMax=%dM" % int(limits["memory_mb"]))

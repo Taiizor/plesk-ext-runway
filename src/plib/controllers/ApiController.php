@@ -73,6 +73,7 @@ class ApiController extends pm_Controller_Action
                         'systemd' => isset($info['systemd']) ? (int)$info['systemd'] : 0,
                         'python' => isset($info['python']) ? $info['python'] : '',
                         'build_deps' => isset($info['build_deps']) ? (object)$info['build_deps'] : (object)[],
+                        'isolationDeps' => isset($info['isolation_deps']) ? (object)$info['isolation_deps'] : (object)[],
                         'helperVersion' => isset($info['helper_version']) ? $info['helper_version'] : '',
                         // enforcing|permissive|null: nginx/Apache may need SELinux policy changes (README).
                         'selinux' => isset($info['selinux']) && is_string($info['selinux']) ? $info['selinux'] : null,
@@ -192,6 +193,7 @@ class ApiController extends pm_Controller_Action
             return [
                 'runtimes' => (object)$runtimes,
                 'buildDeps' => (object)(isset($installed['build_deps']) ? $installed['build_deps'] : []),
+                'isolationDeps' => (object)(isset($installed['isolation_deps']) ? $installed['isolation_deps'] : []),
                 'job' => isset($installed['job']) ? $installed['job'] : null,
             ];
         });
@@ -242,6 +244,17 @@ class ApiController extends pm_Controller_Action
             Modules_Runway_Access::requireAdmin();
             $this->requirePost();
             $result = Modules_Runway_Helper::call('build-deps-install');
+            return ['job' => $result['job'], 'message' => pm_Locale::lmsg('messageJobStarted')];
+        });
+    }
+
+    /** POST api/isolation-deps: install the optional isolation backend as an administrator job. */
+    public function isolationDepsAction()
+    {
+        $this->respond(function () {
+            Modules_Runway_Access::requireAdmin();
+            $this->requirePost();
+            $result = Modules_Runway_Helper::call('isolation-deps-install');
             return ['job' => $result['job'], 'message' => pm_Locale::lmsg('messageJobStarted')];
         });
     }
@@ -343,6 +356,12 @@ class ApiController extends pm_Controller_Action
                 case 'operations':
                     $body = $this->getRequest()->isPost() ? $this->body() : ['action' => 'status'];
                     return Modules_Runway_Operations::call($this->appModel(), $body);
+                case 'isolation':
+                    $write = $this->getRequest()->isPost();
+                    if ($write) {
+                        $this->requirePost();
+                    }
+                    return Modules_Runway_Isolation::call($this->appModel(), $write ? $this->body() : [], $write);
                 case 'metrics':
                     $app = $this->appModel();
                     $range = (string)$this->_getParam('range', '1h');

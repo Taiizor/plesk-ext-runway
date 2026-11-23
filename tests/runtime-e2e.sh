@@ -5,6 +5,7 @@
 #   bash tests/runtime-e2e.sh                         # every runtime, tcp and unix
 #   RUNTIMES="go python" LISTENS="unix" bash tests/runtime-e2e.sh
 #   RUNWAY_E2E_RUNTIMES=go bash tests/runtime-e2e.sh  # same as RUNTIMES (CI runs the Go part)
+#   RUNWAY_E2E_ISOLATION=1 bash tests/runtime-e2e.sh # opt-in isolated builds/startups of all runtimes
 #
 # For each runtime and listen mode it writes the sample app (api/app/sample, force), enables it
 # with health path "/" (api/app/save), waits for the build (api/app/status), then checks the
@@ -32,7 +33,8 @@ PANEL=${PANEL:-http://localhost:18880}
 SITE_ID=${SITE_ID:-1}
 DOMAIN=${DOMAIN:-gotest.local}
 APP_ROOT=${APP_ROOT:-apps/runway-e2e}
-RUNTIMES=${RUNWAY_E2E_RUNTIMES:-${RUNTIMES:-go rust bun python php java dotnet ruby}}
+RUNTIMES=${RUNWAY_E2E_RUNTIMES:-${RUNTIMES:-go rust bun python php java dotnet ruby binary}}
+ISOLATION=${RUNWAY_E2E_ISOLATION:-0}
 LISTENS=${LISTENS:-tcp unix}
 BUILD_WAIT=${BUILD_WAIT:-1200}
 PY=${PYTHON:-}
@@ -48,6 +50,7 @@ PASS=0
 FAIL=0
 MATRIX=""
 SAVED=""
+SAVED_ISOLATION=""
 PHP_TCP_TOOLCHAIN=""
 
 dock() { MSYS_NO_PATHCONV=1 docker "$@"; }
@@ -60,8 +63,8 @@ try:
 except Exception as exc:
     print('ERROR', exc)"; }
 get()  { curl -s -b "$JAR" -H 'X-Requested-With: XMLHttpRequest' "$API/$1"; }
-post() { curl -s -b "$JAR" -H 'X-Requested-With: XMLHttpRequest' -H "X-Forgery-Protection-Token: $TOKEN" \
-              -H 'Content-Type: application/json' -d "$2" "$API/$1"; }
+post() { printf '%s' "$2" | curl -s -b "$JAR" -H 'X-Requested-With: XMLHttpRequest' -H "X-Forgery-Protection-Token: $TOKEN" \
+              -H 'Content-Type: application/json' --data-binary @- "$API/$1"; }
 row()  { MATRIX="$MATRIX$(printf '%-8s %-5s %-22s %-8s %-9s %s' "$1" "$2" "$3" "$4" "$5" "$6")"$'\n'; }
 
 # wait_deploy [SINCE]: waits for the deploy job queued at or after the epoch SINCE (default: any).
@@ -147,6 +150,11 @@ restore() {
     if [ -n "$SAVED" ]; then
         echo "== restoring the previous configuration of $DOMAIN"
         post app/save "$SAVED" | jexpr "d['status']"
+        wait_deploy >/dev/null
+        if [ -n "$SAVED_ISOLATION" ]; then
+            post app/isolation "$SAVED_ISOLATION" | jexpr "d['status']"
+            wait_deploy >/dev/null
+        fi
         post app/control "{\"site_id\": $SITE_ID, \"op\": \"deploy\"}" >/dev/null
         echo "deploy: $(wait_deploy)"
     fi
@@ -165,13 +173,19 @@ HOME_DIR=$(dock exec "$CONTAINER" plesk db -Ne "select s.home from sys_users s j
 [ -n "$HOME_DIR" ] || HOME_DIR=/var/www/vhosts/$DOMAIN
 
 APP=$(get "app?site_id=$SITE_ID")
-SAVED=$(echo "$APP" | jexpr "json.dumps(dict([('site_id', $SITE_ID)] + [(k, v) for k, v in d['data']['config'].items() if k in ('enabled', 'runtime', 'toolchain', 'appRoot', 'listen', 'mode', 'mountPath', 'staticPaths', 'healthPath', 'healthMatch', 'buildCmd', 'startCmd', 'autoDeploy')]))")
+SAVED=$(echo "$APP" | jexpr "json.dumps(dict(d['data']['config'], site_id=$SITE_ID, env=d['data']['env'])) if isinstance(d['data']['env'], str) else 'ERROR cannot back up the environment'")
 case "$SAVED" in ERROR*) bad "cannot read the configuration: $APP"; SAVED=""; exit 1 ;; esac
 UNIX_RE=$(get context | jexpr "json.dumps(dict((r['key'], r.get('unix_toolchain_re') or '') for r in d['data']['runtimes']))")
 # No expected response content: the samples answer "/" with their own text, so a value left
 # behind (e.g. by an interrupted api-smoke) would make every case unhealthy. restore() saves the
 # previous one again.
 check_save=$(post app/save "{\"site_id\": $SITE_ID, \"enabled\": false, \"appRoot\": \"$APP_ROOT\", \"healthPath\": \"/\", \"healthMatch\": \"\"}")
+if [ "$ISOLATION" = "1" ]; then
+    SAVED_ISOLATION=$(get "app/isolation?site_id=$SITE_ID" | jexpr "json.dumps({'site_id': $SITE_ID, 'options': d['data']['options']})")
+    case "$SAVED_ISOLATION" in *'"options"'*) ;; *) echo "Cannot back up the isolation policy"; exit 1 ;; esac
+    iso=$(post app/isolation "{\"site_id\": $SITE_ID, \"options\": {\"enabled\": false}}")
+    [ "$(echo "$iso" | jexpr "d['status']")" = "success" ] || { bad "cannot prepare isolation policy: $iso"; exit 1; }
+fi
 [ "$(echo "$check_save" | jexpr "d['status']")" = "success" ] && ok "switched $DOMAIN to $APP_ROOT (disabled)" || { bad "save: $check_save"; exit 1; }
 
 run_case() {
@@ -204,6 +218,27 @@ run_case() {
         bad "$rt $listen ($toolchain): deploy $state: $(get "app/logs?site_id=$SITE_ID&kind=deploy&lines=15" | jexpr "d['data']['log']" | tail -n 6)"
         row "$rt" "$listen" "$toolchain" "$state" "-" "build/start failed"
         return
+    fi
+    if [ "$ISOLATION" = "1" ]; then
+        if [ "$(get "app/isolation?site_id=$SITE_ID" | jexpr "d['data']['options']['enabled']")" != "True" ]; then
+            started=$(( $(date +%s) - 1 ))
+            out=$(post app/isolation "{\"site_id\": $SITE_ID, \"options\": {\"enabled\": true}}")
+            if [ "$(echo "$out" | jexpr "d['status']")" != "success" ]; then
+                bad "$rt $listen: enabling isolation failed: $out"
+                row "$rt" "$listen" "$toolchain" "isolation" "-" "backend or namespace unavailable"
+                # A common backend/kernel failure affects every runtime. Restore immediately.
+                exit 1
+            fi
+            state=$(wait_deploy "$started")
+            built=True
+            if [ "$state" != "succeeded" ]; then
+                bad "$rt $listen: isolated rebuild failed: $state"
+                row "$rt" "$listen" "$toolchain" "$state" "-" "isolated build/start failed"
+                return
+            fi
+        fi
+        dock exec "$CONTAINER" systemctl cat "runway-app-$SITE_ID.service" | grep -q ' _isolate ' \
+            && ok "$rt $listen: isolated service command" || bad "$rt $listen: unconfined service command"
     fi
     # curl inside the container: its address is not reachable from Docker Desktop hosts.
     body=$(dock exec "$CONTAINER" curl -sk --max-time 15 --resolve "$DOMAIN:443:$IP" "https://$DOMAIN/" | head -c 200 | tr -d '\r' | head -n 1)
@@ -273,7 +308,12 @@ if [ "${FEATURES:-1}" = "1" ] && echo " $RUNTIMES " | grep -q ' go '; then
     as_user "mkdir -p '$HOME_DIR/httpdocs/api/static' '$HOME_DIR/httpdocs/assets' && echo static-ok > '$HOME_DIR/httpdocs/api/static/s.txt' && echo asset-ok > '$HOME_DIR/httpdocs/assets/a.txt'"
 
     state=$(save_wait '"mode": "path", "mountPath": "/api", "staticPaths": ["/api/static"]')
-    body=$(fetch_url /api/hello); root=$(fetch_url /); static=$(fetch_url /api/static/s.txt)
+    # Plesk schedules web-server reloads; build completion does not imply the new route is live.
+    for _ in $(seq 1 15); do
+        body=$(fetch_url /api/hello); root=$(fetch_url /); static=$(fetch_url /api/static/s.txt)
+        if echo "$body" | grep -q "Hello from Go" && ! echo "$root" | grep -q "Hello from Go" && [ "$static" = "static-ok" ]; then break; fi
+        sleep 1
+    done
     if echo "$body" | grep -q "Hello from Go" && ! echo "$root" | grep -q "Hello from Go" && [ "$static" = "static-ok" ]; then
         ok "path mode: /api proxied, / from the document root, /api/static excluded"
     else
@@ -289,6 +329,13 @@ if [ "${FEATURES:-1}" = "1" ] && echo " $RUNTIMES " | grep -q ' go '; then
         bad "static path ($state): /=[$body] /assets=[$asset]"
     fi
     row go web+static tcp "$state" "-" "/ -> app, /assets -> docroot"
+    # Static exclusions must not escape through host interpreter handlers or expose dot files.
+    as_user "echo must-not-be-served > '$HOME_DIR/httpdocs/assets/runway-e2e-blocked.php'; echo private > '$HOME_DIR/httpdocs/assets/.runway-e2e-private'"
+    for file in runway-e2e-blocked.php .runway-e2e-private; do
+        code=$(dock exec "$CONTAINER" curl -sk -o /dev/null -w '%{http_code}' --resolve "$DOMAIN:443:$IP" "https://$DOMAIN/assets/$file")
+        [ "$code" = "403" ] && ok "static security: $file is denied" || bad "static security: $file returned $code"
+    done
+    as_user "rm -f '$HOME_DIR/httpdocs/assets/runway-e2e-blocked.php' '$HOME_DIR/httpdocs/assets/.runway-e2e-private'"
 
     started_at=$(status_field "d['data']['service']['started_at']")
     sleep 2

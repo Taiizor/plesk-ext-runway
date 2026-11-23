@@ -270,15 +270,20 @@ def _deploy_once(domain_id, job):
             build = spec["build"]
             fetch_into_app(ops_execution_state(build_state), pw, spec, log)
         if build and state["build_cmd"]:
+            isolation_prepare(build_state, pw)
             env = merged_env(build_state, pw)
-            env.update({"HOME": pw.pw_dir, "USER": pw.pw_name, "LOGNAME": pw.pw_name,
+            env.update({"HOME": isolation_environment_home(build_state, pw), "USER": pw.pw_name, "LOGNAME": pw.pw_name,
                         "LANG": "C.UTF-8", "SHELL": "/bin/bash", "TMPDIR": "/tmp"})
             if state["toolchain"] and not toolchain_installed(state["runtime"], state["toolchain"]):
                 raise HelperError("Toolchain %s %s is not installed" % (state["runtime"], state["toolchain"]))
             log.line("Runtime: %s %s" % (state["runtime"], state["toolchain"] or "(no toolchain)"))
             log.line("$ " + state["build_cmd"].replace("\n", "\n$ "))
             started = time.time()
-            code = stream_process(["/bin/bash", "-e", "-c", state["build_cmd"]], log, state["build_timeout"],
+            if isolation_options(domain_id)["enabled"]:
+                env = isolation_outer_environment(env, ["/bin/bash", "-e", "-c", state["build_cmd"]])
+            command = isolation_command(ops_execution_state(build_state), pw,
+                                        ["/bin/bash", "-e", "-c", state["build_cmd"]], build=True)
+            code = stream_process(command, log, state["build_timeout"],
                                   env, preexec=_build_preexec(pw, ops_execution_state(build_state)["app_dir"]))
             log.line("Build finished in %.1fs with exit code %d" % (time.time() - started, code))
             if code != 0:
