@@ -457,18 +457,6 @@ const Overview = ({ baseUrl }) => {
                                 ) : (server.selinux === 'permissive' ? <Translate content="Overview.selinuxPermissive" /> : null),
                             },
                             {
-                                key: 'deps',
-                                label: <Translate content="Overview.serverBuildDeps" />,
-                                value: Object.keys(buildDeps).length ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
-                                        {Object.keys(buildDeps).map(tool => (
-                                            <Label key={tool} intent={buildDeps[tool] ? 'success' : 'warning'} view="light">{tool}</Label>
-                                        ))}
-                                        <RouterLink to="/toolchains"><Translate content="Overview.toolchains" /></RouterLink>
-                                    </span>
-                                ) : null,
-                            },
-                            {
                                 key: 'isolationDeps',
                                 label: <Translate content="Overview.serverIsolationDeps" />,
                                 value: isolationDeps ? (
@@ -481,6 +469,18 @@ const Overview = ({ baseUrl }) => {
                                             {'libseccomp: '}
                                             <Translate content={isolationDeps.libseccomp ? 'Toolchains.depFound' : 'Toolchains.depMissing'} />
                                         </Label>
+                                        <RouterLink to="/toolchains"><Translate content="Overview.toolchains" /></RouterLink>
+                                    </span>
+                                ) : null,
+                            },
+                            {
+                                key: 'deps',
+                                label: <Translate content="Overview.serverBuildDeps" />,
+                                value: Object.keys(buildDeps).length ? (
+                                    <span style={{ display: 'inline-flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px' }}>
+                                        {Object.keys(buildDeps).map(tool => (
+                                            <Label key={tool} intent={buildDeps[tool] ? 'success' : 'warning'} view="light">{tool}</Label>
+                                        ))}
                                         <RouterLink to="/toolchains"><Translate content="Overview.toolchains" /></RouterLink>
                                     </span>
                                 ) : null,
