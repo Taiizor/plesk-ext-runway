@@ -40,6 +40,7 @@ def cmd_reapply_all(_payload):
                 write_units(state, pw)
             if state["listen"] == "unix":
                 ensure_socket_dir(state["domain_id"], pw)
+            sync_public_files_units(state)
             count += 1
         except Exception as exc:  # noqa: BLE001
             errors.append("#%s: %s" % (domain_id, exc))

@@ -471,8 +471,26 @@ Apache (group `psaserv`) cannot read: static paths answered 403 until the build 
 - When: in the deploy job after a successful build or fetch (modes `build` and `fetch`, also
   without a build command and for a stopped application, whose document root the web server serves
   all the same), before the restart or the zero-downtime switch, with the state read after the
-  build; and through `app-docroot` with `open: true` after a change on the Runway page (§6). Not for
-  workers (no `document_root`), not for a restart without a build.
+  build; through `app-docroot` with `open: true` after a change on the Runway page (§6); and in
+  periodic checks of enabled, unsuspended web applications, including stopped applications.
+  Workers have no `document_root` and get no permission checks. A restart without a build does
+  not itself trigger the step.
+- Later uploads (`public_files.py`): each enabled web application with a known document root gets
+  `runway-public-files-<id>.timer` and its oneshot service, installed/recovered by `app-apply`,
+  `reapply-all` (installation/upgrades) and `app-docroot`. The timer first runs after 15 seconds,
+  then 60 seconds after the preceding check finishes (`OnUnitInactiveSec=60`, `AccuracySec=1`).
+  Its service calls `_public-files <id>`, re-reads and validates the current state, and calls
+  `open_public_files` with the same limits and customer privilege drop as the build step. A
+  nonblocking per-application `public-files-<id>` lock prevents duplicate checks. Disabled,
+  suspended, tampered and worker applications are skipped, as are active deploy jobs. The scan
+  never holds the deploy lock and never builds or restarts an application; the descriptor-based
+  walk tolerates concurrent uploads and builds. Each application has its own service so a slow
+  document root cannot delay checks of other applications. The service has `Nice=10` and
+  `TimeoutStartSec=120`; its journal reports changes and truncation. Timer and service are removed
+  when disabled/suspended, converted to a worker, cleared of a document root, or removed/uninstalled.
+  No files outside the document root are opened for reading by this step, and equal/outside roots
+  remain no-ops under the same real-path rule below. This is eventual repair, not permission
+  inheritance: an upload can return 403 until the next check, and the existing scan bounds apply.
 - Where: only when the document root's real path (`os.path.realpath` as the system user) lies
   strictly inside the application root's real path. Equal to it or a parent of it would publish
   the sources and settings files (`appsettings.json`, `.env`); a document root elsewhere

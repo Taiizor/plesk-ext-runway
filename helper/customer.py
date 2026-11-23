@@ -358,9 +358,9 @@ def _public_file(dir_fd, name, listed, uid):
 
 
 def _user_open_public_files(app_root, document_root, max_entries, seconds, web_gid=-1):
-    """Runs as the customer (deploy job after a build or fetch, app-docroot after the document root
-    was changed on the Runway page): makes the files in the document root readable for the web
-    server (nginx and Apache, group psaserv), which cannot read what builds and fetches create with
+    """Runs as the customer (after a build/fetch, a document root change, and periodic checks):
+    makes the files in the document root readable for the web server (nginx and Apache, group
+    psaserv), which cannot read what builds and fetches create with
     umask 027 (files 0640, directories 0750, group psacln). Only when the document root's real path
     lies strictly inside the application root's real path (os.path.realpath): equal to it or a
     parent of it would expose the sources and settings files, and a document root elsewhere is none

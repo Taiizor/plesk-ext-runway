@@ -665,6 +665,18 @@ call app-deploy "{\"domain_id\": $ID, \"build\": true}" >/dev/null
     || bad "application root changed: $(diff <(echo "$APP_BEFORE") <(app_snap) | head -6 | tr '\n' ' ')"
 grep -qF "Made 4 files and folders in $PUB readable for the web server (2 symbolic links skipped)" /var/lib/runway/jobs/deploy-$ID.log \
     && ok "the deploy log reports the step" || bad "deploy log: $(grep -i 'readable\|WARNING' /var/lib/runway/jobs/deploy-$ID.log)"
+# Later uploads: the periodic service uses the same rules, without another build or restart.
+[ "$(systemctl is-enabled runway-public-files-$ID.timer)" = "enabled" ] \
+    && ok "a configured web application gets the public files timer" || bad "public files timer missing"
+systemctl stop "runway-public-files-$ID.timer" "runway-public-files-$ID.service"
+PUB_SERVICE_BEFORE=$(systemctl show "runway-app-$ID.service" -p MainPID -p NRestarts)
+runuser -u "$USER_NAME" -- bash -c "umask 027; mkdir -p '$PUB/uploads/reports' && echo download > '$PUB/uploads/reports/file.txt' && echo secret > '$PUB/uploads/.env'"
+systemctl start "runway-public-files-$ID.service"
+[ "$(pub_modes uploads uploads/reports uploads/reports/file.txt uploads/.env)" = "755 755 644 640" ] \
+    && [ "$(systemctl show "runway-app-$ID.service" -p MainPID -p NRestarts)" = "$PUB_SERVICE_BEFORE" ] \
+    && ok "later uploads become readable without rebuilding or restarting; hidden files stay private" \
+    || bad "later upload permissions: $(pub_modes uploads uploads/reports uploads/reports/file.txt uploads/.env)"
+systemctl start "runway-public-files-$ID.timer"
 # A change of the document root on the Runway page (app-docroot, open: true): files that exist
 # already become readable.
 runuser -u "$USER_NAME" -- bash -c "umask 027; echo n > '$PUB/new.txt' && mkdir '$PUB/newdir'"

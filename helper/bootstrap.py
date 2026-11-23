@@ -94,6 +94,8 @@ UNIT_HEALTH = "runway-health.service"
 UNIT_HEALTH_TIMER = "runway-health.timer"
 UNIT_METRICS = "runway-metrics.service"
 UNIT_METRICS_TIMER = "runway-metrics.timer"
+UNIT_PUBLIC_FILES = "runway-public-files-%d.service"
+UNIT_PUBLIC_FILES_TIMER = "runway-public-files-%d.timer"
 
 # Unix socket mode: /run/runway/<id>/app.sock, directory owned by the system user with the
 # web server group (nginx and Apache are members of psaserv, hosting customers are not).

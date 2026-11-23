@@ -4,6 +4,7 @@ def cmd_app_apply(payload):
     result = _app_apply(payload)
     # The health watch timer exists while an application has the watch on.
     sync_health_units()
+    sync_public_files_units(result["state"])
     return result
 
 
@@ -201,6 +202,8 @@ def remove_app(domain_id):
     units = [UNIT_PATH % domain_id, UNIT_DEPLOY % domain_id] + [
         unit for unit in all_app_units(domain_id)
         if unit == UNIT_APP % domain_id or os.path.exists(os.path.join(UNIT_DIR, unit))]
+    units += [unit for unit in (UNIT_PUBLIC_FILES_TIMER % domain_id, UNIT_PUBLIC_FILES % domain_id)
+              if os.path.exists(os.path.join(UNIT_DIR, unit))]
     systemctl("disable", "--now", *units, timeout=120)
     for unit in units:
         remove_quietly(os.path.join(UNIT_DIR, unit))

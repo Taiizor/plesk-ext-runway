@@ -10,6 +10,13 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Fixed
+
+- Files and folders uploaded into an application's document root after a build now get periodic
+  permission checks, including uploads created by running .NET applications in `wwwroot`.
+  Enabled web applications check again 60 seconds after the previous check completes, without
+  rebuilding or restarting; existing ownership, symlink, hidden-file and scan limits still apply.
+
 ## [1.3.0] - 2026-11-17
 
 Continuous resource monitoring, redesigned management pages and optional deployment operations.

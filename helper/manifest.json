@@ -33,6 +33,7 @@
   "app_queries.py",
   "lifecycle.py",
   "deploy.py",
+  "public_files.py",
   "switching/pointers.py",
   "switching/webserver.py",
   "switching/connections.py",

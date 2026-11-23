@@ -334,7 +334,11 @@ the document root, for example `public` with `STATIC_ROOT` set to `public/static
   application directory**, Runway therefore makes the files and folders there readable for the web
   server after every successful build or download (before the new version starts; the deploy log
   says how many it changed) and when the document root is changed on the Runway page (for the
-  files that exist already). The build command needs no `chmod -R o+rX` any more. The rules:
+  files that exist already). Enabled web applications also get a permission check 60 seconds
+  after the previous check finishes, so later uploads (including files created by a running .NET
+  application) become readable without rebuilding or restarting. This is periodic: a new upload
+  can still return 403 until the next check; a running deployment defers it. The build command
+  needs no `chmod -R o+rX` any more. The rules:
   - only a document root strictly inside the application directory, with symbolic links resolved:
     one equal to the application directory or above it (that would publish the sources and
     settings files) or anywhere else (`httpdocs`) is left alone;

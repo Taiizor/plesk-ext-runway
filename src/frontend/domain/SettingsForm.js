@@ -256,8 +256,8 @@ const SettingsForm = ({ data, runtimes, isAdmin = false, saving = false, error =
     const suggestion = documentRootAllowed && isObject(data.config) && normalRoot(values.appRoot) === normalRoot(data.config.appRoot)
         && typeof suggestions[0] === 'string' && suggestions[0] !== typedValue ? suggestions[0] : null;
     // A document root inside the application root: builds create files that the web server cannot
-    // read (umask 027), so Runway makes the files there readable after every build and when the
-    // document root changes (docs/DESIGN.md section 6); the hint says so.
+    // read (umask 027), so Runway makes them readable after builds, document root changes and
+    // periodic checks of later uploads (docs/DESIGN.md section 6); the hint says so.
     const appRootPath = normalRoot(values.appRoot);
     const rootInApp = Boolean(supportsBuild && appRootPath && typedRoot.indexOf(`${appRootPath}/`) === 0);
     // The expected response content and the health watch need a health check path: disabled

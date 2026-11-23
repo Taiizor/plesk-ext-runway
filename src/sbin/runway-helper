@@ -96,6 +96,8 @@ UNIT_HEALTH = "runway-health.service"
 UNIT_HEALTH_TIMER = "runway-health.timer"
 UNIT_METRICS = "runway-metrics.service"
 UNIT_METRICS_TIMER = "runway-metrics.timer"
+UNIT_PUBLIC_FILES = "runway-public-files-%d.service"
+UNIT_PUBLIC_FILES_TIMER = "runway-public-files-%d.timer"
 
 # Unix socket mode: /run/runway/<id>/app.sock, directory owned by the system user with the
 # web server group (nginx and Apache are members of psaserv, hosting customers are not).
@@ -1113,9 +1115,9 @@ def _public_file(dir_fd, name, listed, uid):
 
 
 def _user_open_public_files(app_root, document_root, max_entries, seconds, web_gid=-1):
-    """Runs as the customer (deploy job after a build or fetch, app-docroot after the document root
-    was changed on the Runway page): makes the files in the document root readable for the web
-    server (nginx and Apache, group psaserv), which cannot read what builds and fetches create with
+    """Runs as the customer (after a build/fetch, a document root change, and periodic checks):
+    makes the files in the document root readable for the web server (nginx and Apache, group
+    psaserv), which cannot read what builds and fetches create with
     umask 027 (files 0640, directories 0750, group psacln). Only when the document root's real path
     lies strictly inside the application root's real path (os.path.realpath): equal to it or a
     parent of it would expose the sources and settings files, and a document root elsewhere is none
@@ -6705,6 +6707,7 @@ def cmd_app_apply(payload):
     result = _app_apply(payload)
     # The health watch timer exists while an application has the watch on.
     sync_health_units()
+    sync_public_files_units(result["state"])
     return result
 
 
@@ -6902,6 +6905,8 @@ def remove_app(domain_id):
     units = [UNIT_PATH % domain_id, UNIT_DEPLOY % domain_id] + [
         unit for unit in all_app_units(domain_id)
         if unit == UNIT_APP % domain_id or os.path.exists(os.path.join(UNIT_DIR, unit))]
+    units += [unit for unit in (UNIT_PUBLIC_FILES_TIMER % domain_id, UNIT_PUBLIC_FILES % domain_id)
+              if os.path.exists(os.path.join(UNIT_DIR, unit))]
     systemctl("disable", "--now", *units, timeout=120)
     for unit in units:
         remove_quietly(os.path.join(UNIT_DIR, unit))
@@ -7583,6 +7588,7 @@ def cmd_app_docroot(payload):
             stored["document_root"] = rel
             write_json(app_state_path(domain_id), stored)
     state["document_root"] = rel
+    sync_public_files_units(state)
     public = None
     if payload.get("open"):
         try:
@@ -7787,6 +7793,7 @@ def cmd_reapply_all(_payload):
                 write_units(state, pw)
             if state["listen"] == "unix":
                 ensure_socket_dir(state["domain_id"], pw)
+            sync_public_files_units(state)
             count += 1
         except Exception as exc:  # noqa: BLE001
             errors.append("#%s: %s" % (domain_id, exc))
@@ -8208,6 +8215,72 @@ def _deploy_once(domain_id, job):
             pass
         job_set_status(job, state="succeeded" if ok else "failed", finished_at=now_iso(),
                        exit_code=0 if ok else 1, message=message)
+
+# Source: helper/public_files.py
+# Copyright 2026 Taiizor. Licensed under the MIT License.
+
+# ---------------------------------------------------------------------------
+# Public files
+# ---------------------------------------------------------------------------
+
+def public_files_watch_enabled(state):
+    """Stopped applications still serve static paths; disabled or suspended ones are left alone."""
+    return bool(state.get("document_root") and state.get("listen") != "none"
+                and state.get("enabled") and not state.get("suspended"))
+
+
+def sync_public_files_units(state):
+    """One bounded permission check per application, independent of builds and panel requests."""
+    domain_id = state["domain_id"]
+    service_name = UNIT_PUBLIC_FILES % domain_id
+    timer_name = UNIT_PUBLIC_FILES_TIMER % domain_id
+    service_path = os.path.join(UNIT_DIR, service_name)
+    timer_path = os.path.join(UNIT_DIR, timer_name)
+    if not public_files_watch_enabled(state):
+        if os.path.exists(timer_path) or os.path.exists(service_path):
+            systemctl("disable", "--now", timer_name)
+            systemctl("stop", service_name)
+            remove_quietly(timer_path)
+            remove_quietly(service_path)
+            systemctl("daemon-reload")
+            systemctl("reset-failed", service_name, timer_name)
+        return
+    service = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]", "Description=Runway: public file permissions for application #%d" % domain_id, "",
+        "[Service]", "Type=oneshot", "ExecStart=%s _public-files %d" % (HELPER_COPY, domain_id),
+        "TimeoutStartSec=%d" % (PUBLIC_FILES_SECONDS + 60), "Nice=10", "",
+    ])
+    timer = "\n".join([
+        "# Managed by the Plesk Runway extension. Manual changes will be overwritten.",
+        "[Unit]", "Description=Runway: check public file permissions every minute", "",
+        "[Timer]", "OnActiveSec=15", "OnUnitInactiveSec=60", "AccuracySec=1", "",
+        "[Install]", "WantedBy=timers.target", "",
+    ])
+    changed = write_unit_file(service_path, service)
+    changed = write_unit_file(timer_path, timer) or changed
+    if changed:
+        systemctl("daemon-reload", check=True)
+    if changed or not unit_enabled(timer_name) or not unit_is_active(timer_name):
+        systemctl("enable", "--now", timer_name, check=True)
+
+
+def internal_public_files(domain_id):
+    """Repair later uploads with the same ownership, path and symlink rules as the build step."""
+    lock = FileLock("public-files-%d" % domain_id)
+    if not lock.acquire(blocking=False):
+        return
+    try:
+        state, pw = load_app_state(domain_id)
+        if not public_files_watch_enabled(state) or state.get("tampered") or unit_is_active(UNIT_DEPLOY % domain_id):
+            return
+        # Do not hold the deploy lock: a permission scan must never delay a deployment. The
+        # descriptor-based walk tolerates files being replaced by a concurrent build or upload.
+        result = open_public_files(state, pw)
+        if result is not None and (result.get("changed") or result.get("passable") or result.get("truncated")):
+            print(public_files_summary(result, state["document_root"]))
+    finally:
+        lock.release()
 
 # Source: helper/switching/pointers.py
 # Copyright 2026 Taiizor. Licensed under the MIT License.
@@ -10440,6 +10513,9 @@ def main(argv):
         return 0
     if command == "_metrics" and len(argv) == 2:
         internal_metrics()
+        return 0
+    if command == "_public-files" and len(argv) == 3:
+        internal_public_files(v_domain_id(argv[2]))
         return 0
 
     handler = COMMANDS.get(command)

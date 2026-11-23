@@ -217,6 +217,7 @@ def cmd_app_docroot(payload):
             stored["document_root"] = rel
             write_json(app_state_path(domain_id), stored)
     state["document_root"] = rel
+    sync_public_files_units(state)
     public = None
     if payload.get("open"):
         try:
