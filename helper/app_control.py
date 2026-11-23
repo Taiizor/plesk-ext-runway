@@ -29,12 +29,15 @@ def _app_apply(payload):
     # must never restore an old unconfined unit while an administrator enables isolation.
     lock = FileLock("deploy-%d" % domain_id)
     if not state["enabled"] or state["suspended"]:
+        # Disabling or suspension ends a running deployment first (a switch finishes or rolls back).
         systemctl("disable", "--now", UNIT_PATH % domain_id)
         systemctl("stop", UNIT_DEPLOY % domain_id, timeout=ZD_DEPLOY_STOP + 30)
-        acquired = lock.acquire(blocking=True, timeout=60)
-    else:
-        acquired = not unit_is_active(UNIT_DEPLOY % domain_id) and lock.acquire(blocking=False)
-    if not acquired:
+        if not lock.acquire(blocking=True, timeout=60):
+            raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+    elif unit_is_active(UNIT_DEPLOY % domain_id):
+        # The 1.0 wording (docs/DESIGN.md section 12.5); the smoke tests match on it.
+        raise HelperError("A deployment is running for this application. Wait until it finishes, then save again.")
+    elif not lock.acquire(blocking=False):
         raise HelperError("Another deployment or settings change is in progress. Wait until it finishes, then save again.")
     try:
         state, pw = validate_app(payload)
