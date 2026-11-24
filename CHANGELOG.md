@@ -24,7 +24,12 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   explicit writable folders and Unix sockets, gives each application private caches and supports
   offline networking. Unset isolated resource limits default to 1024 MiB, 100% CPU, 1024 tasks.
   Policy changes stop old slots and rebuild; customers cannot disable policy through application
-  removal or recovery. The isolation strings are translated into every panel language.
+  removal or recovery. A native-ABI libseccomp filter prevents namespace creation and entry
+  without writing `/proc/sys`, so Docker's and systemd's read-only kernel settings stay in place;
+  the services of isolated applications run without `ProtectKernelTunables` (its read-only
+  `/proc` paths would make the kernel refuse bubblewrap's own `/proc`, which keeps `/proc/sys`
+  read-only inside the sandbox). Native build headers are available read-only for cgo and other
+  compiled dependencies. The isolation strings are translated into every panel language.
 - Offline Linux namespace regression runner and an opt-in isolated runtime E2E matrix
   (`RUNWAY_E2E_ISOLATION=1`). CI runs isolation end to end in its own Plesk container: the Go
   sample isolated through the panel, then the namespace, file, network and web server checks of
@@ -45,7 +50,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   zero-downtime saves and Restart in that case and did not lock the others. A save that keeps the
   stored environment variables reads them after the wait. While a deployment runs, Start,
   Restart, Recover and saves are refused at once with the 1.0 messages (1.3.0 refused only saves
-  of zero-downtime applications or with a build, and Restart of zero-downtime applications).
+  of zero-downtime applications or with a build, and Restart of zero-downtime applications); a
+  save that disables the application or a domain suspension still stops the deployment first and
+  waits up to 60 seconds.
   Stop waits up to 10 seconds for a short holder, never for a deployment, and a Start that waited
   while a Stop ran is refused.
 - Upgrades and toolchain changes re-render an application whose deployment lock is busy a
@@ -53,6 +60,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   reboot); upgrades also strip root-privileged Exec lines from its old units meanwhile.
   Uninstalling removes an application even when its lock stays busy, deletes any leftover
   application units and reports what it could not remove.
+- Environment variables named `RUNWAY_ISOLATION_*` are reserved for Runway: saves that set them
+  are refused, and the upgrade removes stored ones and reports them.
 - The frontend bundle shrinks from 246 KiB to 201 KiB: the SDK's query-string helper uses a small
   equivalent of `qs.stringify` instead of the full `qs` package, below webpack's size limit.
 
@@ -70,22 +79,9 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Configured static paths reject hidden files and common server interpreter extensions.
   Apache forces static handling, disables CGI/SSI and symlink following, and keeps authentication
   overrides. nginx retains Plesk's existing static access controls.
-- Classic and slot-based configuration/start operations share the deployment lock so an
-  isolation policy change cannot race a stale unit writer. Private command/environment payloads
-  are restored inside the namespace, after the trusted unprivileged launcher has started.
-- Isolated applications start on regular Linux servers: their services no longer set
-  `ProtectKernelTunables`, whose read-only `/proc` paths made the kernel refuse bubblewrap's own
-  `/proc` (builds were not affected; Docker Desktop test containers hid the problem).
-- CI warms the GitHub release cache for every end-to-end job that installs a toolchain from
-  GitHub, so the panel job no longer fails on the anonymous API limit of the runner.
-- Isolation keeps Docker/systemd's read-only kernel settings: a native-ABI libseccomp filter
-  prevents namespace creation/entry without writing `/proc/sys`. Native build headers are
-  available read-only for cgo and other compiled dependencies.
 - Zero-downtime marker checks follow Plesk's `nginx_ip_default.conf` when the domain is the
   default site and `nginx.conf` is a placeholder. Runtime integration tests restore the full
   application configuration/environment and wait for scheduled path-routing reloads.
-- Isolation form controls use distinct DOM IDs and policy actions wake status polling, including
-  its background-tab grace period, so deployment completion clears the form's busy state.
 
 ## [1.3.0] - 2026-11-17
 
