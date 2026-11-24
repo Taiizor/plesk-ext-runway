@@ -116,6 +116,9 @@ def main(argv):
     if command == "_public-files" and len(argv) == 3:
         internal_public_files(v_domain_id(argv[2]))
         return 0
+    if command == "_rerender" and len(argv) == 3:
+        internal_rerender(v_domain_id(argv[2]))
+        return 0
 
     handler = COMMANDS.get(command)
     if handler is None:

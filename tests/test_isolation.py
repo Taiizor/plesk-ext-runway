@@ -13,6 +13,8 @@ import subprocess
 import socket
 import sys
 import tempfile
+import threading
+import time
 from types import SimpleNamespace
 import unittest
 from unittest import mock
@@ -44,7 +46,7 @@ class IsolationTests(unittest.TestCase):
         for name, value in {"ISOLATION_CONFIG_DIR": self.root / "policy", "LOCK_DIR": self.root / "locks",
                             "OPS_CONFIG_DIR": self.root / "operations", "OPS_DATA_DIR": self.root / "ops-data",
                             "APPS_DIR": self.root / "states", "UNIT_DIR": self.root / "units",
-                            "RUN_DIR": self.root / "run"}.items():
+                            "RUN_DIR": self.root / "run", "RERENDER_DIR": self.root / "rerender"}.items():
             value.mkdir()
             self.stack.enter_context(mock.patch.object(self.h, name, str(value)))
         self.stack.enter_context(mock.patch.object(self.h, "load_app_state", return_value=(self.state, self.pw)))
@@ -173,9 +175,203 @@ class IsolationTests(unittest.TestCase):
             self.h._isolation_socket_fd(str(link))
 
     def test_classic_configuration_saves_cannot_race_an_isolation_policy_change(self):
-        with self.h.FileLock("deploy-17"), self.assertRaises(self.h.HelperError):
-            self.h._app_apply(dict(self.state))
+        with mock.patch.object(self.h, "DEPLOY_LOCK_WAIT", 0.3), self.h.FileLock("deploy-17"):
+            with self.assertRaisesRegex(self.h.HelperError, "Another deployment or settings change is in progress"):
+                self.h._app_apply(dict(self.state))
+            with self.assertRaisesRegex(self.h.HelperError, "still in progress"):
+                self.h.cmd_app_action({"domain_id": 17, "action": "start"})
         self.systemctl.assert_not_called()
+
+    def test_saves_and_starts_wait_for_a_short_holder_of_the_deploy_lock(self):
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+        threading.Timer(0.4, holder.release).start()
+        started = time.monotonic()
+        lock, reason = self.h.try_deploy_lock(17, 5)
+        try:
+            self.assertIsNone(reason)
+            self.assertGreaterEqual(time.monotonic() - started, 0.3)
+        finally:
+            lock.release()
+        with self.h.FileLock("deploy-17"):
+            self.assertEqual((None, "busy"), self.h.try_deploy_lock(17, 0.2))
+
+    def test_a_running_deployment_refuses_saves_and_starts_at_once_but_never_stop(self):
+        deploying = mock.patch.object(self.h, "unit_is_active", side_effect=lambda unit: unit == self.h.UNIT_DEPLOY % 17)
+        with deploying, mock.patch.object(self.h, "DEPLOY_LOCK_WAIT", 30):
+            started = time.monotonic()
+            # The 1.0 wording: tests/helper-smoke.sh and docs/DESIGN.md section 12.5 rely on it.
+            with self.assertRaisesRegex(self.h.HelperError, "^A deployment is running for this application"):
+                self.h._app_apply(dict(self.state))
+            for action in ("start", "restart", "recover"):
+                with self.subTest(action=action), \
+                        self.assertRaisesRegex(self.h.HelperError, "^A deployment is already running for this application$"):
+                    self.h.cmd_app_action({"domain_id": 17, "action": action})
+            self.assertLess(time.monotonic() - started, 5)
+            self.systemctl.assert_not_called()
+            with self.h.FileLock("deploy-17"), mock.patch.object(self.h, "update_state_flags") as flags, \
+                    mock.patch.object(self.h, "ops_event"):
+                self.h.cmd_app_action({"domain_id": 17, "action": "stop"})
+            flags.assert_called_once_with(17, stopped=True)
+            self.systemctl.assert_any_call("disable", "--now", self.h.UNIT_APP % 17, check=True, timeout=120)
+
+    def test_reapply_defers_a_busy_application_and_strips_its_root_exec_lines(self):
+        unit = Path(self.h.UNIT_DIR) / (self.h.UNIT_APP % 17)
+        unit.write_text("[Service]\nExecStartPre=+/bin/mkdir -p /run/runway/17\nExecStart=/bin/true\n")
+        with mock.patch.object(self.h, "iter_app_states", return_value=[dict(self.state)]), \
+                mock.patch.object(self.h, "unit_is_active", side_effect=lambda name: name == self.h.UNIT_DEPLOY % 17), \
+                mock.patch.object(self.h, "run") as run, mock.patch.object(self.h, "write_units") as write_units, \
+                mock.patch.object(self.h, "ensure_layout"), mock.patch.object(self.h, "sync_health_units"), \
+                mock.patch.object(self.h, "sync_metrics_units"), mock.patch.object(self.h, "sync_public_files_units"):
+            result = self.h.cmd_reapply_all(None)
+            self.assertTrue(os.path.exists(self.h.rerender_marker_path(17)))
+            with mock.patch.object(self.h, "iter_app_states", return_value=[dict(self.state, toolchain="1")]), \
+                    mock.patch.object(self.h, "validate_app", return_value=(dict(self.state), self.pw)):
+                self.assertEqual(0, self.h.rerender_runtime_apps("binary"))
+        write_units.assert_not_called()
+        self.assertEqual(0, result["count"])
+        self.assertIn("#17: a deployment is running; its units are re-rendered once the deploy lock is free", result["errors"])
+        self.assertNotIn("ExecStartPre=+", unit.read_text())
+        self.assertIn("ExecStart=/bin/true", unit.read_text())
+        for call in run.call_args_list:
+            command = call.args[0]
+            self.assertEqual(["systemd-run", "--on-active=60", "--unit=runway-rerender-17"], command[:3])
+            self.assertEqual([self.h.HELPER_COPY, "_rerender", "17"], command[-3:])
+        self.assertEqual(2, run.call_count)
+
+    def test_a_waiting_save_keeps_the_variables_another_save_stored_meanwhile(self):
+        self.h.write_json(self.h.app_state_path(17), dict(self.state, env={"API_KEY": "old"}))
+        payload = {key: value for key, value in self.state.items() if key != "env"}
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+
+        def other_save():
+            self.h.write_json(self.h.app_state_path(17), dict(self.state, env={"API_KEY": "new"}))
+            holder.release()
+
+        threading.Timer(0.4, other_save).start()
+        with mock.patch.object(self.h, "write_units"), mock.patch.object(self.h, "prepare_start"), \
+                mock.patch.object(self.h, "ensure_layout"), mock.patch.object(self.h, "web_server_group"), \
+                mock.patch.object(self.h, "allocate_port", return_value=25001):
+            result = self.h._app_apply(payload)
+        self.assertEqual({"API_KEY": "new"}, result["state"]["env"])
+        self.assertEqual({"API_KEY": "new"}, self.h.read_json(self.h.app_state_path(17))["env"])
+
+    def test_a_stop_that_arrives_while_start_waits_wins(self):
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+
+        def stop():
+            self.state["stopped"] = True  # what Stop wrote while Restart waited for the lock
+            holder.release()
+
+        threading.Timer(0.4, stop).start()
+        with self.assertRaisesRegex(self.h.HelperError, "stopped while this action waited"):
+            self.h.cmd_app_action({"domain_id": 17, "action": "restart"})
+        self.systemctl.assert_not_called()
+
+    def test_stop_waits_briefly_for_a_short_holder_but_never_fails_on_the_lock(self):
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+        threading.Timer(0.4, holder.release).start()
+        with mock.patch.object(self.h, "update_state_flags"), mock.patch.object(self.h, "ops_event"):
+            started = time.monotonic()
+            self.h.cmd_app_action({"domain_id": 17, "action": "stop"})
+            self.assertGreaterEqual(time.monotonic() - started, 0.3)
+            self.systemctl.reset_mock()
+            with mock.patch.object(self.h, "STOP_LOCK_WAIT", 0.2), self.h.FileLock("deploy-17"):
+                self.h.cmd_app_action({"domain_id": 17, "action": "stop"})
+        self.systemctl.assert_any_call("disable", "--now", self.h.UNIT_APP % 17, check=True, timeout=120)
+
+    def test_reconcile_schedules_a_lost_rerender_again_and_drops_markers_of_removed_apps(self):
+        self.h.write_json(self.h.app_state_path(17), self.state)
+        for domain_id in (17, 18):
+            Path(self.h.rerender_marker_path(domain_id)).write_text("")
+        with mock.patch.object(self.h, "run") as run:
+            self.h.reschedule_rerenders()
+        self.assertEqual(1, run.call_count)
+        self.assertEqual([self.h.HELPER_COPY, "_rerender", "17"], run.call_args.args[0][-3:])
+        self.assertTrue(os.path.exists(self.h.rerender_marker_path(17)))
+        self.assertFalse(os.path.exists(self.h.rerender_marker_path(18)))
+
+    def test_deferred_rerender_waits_for_the_deploy_lock_and_renders_the_units(self):
+        Path(self.h.rerender_marker_path(17)).write_text("")
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+        threading.Timer(0.4, holder.release).start()
+        with mock.patch.object(self.h, "write_units") as write_units, mock.patch.object(self.h, "sync_public_files_units"), \
+                mock.patch.object(self.h, "deploy_timeout", return_value=10):
+            self.h.internal_rerender(17)
+            write_units.assert_called_once_with(self.state, self.pw)
+            self.systemctl.assert_any_call("daemon-reload")
+            self.assertFalse(os.path.exists(self.h.rerender_marker_path(17)))
+            write_units.reset_mock()
+            with mock.patch.object(self.h, "load_app_state", side_effect=self.h.HelperError("removed")):
+                self.h.internal_rerender(17)
+            write_units.assert_not_called()
+            # A request that arrives while the re-render runs keeps its marker for Reconcile.
+            Path(self.h.rerender_marker_path(17)).write_text("first")
+            write_units.side_effect = lambda *a: Path(self.h.rerender_marker_path(17)).write_text("second")
+            self.h.internal_rerender(17)
+            self.assertEqual("second", Path(self.h.rerender_marker_path(17)).read_text())
+
+    def test_removal_waits_for_the_deploy_lock_and_only_uninstall_goes_on_without_it(self):
+        unit = os.path.join(self.h.UNIT_DIR, self.h.UNIT_APP % 17)
+        with contextlib.ExitStack() as stack:
+            for name in ("remove_socket_dir", "remove_link", "remove_include", "ops_remove_metadata", "sync_health_units"):
+                stack.enter_context(mock.patch.object(self.h, name))
+            remove = stack.enter_context(mock.patch.object(self.h, "remove_quietly"))
+            stack.enter_context(mock.patch.object(self.h, "LOCK_TIMEOUT", 0.3))
+            stack.enter_context(self.h.FileLock("deploy-17"))
+            with self.assertRaisesRegex(self.h.HelperError, "still in progress"):
+                self.h.remove_app(17)
+            self.assertNotIn(mock.call(unit), remove.call_args_list)
+            self.h.remove_app(17, force=True)
+        remove.assert_any_call(unit)
+        remove.assert_any_call(self.h.rerender_marker_path(17))
+        self.systemctl.assert_any_call("stop", "runway-rerender-17.timer", "runway-rerender-17.service",
+                                       "runway-redeploy-17.timer", "runway-redeploy-17.service", timeout=60)
+
+    def test_uninstall_removes_every_application_and_its_leftover_units(self):
+        units = Path(self.h.UNIT_DIR)
+        (units / (self.h.UNIT_APP % 17)).write_text("[Service]\n")
+        (units / "runway-app-99.service").write_text("[Service]\n")  # an application without a state
+        (self.root / "tmpfiles").mkdir()
+        inside = str(self.root)
+
+        def remove_quietly(path):
+            # Only files of this fixture: the other paths of an application are real ones.
+            if str(path).startswith(inside) and os.path.lexists(path):
+                os.remove(path)
+
+        with contextlib.ExitStack() as stack:
+            for name in ("remove_socket_dir", "remove_link", "remove_include", "ops_remove_metadata",
+                         "sync_health_units", "sync_metrics_units"):
+                stack.enter_context(mock.patch.object(self.h, name))
+            stack.enter_context(mock.patch.object(self.h, "remove_quietly", side_effect=remove_quietly))
+            stack.enter_context(mock.patch.object(self.h, "iter_app_states", return_value=[dict(self.state)]))
+            stack.enter_context(mock.patch.object(self.h, "LOCK_TIMEOUT", 0.3))
+            stack.enter_context(mock.patch.object(self.h, "TMPFILES_DIR", str(self.root / "tmpfiles")))
+            rmtree = stack.enter_context(mock.patch.object(self.h.shutil, "rmtree"))
+            stack.enter_context(self.h.FileLock("deploy-17"))
+            result = self.h.cmd_uninstall({})
+        self.assertEqual([17], result["removed_apps"])
+        self.assertEqual(["removed leftover units: runway-app-99.service"], result["errors"])
+        self.assertEqual([], sorted(path.name for path in units.iterdir()))
+        self.assertTrue(rmtree.called)
+
+    def test_uninstall_sweeps_leftover_application_units_only(self):
+        units = Path(self.h.UNIT_DIR)
+        leftovers = ["runway-app-99-b.service", "runway-app-99.service", "runway-deploy-99.path",
+                     "runway-deploy-99.service", "runway-public-files-99.timer"]
+        kept = ["runway-health.timer", "runway-converge.service", "runway-job-admin.service", "other.service"]
+        for name in leftovers + kept:
+            (units / name).write_text("[Unit]\n")
+        self.assertEqual(leftovers, self.h.remove_leftover_app_units())
+        self.assertEqual(sorted(kept), sorted(path.name for path in units.iterdir()))
+        self.systemctl.assert_any_call("disable", "--now", *leftovers, timeout=120)
+        self.systemctl.assert_any_call("stop", "runway-rerender-*.timer", "runway-rerender-*.service",
+                                       "runway-redeploy-*.timer", "runway-redeploy-*.service", timeout=60)
 
     def test_customer_application_removal_keeps_the_administrator_policy(self):
         self.options()

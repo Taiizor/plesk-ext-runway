@@ -231,6 +231,8 @@ def cmd_apps_list(payload):
     """Every application with the state of its live unit. converge: true (the panel's scheduled
     Reconcile only) also repairs zero-downtime slots and pointers (docs/DESIGN.md section 12.8)."""
     converge = bool((payload or {}).get("converge"))
+    if converge:
+        reschedule_rerenders()
     states = list(iter_app_states())
     for state in states:
         if not isinstance(state.get("domain_id"), int):

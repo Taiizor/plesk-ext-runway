@@ -61,9 +61,9 @@ Runway/
 |---|---|
 | Helper | `/usr/local/psa/admin/sbin/modules/runway/runway-helper`, stable copy `/opt/runway/bin/runway-helper` |
 | Toolchains | `/opt/runway/<runtime>/...` (e.g. `/opt/runway/go/1.27.4`, `/opt/runway/rust/{rustup,cargo}`, `/opt/runway/bun/1.3.2`, `/opt/runway/java/21.0.5`, `/opt/runway/dotnet` (shared root, versions inside), `/opt/runway/python/3.13.1` (uv-managed), `/opt/runway/uv/uv`) |
-| State | `/var/lib/runway/{apps,jobs,locks,cache,health}` (root 0700; `health/<id>.json`: the health watch, §7) |
+| State | `/var/lib/runway/{apps,jobs,locks,cache,health,rerender}` (root 0700; `health/<id>.json`: the health watch, §7; `rerender/<id>`: a deferred re-render, §12.8) |
 | Env files | `/etc/runway/env/<domainId>.env` (root 0600) |
-| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service` and `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left); zero-downtime slots `runway-app-<id>-a.service`, `-b.service` and the boot unit `runway-converge.service` (§12.3); `runway-health.timer` + `runway-health.service` while an application has the health watch on (§7) |
+| Units | `runway-app-<id>.service`, `runway-deploy-<id>.service`, `runway-deploy-<id>.path`, transient `runway-job-admin.service`, `runway-redeploy-<id>` (timer that restarts a deployment when a trigger file changed while no time was left) and `runway-rerender-<id>` (timer that re-renders an application a minute after an upgrade or a toolchain change found its deploy lock busy, §12.8); zero-downtime slots `runway-app-<id>-a.service`, `-b.service` and the boot unit `runway-converge.service` (§12.3); `runway-health.timer` + `runway-health.service` while an application has the health watch on (§7) |
 | Sockets | `/run/runway/<id>/app.sock` (dir `sysuser:psaserv` 2750, created by the helper as root; at boot by `systemd-tmpfiles` from `/etc/tmpfiles.d/runway-<id>.conf`, plus `runway.conf` for `/run/runway` itself); zero-downtime: `a.sock`, `b.sock` and the root link `/run/runway/<id>.sock` (§12.3) |
 | Web include files | zero-downtime tcp applications: `/etc/runway/web/<id>.nginx.conf`, `<id>.apache.conf` (root 0644, the live port) |
 | Per-user caches | `~/.runway/` in the subscription (GOPATH, GOCACHE, CARGO_HOME, BUN_INSTALL cache, Maven/Gradle caches, NUGET_PACKAGES, pip/uv cache, GEM_HOME, Composer cache) |
@@ -341,19 +341,20 @@ their code.
 | `app-page` | `{domain_id, sysuser, app_root, runtime, listen?, toolchain?, document_roots?}` | `{toolchains:{key:[installed...]}, build_deps, config:{env} \| null, status, inspect:{exists, entries (max 80), entry_count, triggers:{deploy,restart}, document_root, public_dirs, path, home, <runtime>: detection \| null, inspect_errors?}, defaults:{key:{build_cmd, start_cmd, unix_supported, listen, variants}}}`; `variants["<tcp\|unix>\|<toolchain>"]` holds the defaults per listen mode (toolchain `""`, or every installed toolchain for runtimes whose defaults depend on it: PHP) |
 | `app-sample` | `{domain_id, sysuser, app_root, runtime, listen, toolchain?, force?}` | `{written:[files], toolchain, defaults:{build_cmd,start_cmd,...}}`; refuses a non-empty app root (entries other than `tmp`) unless `force` (code `not_empty`) and a unix sample for a toolchain outside `unix_toolchain_re` (code `unix_unsupported`) |
 | `app-deploy` | `{domain_id, build: bool, start?: bool}` or `{domain_id, fetch:{url, sha256, extract, filename, build}}` | `{job}`; `start: true` (panel "Build & restart") clears `stopped`/`tampered`; deploys of a stopped app (CLI, fetch, trigger files) build but do not start it (job succeeds with "The application is stopped; it was not started") |
-| `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps |
+| `app-action` | `{domain_id, action: start\|restart\|stop\|recover, plain?}` | `{action}` (`{action, job}` for the switch job of a zero-downtime restart; `plain: true` restarts in place); start/restart clear `stopped`/`tampered`, call `prepare_start()` and enable + start the unit; stop sets `stopped` and runs `disable --now`; recover (Reconcile, for apps systemd gave up on: `start_limit_hit` in `apps-list`) refuses stopped apps. Start, restart and recover run under the deploy lock (refused while a deployment runs; a start or restart whose application was stopped while it waited for the lock is refused: "The application was stopped while this action waited; start it again"); stop waits up to 10 s for a short holder of the lock, never for a deployment (§12.5) |
 | `app-status` | `{domain_id}` | `{configured, service:{load_state, active_state, sub_state, main_pid, started_at (systemctl with TZ=UTC), started_iso, restarts, memory_bytes, memory_used_bytes, memory_cache_bytes, result, enabled}, watcher:{active_state, enabled}, deploy:{job status}}` plus, for configured apps, `enabled, suspended, stopped, tampered (+ tampered_at, tampered_detail), listen_mode, mode, mount_path, static_paths, health_path, health_match, health (healthy\|unhealthy\|unknown), health_detail, health_code, health_params, health_watch` (null while off, see below), and with a port `port, socket (unix), listener (ok\|none\|foreign\|tampered\|worker), listener_detail, listener_code, listener_params, listening`. Unix mode: a tampered socket path is contained before the status is read |
 | `apps-list` | — | `{apps:[{domain_id, domain, runtime, toolchain, port, enabled, listen, mode, document_root, updated_epoch, suspended, stopped, tampered, sysuser, app_dir, home_changed, active_state, sub_state, result, start_limit_hit, memory_bytes, memory_used_bytes, memory_cache_bytes}], reconcile_paused}` (memory: see below); `start_limit_hit` = failed and (`Result=start-limit-hit` or `NRestarts` ≥ 10: systemd 255 keeps the last exit result when automatic restarts hit the limit); contains tampered socket paths of unix apps (the scheduled reconcile calls it every 10 minutes); zero-downtime fields and `{converge: true}`: §12.8 |
 | `info` | — | `{helper_version, python, systemd, os, arch, rust_target, build_deps, installed, fetch_insecure, selinux, update_source}` (`update_source`: the URL of the test-only switch, or null) |
 | `update-status` | — | no network: `{installed: "X.Y.Z-R", installed_version, installed_release, latest: {tag, version, release, full, html_url, published_at, zip: {name, url, size}, sums_url} \| null, available, checked_at, error, update_source, last_failed_version, last_failed_at, job}`; the installed version comes from Plesk's `/usr/local/psa/admin/plib/modules/runway/meta.xml` (`VERSION` and release 0 when unreadable); `latest`/`checked_at`/`error` only when they belong to the current source |
 | `update-check` | `{force, auto_install}` | the `update-status` fields plus `checked` (network used), `started` (self-update job started), `auto_skipped`/`auto_error`; uses the network unless the cache of the current source is younger than 12 hours (`force`: 60 seconds); failures are cached with `checked_at` as `error`; `auto_install` starts the job when an update is available, no admin job runs and the same version did not fail within 24 hours |
 | `update-install` | `{version: "X.Y.Z-R"}` | `{job: "admin", version}`; refuses a malformed version, one that is not newer than the installed one, one that is not the cached available update, and a running admin job |
-| `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; post-install prints and logs `errors` |
+| `install`, `reapply-all` | — | `{count, errors, info?}`: re-renders env files, units and tmpfiles entries of every app and creates the socket directories (running services keep running); stored variables that are no longer allowed are dropped (reported in `errors`), and units of apps that cannot be re-rendered lose root-privileged Exec lines; an app whose deploy lock is busy is reported, loses those lines too and is re-rendered a minute later (`runway-rerender-<id>`, §12.8); post-install prints and logs `errors` |
 | `docroot-check` | `{sysuser, document_root}` | `{exists, real, document_root}`: as the system user, the document root (relative, `v_document_root`: the rules of an application root, at most 255 characters, no segment that starts with `-`) must stay strictly inside the home directory once `os.path.realpath` resolved the links (code `docroot_outside`) and, when it exists (`lexists`), be a directory (code `docroot_not_dir`); `real` is the resolved path relative to the home directory. A missing path is fine. Changes nothing |
 | `docroot-access` | `{sysuser, document_root}` | `{changed, blocked, document_root}`: run by the panel after Plesk changed the document root. As the system user, every directory of the resolved path below the home directory, the document root included, that the web server group cannot pass (neither group `psaserv` with `g+x` nor `o+x`) gets `o+x` (`fchmod` through an `O_NOFOLLOW` descriptor, never the read bit); directories of other owners and unopenable ones are reported in `blocked`, never changed |
 | `app-docroot` | `{domain_id, document_root, open?}` | `{configured, document_root, public}`: the domain's document root for the application's state (§6): stored like `app-apply`'s `document_root` (under the state lock, `""` for workers and invalid values); with `open: true` the step of *Public files* runs at once (`public`: its result, `null` when it does not apply, `{error}` when it failed; the state is stored anyway). Without a state `configured: false` and nothing changes |
-| `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`); `app-logs` merges the journals of the app units (§12.10) | |
+| `app-logs`, `app-remove`, `app-config`, `app-inspect`, `job-status`, `build-deps-install`, `web-reconfigure`, `uninstall` | as in the base (`uninstall` also removes the tmpfiles entries and `/run/runway`, removes an application also when its deploy lock stays busy, deletes every per-application unit file that is left and returns `errors`; `app-remove`: §12.8); `app-logs` merges the journals of the app units (§12.10) | |
 | `_converge` (internal) | — | run by `runway-converge.service` at boot (and usable by hand): the convergence of §12.8 for every application with zero-downtime slots or pointer files |
+| `_rerender <id>` (internal) | — | run by the transient `runway-rerender-<id>` a minute after `reapply-all` or a toolchain change found the application's deploy lock busy: waits for the lock, then re-renders like `reapply-all` (§12.8) |
 | `_health [now]` (internal) | — | run by `runway-health.service` every 10 s (`runway-health.timer`): the health watch below; `now` checks every watched application at once, without the interval and the start grace (tests, by hand) |
 
 Memory of an application unit (`app-status` `service` and `slots`, `apps-list`):
@@ -1092,9 +1093,9 @@ intent record, which the convergence or the boot unit settles from the pointer (
 | Restart (panel, API, CLI), `restart.txt` | `app-action restart` starts the deploy job in restart mode (as `app-deploy {build: false, start: true}`, clearing `stopped`) and returns `{action, job}`; refused while a deployment runs; when the live unit is not active: plain restart, no job |
 | Restart in place | `app-action {action: restart, plain: true}`: plain restart (below) |
 | Save | `app-apply` renders the units and env files of both slots (and of the 1.0 unit while it is live) without touching the live instance; with a build command the deploy job builds and switches (as in 1.0); without one, `app-apply` (restart requested, live unit active, `restart_plain` false) starts the switch job and returns `job` |
-| Start | plain start of the live unit (an intent record left by an interrupted switch is settled first, §12.8) |
+| Start | plain start of the live unit (an intent record left by an interrupted switch is settled first, §12.8); refused while a deployment runs (see Concurrency below) |
 | Stop | sets `stopped`, stops and disables every app unit (`runway-app-<id>.service`, `-a`, `-b`); the pointer stays (502, as for a stopped 1.0 application) |
-| Recover (Reconcile, start limit hit) | plain start of the live unit |
+| Recover (Reconcile, start limit hit) | plain start of the live unit; refused while a deployment runs (Reconcile retries 10 minutes later) |
 | Suspend, disable | as in 1.0 for all three app units (stopping the deploy unit first ends a running switch, §12.4) |
 | Re-activation | plain start of the live unit |
 
@@ -1131,12 +1132,21 @@ subscription's system user or the application root of an application that has or
 `restart_plain` (the web server configuration or the socket owner changes with it), also while the
 1.0 unit is still the live instance: one plain restart instead of a switch.
 
-Concurrency: for switchable applications `app-apply` holds the deploy lock (taken without waiting;
-lock order deploy, then ports) for its whole run: check, state write, rendering, pointer and job
-start; when a deployment holds it, the save is refused ("A deployment is running ...", as in 1.0 for
-saves with a build), except disabling and suspension, which stop the deploy unit first and then
-wait for the lock; Reconcile retries 10 minutes later. Restart is refused while a deployment runs. A
-trigger file touched during a switch starts another round afterwards, as in 1.0. Applications switch
+Concurrency: `app-apply` holds the deploy lock (lock order deploy, then ports) for its whole run:
+check, state write, rendering, pointer and job start; since application isolation (§14) this holds
+for every application, not only switchable ones. While a deployment runs (its deploy unit is active,
+also while the job still waits for the lock) the save is refused at once ("A deployment is running
+...", as in 1.0 for saves with a build); another holder of the lock (a save, Start, Restart, Recover,
+the health watch, the convergence, a re-render, an isolation policy change: seconds each) is waited
+for up to 30 s (`DEPLOY_LOCK_WAIT`; then "Another deployment or settings change is in progress
+..."). Disabling and suspension stop the deploy unit first and then wait up to 60 s for the lock;
+Reconcile retries 10 minutes later. Start, Restart and Recover take the lock the same way, also for
+applications without the setting: refused at once while a deployment runs ("A deployment is already
+running for this application"), so none of them starts a unit that a save or a policy change is
+rewriting; one whose application was stopped while it waited is refused. Stop waits up to 10 s
+(`STOP_LOCK_WAIT`) for a short holder, so a Start in progress does not override it, but never for
+a deployment (it stops a running switch, §12.4) and goes ahead without the lock when it stays
+busy. A trigger file touched during a switch starts another round afterwards, as in 1.0. Applications switch
 independently; their include writes, reloads and confirmations are serialized by the server-wide
 `web-reload` lock.
 
@@ -1250,8 +1260,17 @@ may bind only their own port (`SocketBindAllow=tcp:<port_a>` or `tcp:<port_b>`,
 - **Pointer writers**: the switch job, the plain restart, `app-apply` and the convergence, each
   under the application's deploy lock and from a state read under it. `write_units()` renders the
   units and env files only (for applications that are not switchable it also writes the 1.0
-  tmpfiles entry, as in 1.0). `reapply-all` and `rerender_runtime_apps` take the deploy lock
-  without waiting per application and leave the pointer alone while a deployment holds it.
+  tmpfiles entry, as in 1.0). `reapply-all` and `rerender_runtime_apps` take the deploy lock per
+  application, waiting up to 10 s for a short holder (`RERENDER_LOCK_WAIT`). An application whose
+  deploy unit is active, or whose lock stays busy, is skipped and reported; `runway-rerender-<id>`
+  (transient: `systemd-run --on-active=60`, `_rerender <id>`; a pending one is kept, `app-remove`
+  stops it) re-renders it once the lock is free, a minute later at the earliest: it waits for the
+  lock as long as a deployment may hold it,
+  then renders the units, env files and the pointer like `reapply-all` (an intent record is settled
+  first; nothing starts or restarts). `/var/lib/runway/rerender/<id>` marks it until it has run
+  (a request that arrives during a run writes a new token and keeps its marker);
+  `apps-list {converge: true}` (Reconcile) schedules a marked one again, e.g. after a reboot. `reapply-all` strips root-privileged Exec lines from the unit
+  files of a skipped application at once, as for one that cannot be re-rendered.
 - **Convergence** (`converge(state)`, deploy lock taken without waiting, skipped while busy), for
   applications with slots (§12.3: also an intent record alone), with slot unit or env files left
   over, or with pointer files:
@@ -1299,8 +1318,12 @@ may bind only their own port (`SocketBindAllow=tcp:<port_a>` or `tcp:<port_b>`,
   root link, the include files, `port_a`/`port_b` and the tmpfiles entry: `app-apply` (disable and
   suspend stop all three), `app-action`, `contain_tampering`, `app-remove` (removes everything and
   frees the ports with the state file) and `uninstall` (as today; `/etc/runway/web` goes with
-  `/etc/runway`, the boot unit is removed).
-- Recover (start limit hit): plain start of the live unit.
+  `/etc/runway`, the boot unit is removed). `app-remove` stops the units (the deploy unit too) and
+  a pending `runway-rerender-<id>` or `runway-redeploy-<id>`, then waits up to 60 s for the deploy
+  lock and is refused otherwise (Reconcile retries); `uninstall` removes an application also without the lock, reports
+  failures in `errors` and finally deletes every per-application unit file that is still left.
+- Recover (start limit hit): plain start of the live unit (under the deploy lock; refused while a
+  deployment runs).
 - `internal_deploy` waits up to 120 s for the deploy lock (the convergence and `app-apply` hold it
   briefly); when it cannot get it, a panel request marks the job failed and the job re-arms itself
   (`runway-redeploy-<id>`) so a trigger file is not lost. Every round of a job budgets
@@ -1409,7 +1432,9 @@ CLI (§9):
   expected response content, fails the job while the old one keeps serving; an old slot that
   unlinks its socket on exit leaves the active one reachable; the tamper check accepts the root link and still contains a symlink at a slot socket;
   a new version that binds `app.sock` fails the first switch at once; a held standby port moves to
-  another port; a save during a switch is refused; Stop during a switch; a job killed (fault flag)
+  another port; a save during a switch is refused; Stop during a switch; during a deployment
+  `reapply-all` defers the application to `runway-rerender-<id>` and Start is refused, `_rerender`
+  re-renders it once the lock is free, and Start waits for a short holder of the lock; a job killed (fault flag)
   after the traffic moved is settled by the convergence (`runway-helper _converge`, tcp and unix);
   turning it off from slot a (tcp) gives the 1.0 unit a new port, and a re-apply with the panel's
   old port and no restart (as the Reconcile sends it) keeps the port the 1.0 unit listens on;
@@ -1519,7 +1544,8 @@ Application policies, kernel settings and container security profiles are left t
 existing administration flows. The per-app namespace probe remains authoritative.
 
 Application service/environment writers and starts share the per-domain deploy lock, including classic apps, upgrade
-re-renders and toolchain re-renders. Policy saves reject active deploys, converge an interrupted
+re-renders and toolchain re-renders. A running deployment refuses saves and starts, other holders are waited for
+briefly, and a re-render that meets a busy lock is deferred to `runway-rerender-<id>` (§12.5, §12.8). Policy saves reject active deploys, converge an interrupted
 switch, stop all old units, persist policy, render units, reload systemd and queue an isolated
 build. A stopped app builds but stays stopped. An error after saving policy leaves the app
 stopped. A failed candidate probe leaves the prior policy and processes alone. This operation

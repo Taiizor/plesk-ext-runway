@@ -180,10 +180,12 @@ def rerender_runtime_apps(runtime, log=None):
             state, pw = validate_app(raw)
             state["port"] = raw.get("port", 0)
             state.update(helper_fields(raw))
-            lock = FileLock("deploy-%d" % state["domain_id"])
-            if not lock.acquire(blocking=False):
+            lock, busy = try_deploy_lock(state["domain_id"], RERENDER_LOCK_WAIT)
+            if lock is None:
+                schedule_rerender(state["domain_id"])
                 if log:
-                    log.line("App #%s has an operation in progress; its environment follows with its next apply." % state["domain_id"])
+                    log.line("App #%s: %s; its environment is updated once the deploy lock is free."
+                             % (state["domain_id"], "a deployment is running" if busy == "deployment" else "another operation is in progress"))
                 continue
             try:
                 state, pw = load_app_state(state["domain_id"])

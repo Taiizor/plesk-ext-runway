@@ -96,6 +96,11 @@ UNIT_METRICS = "runway-metrics.service"
 UNIT_METRICS_TIMER = "runway-metrics.timer"
 UNIT_PUBLIC_FILES = "runway-public-files-%d.service"
 UNIT_PUBLIC_FILES_TIMER = "runway-public-files-%d.timer"
+# Transient (systemd-run): the re-render that reapply-all or a toolchain change deferred (lifecycle.py);
+# RERENDER_DIR/<id> marks it until it has run (Reconcile schedules it again, e.g. after a reboot).
+RERENDER_DIR = STATE_DIR + "/rerender"
+UNIT_RERENDER = "runway-rerender-%d.service"
+UNIT_RERENDER_TIMER = "runway-rerender-%d.timer"
 
 # Unix socket mode: /run/runway/<id>/app.sock, directory owned by the system user with the
 # web server group (nginx and Apache are members of psaserv, hosting customers are not).

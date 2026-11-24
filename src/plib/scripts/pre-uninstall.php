@@ -24,7 +24,11 @@ try {
 }
 
 try {
-    Modules_Runway_Helper::call('uninstall', ['keep_toolchains' => false]);
+    $result = Modules_Runway_Helper::call('uninstall', ['keep_toolchains' => false]);
+    // Applications that could not be removed cleanly, and leftover units that were deleted.
+    foreach (isset($result['errors']) && is_array($result['errors']) ? $result['errors'] : [] as $error) {
+        echo 'Runway: warning: ' . $error . "\n";
+    }
 } catch (Exception $e) {
     // Never block the uninstallation; report what could not be cleaned up.
     echo 'Runway: warning: cleanup failed: ' . $e->getMessage() . "\n";

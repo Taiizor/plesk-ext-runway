@@ -44,6 +44,19 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Classic and slot-based configuration/start operations share the deployment lock so an
   isolation policy change cannot race a stale unit writer. Private command/environment payloads
   are restored inside the namespace, after the trusted unprivileged launcher has started.
+- Saves, Start, Restart and Recover of every application take the deployment lock and wait up to
+  30 seconds for a short holder (the health watch, the convergence, another save); 1.3.0 refused
+  zero-downtime saves and Restart in that case and did not lock the others. A save that keeps the
+  stored environment variables reads them after the wait. While a deployment runs, Start,
+  Restart, Recover and saves are refused at once with the 1.0 messages (1.3.0 refused only saves
+  of zero-downtime applications or with a build, and Restart of zero-downtime applications).
+  Stop waits up to 10 seconds for a short holder, never for a deployment, and a Start that waited
+  while a Stop ran is refused.
+- Upgrades and toolchain changes re-render an application whose deployment lock is busy a
+  minute later instead of skipping it (Reconcile schedules a lost re-render again, e.g. after a
+  reboot); upgrades also strip root-privileged Exec lines from its old units meanwhile.
+  Uninstalling removes an application even when its lock stays busy, deletes any leftover
+  application units and reports what it could not remove.
 - Isolation keeps Docker/systemd's read-only kernel settings: a native-ABI libseccomp filter
   prevents namespace creation/entry without writing `/proc/sys`. Native build headers are
   available read-only for cgo and other compiled dependencies.

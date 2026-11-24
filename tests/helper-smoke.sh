@@ -1241,6 +1241,33 @@ st=$(wait_job deploy-$ID)
     && [ "$(zd_status | field "['stopped']")" = "True" ] && ok "Stop during a switch stops both versions and persists" || bad "stop during switch: $st $(job_msg) $(systemctl is-active runway-app-$ID-a runway-app-$ID-b)"
 call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" >/dev/null
 wait_listening && ok "Start runs the live slot again" || bad "start after stop: $(zd_status | jexpr "(d['slot'], d['listener'])")"
+# A deployment holds the deploy lock: reapply-all (an upgrade) and Start leave the application
+# alone; runway-rerender-<id> re-renders it once the lock is free (docs/DESIGN.md section 12.8).
+call app-apply "{$(zd_base '{"ZD_DELAY": "10s"}'), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
+for _ in $(seq 1 40); do [ "$(call job-status "{\"job\": \"deploy-$ID\"}" | field "['phase']" 2>/dev/null)" = "waiting" ] && break; sleep 0.5; done
+out=$(call reapply-all '{}')
+echo "$out" | grep -q "#$ID: a deployment is running; its units are re-rendered once the deploy lock is free" \
+    && systemctl list-timers --all --no-legend "runway-rerender-$ID.timer" | grep -q "runway-rerender-$ID.timer" \
+    && [ -e /var/lib/runway/rerender/$ID ] && ok "reapply-all during a deployment defers the application to runway-rerender-$ID" || bad "reapply-all during a deployment: $out"
+systemctl stop "runway-rerender-$ID.timer" 2>/dev/null
+call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" | grep -q 'A deployment is already running for this application' \
+    && ok "Start is refused while a deployment runs" || bad "Start during a deployment was not refused"
+st=$(wait_job deploy-$ID)
+[ "$st" = "succeeded" ] && wait_listening || bad "switch after reapply-all: $st $(job_msg)"
+# The deferred re-render, once the lock is free, rewrites a changed env file of the live slot.
+echo "# stale" >> /etc/runway/env/$ID-$(slot_now).env
+"$H" _rerender $ID && ! grep -q '^# stale$' /etc/runway/env/$ID-$(slot_now).env && [ ! -e /var/lib/runway/rerender/$ID ] \
+    && ok "_rerender re-renders the units and env files once the deploy lock is free" || bad "_rerender: $(tail -n 2 /etc/runway/env/$ID-$(slot_now).env)"
+# A short holder of the deploy lock (the health watch, a save, the convergence) is waited for.
+rm -f "$ZD_TMP/held"
+flock /var/lib/runway/locks/deploy-$ID.lock sh -c "sleep 3; touch $ZD_TMP/held" &
+HOLDER=$!
+sleep 1
+out=$(call app-action "{\"domain_id\": $ID, \"action\": \"start\"}")
+waited=$([ -e "$ZD_TMP/held" ] && echo yes || echo no)
+wait $HOLDER
+echo "$out" | grep -q '"ok": true' && [ "$waited" = "yes" ] && ok "Start waits for a short holder of the deploy lock" \
+    || bad "Start behind a short holder: $out (waited: $waited)"
 
 echo "-- unix"
 out=$(call app-apply "{$(zd_base), \"listen\": \"unix\", \"zero_downtime\": true}")

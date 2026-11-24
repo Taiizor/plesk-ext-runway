@@ -8,10 +8,48 @@ def cmd_app_apply(payload):
     return result
 
 
+# An application's deploy lock: a deployment holds it for its whole job; a save, Start, Restart,
+# Recover, the health watch, the convergence, a re-render and a policy change hold it for seconds.
+# Seconds a command waits for such a short holder (None: DEPLOY_LOCK_WAIT, read at call time).
+DEPLOY_LOCK_WAIT = 30
+STOP_LOCK_WAIT = 10
+
+
+def try_deploy_lock(domain_id, wait=None):
+    """(lock, None) with the deploy lock of an application held (the caller releases it); (None,
+    "deployment") while its deploy unit is active (a deployment holds the lock or waits for it: it
+    goes first); (None, "busy") when another operation kept the lock for `wait` seconds."""
+    unit = UNIT_DEPLOY % domain_id
+    lock = FileLock("deploy-%d" % domain_id)
+    deadline = time.time() + (DEPLOY_LOCK_WAIT if wait is None else wait)
+    while True:
+        if unit_is_active(unit):
+            return None, "deployment"
+        if lock.acquire(blocking=False):
+            if not unit_is_active(unit):
+                return lock, None
+            # A deployment started meanwhile and waits for this lock.
+            lock.release()
+            return None, "deployment"
+        if time.time() >= deadline:
+            return None, "busy"
+        time.sleep(0.5)
+
+
+def deploy_lock(domain_id, deployment_message, busy_message):
+    """try_deploy_lock() for a command: the held lock, or a HelperError with the reason's message."""
+    lock, reason = try_deploy_lock(domain_id)
+    if lock is None:
+        raise HelperError(deployment_message if reason == "deployment" else busy_message)
+    return lock
+
+
 def _app_apply(payload):
     payload = dict(payload or {})
-    if "env" not in payload:
-        # The panel omits "env" when it did not load/edit it: keep the stored secrets.
+    keep_env = "env" not in payload
+    if keep_env:
+        # The panel omits "env" when it did not load/edit it: keep the stored secrets (read again
+        # under the deploy lock below; this copy only serves the checks before it).
         stored = read_json(app_state_path(v_domain_id(payload.get("domain_id"))))
         payload["env"] = stored.get("env", {}) if isinstance(stored, dict) else {}
     state, pw = validate_app(payload)
@@ -27,21 +65,25 @@ def _app_apply(payload):
         raise HelperError("%s toolchain '%s' is not installed on this server" % (RUNTIMES[state["runtime"]].label, state["toolchain"]))
     # Every writer shares the deploy lock, including classic applications: a concurrent save
     # must never restore an old unconfined unit while an administrator enables isolation.
-    lock = FileLock("deploy-%d" % domain_id)
     if not state["enabled"] or state["suspended"]:
         # Disabling or suspension ends a running deployment first (a switch finishes or rolls back).
         systemctl("disable", "--now", UNIT_PATH % domain_id)
         systemctl("stop", UNIT_DEPLOY % domain_id, timeout=ZD_DEPLOY_STOP + 30)
+        lock = FileLock("deploy-%d" % domain_id)
         if not lock.acquire(blocking=True, timeout=60):
             raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
-    elif unit_is_active(UNIT_DEPLOY % domain_id):
-        # The 1.0 wording (docs/DESIGN.md section 12.5); the smoke tests match on it.
-        raise HelperError("A deployment is running for this application. Wait until it finishes, then save again.")
-    elif not lock.acquire(blocking=False):
-        raise HelperError("Another deployment or settings change is in progress. Wait until it finishes, then save again.")
+    else:
+        # A running deployment refuses the save at once (the 1.0 wording, docs/DESIGN.md section
+        # 12.5; the smoke tests match on it); a short operation (the health watch, the convergence,
+        # another save) is waited for.
+        lock = deploy_lock(domain_id, "A deployment is running for this application. Wait until it finishes, then save again.",
+                           "Another deployment or settings change is in progress. Wait until it finishes, then save again.")
     try:
-        state, pw = validate_app(payload)
         stored = read_json(app_state_path(domain_id))
+        if keep_env:
+            # A save or a restore that ended while this one waited for the lock may have changed them.
+            payload["env"] = stored.get("env", {}) if isinstance(stored, dict) else {}
+        state, pw = validate_app(payload)
         if state["zero_downtime"] or (isinstance(stored, dict) and (zd_has_slots(helper_fields(stored)) or stored.get("zero_downtime")
                                                                     or slot_files_left(domain_id))):
             if isinstance(stored, dict) and helper_fields(stored)["switch"]:
@@ -202,21 +244,32 @@ def cmd_app_remove(payload):
     return {"removed": domain_id}
 
 
-def remove_app(domain_id):
+def remove_app(domain_id, force=False):
     """Stops and deletes everything of an application: its units (the 1.0 unit and both
     zero-downtime slots), environment files, state, tmpfiles entry, socket directory, root link,
-    web server include files and job files (the ports are free with the state file)."""
+    web server include files and job files (the ports are free with the state file). The removal
+    waits up to LOCK_TIMEOUT for the deploy lock (its holders are short once the deploy unit is
+    stopped); force (uninstall) removes everything also when another operation keeps it longer."""
     units = [UNIT_PATH % domain_id, UNIT_DEPLOY % domain_id] + [
         unit for unit in all_app_units(domain_id)
         if unit == UNIT_APP % domain_id or os.path.exists(os.path.join(UNIT_DIR, unit))]
     units += [unit for unit in (UNIT_PUBLIC_FILES_TIMER % domain_id, UNIT_PUBLIC_FILES % domain_id)
               if os.path.exists(os.path.join(UNIT_DIR, unit))]
+    # First the transient timers (runway-rerender-<id>, runway-redeploy-<id>): none of them may
+    # write the units again or start a deployment while the units stop.
+    systemctl("stop", UNIT_RERENDER_TIMER % domain_id, UNIT_RERENDER % domain_id,
+              "runway-redeploy-%d.timer" % domain_id, "runway-redeploy-%d.service" % domain_id, timeout=60)
     systemctl("disable", "--now", *units, timeout=120)
-    with FileLock("deploy-%d" % domain_id):
+    lock = FileLock("deploy-%d" % domain_id)
+    if not lock.acquire(blocking=True, timeout=LOCK_TIMEOUT) and not force:
+        raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+    try:
         # A writer may have completed while removal waited; drain any newly created slots too.
         units = list(dict.fromkeys(units + existing_app_units(domain_id)))
         systemctl("disable", "--now", *units, timeout=120)
         _remove_app_files(domain_id, units)
+    finally:
+        lock.release()
 
 
 def _remove_app_files(domain_id, units):
@@ -233,6 +286,7 @@ def _remove_app_files(domain_id, units):
     for path in job_paths("deploy-%d" % domain_id):
         remove_quietly(path)
     remove_quietly(health_watch_path(domain_id))
+    remove_quietly(rerender_marker_path(domain_id))
     ops_remove_metadata(domain_id)
     # Isolation is an administrator policy: customer removal/recreation and recovery must keep it.
     systemctl("daemon-reload")
@@ -245,21 +299,44 @@ def cmd_app_action(payload):
     stop: stops and disables the unit and remembers it ("stopped": also across reboots, trigger
     files and deployments, until the next start); recover: restart of an application that hit
     systemd's start limit (Reconcile; refused for stopped applications)."""
-    domain_id = v_domain_id((payload or {}).get("domain_id"))
-    action = (payload or {}).get("action")
+    payload = payload or {}
+    domain_id = v_domain_id(payload.get("domain_id"))
+    action = payload.get("action")
     state, pw = load_app_state(domain_id)
+    if action not in ("start", "restart", "recover"):
+        # Stop waits a moment for a Start or a save in progress, so it is not overridden by it, but
+        # never for a deployment: it also stops a running switch (docs/DESIGN.md section 12.4), and
+        # it goes ahead without the lock when the lock stays busy.
+        lock = try_deploy_lock(domain_id, STOP_LOCK_WAIT)[0] if action == "stop" else None
+        try:
+            if lock is not None:
+                state, pw = load_app_state(domain_id)
+            return _app_action(state, pw, action, payload)
+        finally:
+            if lock is not None:
+                lock.release()
+    # Start, Restart and Recover share the deploy lock with every writer of the units, so none of
+    # them starts a unit while a save or an isolation policy change rewrites it (docs/DESIGN.md
+    # section 12.5): a running deployment refuses them, a short operation is waited for.
+    stopped_before = bool(state["stopped"])
+    lock = deploy_lock(domain_id, "A deployment is already running for this application",
+                       "Another operation of this application is still in progress. Please try again in a moment.")
+    try:
+        state, pw = load_app_state(domain_id)
+        if state["stopped"] and not stopped_before and action != "recover":
+            # A Stop (or a containment) arrived while this action waited: the later request wins.
+            raise HelperError("The application was stopped while this action waited; start it again")
+        return _app_action(state, pw, action, payload)
+    finally:
+        lock.release()
+
+
+def _app_action(state, pw, action, payload):
     if zd_has_slots(state):
-        result = _zd_app_action(state, pw, action, bool((payload or {}).get("plain")), actor=ops_actor(payload.get("actor")))
-        ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": ops_actor(payload.get("actor"))})
+        actor = ops_actor(payload.get("actor"))
+        result = _zd_app_action(state, pw, action, bool(payload.get("plain")), actor=actor)
+        ops_event(state, "app_stop" if action == "stop" else "app_start", {"action": action, "actor": actor})
         return result
-    if action in ("start", "restart", "recover"):
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("A deployment is already running for this application")
-            state, pw = load_app_state(domain_id)
-            if zd_has_slots(state):
-                raise HelperError("The application configuration changed; retry this action")
-            return _classic_app_action(state, pw, action, payload)
     return _classic_app_action(state, pw, action, payload)
 
 
@@ -291,9 +368,10 @@ def _classic_app_action(state, pw, action, payload):
 
 
 def _zd_app_action(state, pw, action, plain, actor="system"):
-    """app-action of an application with zero-downtime slots (docs/DESIGN.md section 12.5):
-    restart of a running application starts the switch job ({action, job}); plain (Restart in
-    place), start and recover act on the live unit; stop stops every app unit."""
+    """app-action of an application with zero-downtime slots (docs/DESIGN.md section 12.5; start,
+    restart and recover run under the deploy lock, see cmd_app_action): restart of a running
+    application starts the switch job ({action, job}); plain (Restart in place), start and recover
+    act on the live unit; stop stops every app unit."""
     domain_id = state["domain_id"]
     if action == "stop":
         update_state_flags(domain_id, stopped=True)
@@ -307,51 +385,40 @@ def _zd_app_action(state, pw, action, plain, actor="system"):
         raise HelperError("The domain is suspended")
     if action == "recover" and state["stopped"]:
         raise HelperError("The application is stopped")
-    lock = FileLock("deploy-%d" % domain_id)
-    busy = unit_is_active(UNIT_DEPLOY % domain_id) or not lock.acquire(blocking=False)
-    if busy:
-        raise HelperError("A deployment or settings change is already running for this application")
-    try:
-        if not busy and state["switch"]:
-            # An interrupted switch is settled from the pointer first, so the instance that carries
-            # the traffic is the one started or restarted (docs/DESIGN.md section 12.8).
-            try:
-                zd_converge_locked(state, pw)
-            except HelperError:
-                pass
-            state, pw = load_app_state(domain_id)
-        live_unit = app_unit(domain_id, state["slot"])
-        if action == "restart" and (busy or plain or unit_is_active(live_unit)):
-            if busy:
-                raise HelperError("A deployment is already running for this application")
-            if action != "recover" and (state["stopped"] or state["tampered"]):
-                update_state_flags(domain_id, **CLEARED_FLAGS)
-                state.update(CLEARED_FLAGS)
-            if not plain and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
-                return {"action": action, "job": start_deploy_job(domain_id, "restart", False, actor=actor)["job"]}
-            zd_plain_restart(state, pw)
-            return {"action": action}
-        if action != "recover" and (state["stopped"] or state["tampered"]):
+    if state["switch"]:
+        # An interrupted switch is settled from the pointer first, so the instance that carries
+        # the traffic is the one started or restarted (docs/DESIGN.md section 12.8).
+        try:
+            zd_converge_locked(state, pw)
+        except HelperError:
+            pass
+        state, pw = load_app_state(domain_id)
+    live_unit = app_unit(domain_id, state["slot"])
+    if action == "restart" and (plain or unit_is_active(live_unit)):
+        if state["stopped"] or state["tampered"]:
             update_state_flags(domain_id, **CLEARED_FLAGS)
             state.update(CLEARED_FLAGS)
-        if not busy:
-            if not state["zero_downtime"] and state["slot"]:
-                # Turned off and nothing runs: the 1.0 unit starts instead of the slot.
-                zd_plain_restart(state, pw)
-                return {"action": action}
-            if pointer_wanted(state) and write_pointer(state, pw, state["slot"]):
-                web_unit = web_traffic_server()[0]
-                if web_unit:
-                    with FileLock("web-reload"):
-                        web_reload_nowait(web_unit)
-        prepare_start(live_view(state), pw)
-        systemctl("enable", live_unit, check=True)
-        systemctl("reset-failed", live_unit)
-        systemctl("restart" if action == "restart" else "start", "--no-block", live_unit, check=True)
+        if not plain and not state["restart_plain"] and zd_switchable(state) and zd_target(state) is not None:
+            return {"action": action, "job": start_deploy_job(domain_id, "restart", False, actor=actor)["job"]}
+        zd_plain_restart(state, pw)
         return {"action": action}
-    finally:
-        if not busy:
-            lock.release()
+    if action != "recover" and (state["stopped"] or state["tampered"]):
+        update_state_flags(domain_id, **CLEARED_FLAGS)
+        state.update(CLEARED_FLAGS)
+    if not state["zero_downtime"] and state["slot"]:
+        # Turned off and nothing runs: the 1.0 unit starts instead of the slot.
+        zd_plain_restart(state, pw)
+        return {"action": action}
+    if pointer_wanted(state) and write_pointer(state, pw, state["slot"]):
+        web_unit = web_traffic_server()[0]
+        if web_unit:
+            with FileLock("web-reload"):
+                web_reload_nowait(web_unit)
+    prepare_start(live_view(state), pw)
+    systemctl("enable", live_unit, check=True)
+    systemctl("reset-failed", live_unit)
+    systemctl("restart" if action == "restart" else "start", "--no-block", live_unit, check=True)
+    return {"action": action}
 
 
 DEPLOY_TITLES = {"build": "Build & restart", "restart": "Restart", "fetch": "Fetch & restart", "rollback": "Roll back release"}

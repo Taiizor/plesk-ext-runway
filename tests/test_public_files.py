@@ -199,7 +199,8 @@ class PublicFilesTests(unittest.TestCase):
                 stack.enter_context(mock.patch.object(self.h, name))
             remove = stack.enter_context(mock.patch.object(self.h, "remove_quietly"))
             self.h.remove_app(17)
-        stopped = self.systemctl.call_args_list[0].args
+        # The first "disable --now" stops the units (transient timers are stopped before it).
+        stopped = next(call.args for call in self.systemctl.call_args_list if call.args[:2] == ("disable", "--now"))
         for name in ("runway-public-files-17.timer", "runway-public-files-17.service"):
             self.assertIn(name, stopped)
             remove.assert_any_call(str(self.units / name))
