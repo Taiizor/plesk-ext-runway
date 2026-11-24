@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Ezt a futtatókörnyezetet az előfizetés szolgáltatáscsomagja nem engedélyezi.',
+    'planLimitApps' => 'Runway: engedélyezett alkalmazások',
+    'planLimitMemory' => 'Runway: memória alkalmazásonként (MiB)',
+    'planLimitCpu' => 'Runway: CPU alkalmazásonként (%)',
+    'planLimitTasks' => 'Runway: folyamatok/szálak alkalmazásonként',
+    'permissionRuntime' => 'Runway: %%runtime%% használata',
+    'permissionRuntimeDescription' => 'Engedélyezi ezt a futtatókörnyezetet az új vagy újra engedélyezett Runway-alkalmazásokhoz, ha a szolgáltatáscsomag-házirendek be vannak kapcsolva.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Telepítsen eszközláncokat, és futtasson alkalmazásokat szolgáltatásként, Docker nélkül.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'A privilegizált segédprogram hibát jelzett: %%details%%',
+    'errorDeploymentRunning' => 'Az alkalmazás üzembe helyezése folyamatban van. Várja meg, amíg befejeződik, majd próbálja újra.',
+    'errorOperationInProgress' => 'Az alkalmazás egy másik művelete még folyamatban van. Próbálja újra egy kis idő múlva.',
+    'errorStoppedMeanwhile' => 'Az alkalmazás leállt, amíg ez a művelet várakozott. Ha futnia kell, indítsa el újra.',
     'errorAccessDenied' => 'Hozzáférés megtagadva.',
     'errorNoDomain' => 'A domain nem található.',
     'errorNoHosting' => 'A domainhez nem tartozik webtárhely.',

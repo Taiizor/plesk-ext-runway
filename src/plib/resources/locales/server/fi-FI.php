@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Tilauksen palvelusuunnitelma ei salli tätä ajoympäristöä.',
+    'planLimitApps' => 'Runway: käytössä olevat sovellukset',
+    'planLimitMemory' => 'Runway: muisti sovellusta kohden (MiB)',
+    'planLimitCpu' => 'Runway: suoritin sovellusta kohden (%)',
+    'planLimitTasks' => 'Runway: prosessit / säikeet sovellusta kohden',
+    'permissionRuntime' => 'Runway: käytä ajoympäristöä %%runtime%%',
+    'permissionRuntimeDescription' => 'Salli tämä ajoympäristö uusille tai uudelleen käyttöön otetuille Runway-sovelluksille, kun palvelusuunnitelmien käytännöt ovat käytössä.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Asenna työkaluketjuja ja suorita sovelluksia palveluina ilman Dockeria.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Etuoikeutettu apuohjelma epäonnistui: %%details%%',
+    'errorDeploymentRunning' => 'Tämän sovelluksen käyttöönotto on käynnissä. Odota, kunnes se valmistuu, ja yritä sitten uudelleen.',
+    'errorOperationInProgress' => 'Tämän sovelluksen toinen toiminto on vielä kesken. Yritä hetken kuluttua uudelleen.',
+    'errorStoppedMeanwhile' => 'Sovellus pysäytettiin tämän toiminnon odottaessa. Käynnistä se uudelleen, jos sen kuuluu olla käynnissä.',
     'errorAccessDenied' => 'Käyttö estetty.',
     'errorNoDomain' => 'Toimialuetta ei löytynyt.',
     'errorNoHosting' => 'Toimialueella ei ole web-isännöintiä.',

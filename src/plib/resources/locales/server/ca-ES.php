@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'El pla de servei de la subscripció no permet aquest entorn d\'execució.',
+    'planLimitApps' => 'Runway: aplicacions habilitades',
+    'planLimitMemory' => 'Runway: memòria per aplicació (MiB)',
+    'planLimitCpu' => 'Runway: CPU per aplicació (%)',
+    'planLimitTasks' => 'Runway: processos / fils per aplicació',
+    'permissionRuntime' => 'Runway: ús de %%runtime%%',
+    'permissionRuntimeDescription' => 'Permet aquest entorn d\'execució per a aplicacions de Runway noves o tornades a habilitar quan les polítiques dels plans de servei estan activades.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instal·leu cadenes d\'eines i executeu aplicacions com a serveis, sense Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'L\'auxiliar amb privilegis ha fallat: %%details%%',
+    'errorDeploymentRunning' => 'Hi ha un desplegament en curs per a aquesta aplicació. Espereu que acabi i torneu-ho a provar.',
+    'errorOperationInProgress' => 'Encara hi ha una altra operació d\'aquesta aplicació en curs. Torneu-ho a provar d\'aquí a un moment.',
+    'errorStoppedMeanwhile' => 'L\'aplicació s\'ha aturat mentre aquesta acció esperava. Torneu-la a iniciar si s\'ha d\'executar.',
     'errorAccessDenied' => 'Accés denegat.',
     'errorNoDomain' => 'No s\'ha trobat el domini.',
     'errorNoHosting' => 'El domini no té allotjament web.',

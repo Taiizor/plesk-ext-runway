@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Plan usług subskrypcji nie zezwala na to środowisko uruchomieniowe.',
+    'planLimitApps' => 'Runway: włączone aplikacje',
+    'planLimitMemory' => 'Runway: pamięć na aplikację (MiB)',
+    'planLimitCpu' => 'Runway: CPU na aplikację (%)',
+    'planLimitTasks' => 'Runway: procesy / wątki na aplikację',
+    'permissionRuntime' => 'Runway: korzystanie z %%runtime%%',
+    'permissionRuntimeDescription' => 'Pozwala używać tego środowiska uruchomieniowego w nowych lub ponownie włączanych aplikacjach Runway, gdy zasady planów usług są włączone.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instaluj zestawy narzędzi i uruchamiaj aplikacje jako usługi, bez Dockera.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Uprzywilejowany program pomocniczy zgłosił błąd: %%details%%',
+    'errorDeploymentRunning' => 'Trwa wdrożenie tej aplikacji. Poczekaj, aż się zakończy, a następnie spróbuj ponownie.',
+    'errorOperationInProgress' => 'Inna operacja tej aplikacji jest nadal w toku. Spróbuj ponownie za chwilę.',
+    'errorStoppedMeanwhile' => 'Aplikacja została zatrzymana, gdy ta akcja oczekiwała. Uruchom ją ponownie, jeśli ma działać.',
     'errorAccessDenied' => 'Odmowa dostępu.',
     'errorNoDomain' => 'Nie znaleziono domeny.',
     'errorNoHosting' => 'Domena nie ma hostingu WWW.',

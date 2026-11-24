@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Questo runtime non è consentito dal piano di servizio dell\'abbonamento.',
+    'planLimitApps' => 'Runway: applicazioni abilitate',
+    'planLimitMemory' => 'Runway: memoria per applicazione (MiB)',
+    'planLimitCpu' => 'Runway: CPU per applicazione (%)',
+    'planLimitTasks' => 'Runway: processi / thread per applicazione',
+    'permissionRuntime' => 'Runway: uso di %%runtime%%',
+    'permissionRuntimeDescription' => 'Consente questo runtime per le applicazioni Runway nuove o riabilitate quando i criteri dei piani di servizio sono attivi.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Installa toolchain ed esegui applicazioni come servizi, senza Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Errore dell\'helper privilegiato: %%details%%',
+    'errorDeploymentRunning' => 'È in corso un\'implementazione per questa applicazione. Attendi che termini, poi riprova.',
+    'errorOperationInProgress' => 'Un\'altra operazione di questa applicazione è ancora in corso. Riprova tra un momento.',
+    'errorStoppedMeanwhile' => 'L\'applicazione è stata arrestata mentre questa azione era in attesa. Avviala di nuovo se deve essere in esecuzione.',
     'errorAccessDenied' => 'Accesso negato.',
     'errorNoDomain' => 'Dominio non trovato.',
     'errorNoHosting' => 'Il dominio non ha un hosting web.',

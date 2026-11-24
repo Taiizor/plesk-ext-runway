@@ -210,5 +210,4 @@ parsing. CI runs these with the existing suites. Real Plesk backup/restore orche
 runtime-specific release builds still need integration testing; fixtures do not validate those
 external services.
 
-New labels have English and Turkish values; other panel locales use English for these additions
-until translations are contributed. Existing translations remain.
+The labels are translated into every panel language, like the rest of the interface.

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Acest mediu de execuție nu este permis de planul de servicii al abonamentului.',
+    'planLimitApps' => 'Runway: aplicații activate',
+    'planLimitMemory' => 'Runway: memorie per aplicație (MiB)',
+    'planLimitCpu' => 'Runway: CPU per aplicație (%)',
+    'planLimitTasks' => 'Runway: procese / fire de execuție per aplicație',
+    'permissionRuntime' => 'Runway: utilizare %%runtime%%',
+    'permissionRuntimeDescription' => 'Permite acest mediu de execuție pentru aplicațiile Runway noi sau reactivate când politicile planurilor de servicii sunt activate.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instalați toolchain-uri și rulați aplicații ca servicii, fără Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Programul auxiliar privilegiat a eșuat: %%details%%',
+    'errorDeploymentRunning' => 'Pentru această aplicație rulează o implementare. Așteptați până se termină, apoi încercați din nou.',
+    'errorOperationInProgress' => 'O altă operație a acestei aplicații este încă în curs. Încercați din nou în câteva clipe.',
+    'errorStoppedMeanwhile' => 'Aplicația a fost oprită în timp ce această acțiune aștepta. Porniți-o din nou dacă trebuie să ruleze.',
     'errorAccessDenied' => 'Acces refuzat.',
     'errorNoDomain' => 'Domeniul nu a fost găsit.',
     'errorNoHosting' => 'Domeniul nu are găzduire web.',

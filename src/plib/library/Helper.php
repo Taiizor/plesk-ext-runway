@@ -49,15 +49,38 @@ class Modules_Runway_Helper
         if (empty($data['ok'])) {
             $error = isset($data['error']) ? (string)$data['error'] : 'Unknown error';
             Modules_Runway_Log::debug("runway-helper {$command} failed: {$error}");
-            $exception = new Modules_Runway_Exception($error);
-            if (isset($data['code']) && is_string($data['code'])) {
-                $exception->setHelperCode($data['code']);
+            $code = isset($data['code']) && is_string($data['code']) ? $data['code'] : null;
+            $exception = new Modules_Runway_Exception(self::localizedError($code, $error));
+            if ($code !== null) {
+                $exception->setHelperCode($code);
             }
             throw $exception;
         }
 
         unset($data['ok']);
         return $data;
+    }
+
+    /**
+     * The panel's own wording of the helper's lock refusals ("code" of its error answer), which
+     * happen in every language; other errors keep the helper's English text.
+     *
+     * @param string|null $code
+     * @param string $error
+     * @return string
+     */
+    private static function localizedError($code, $error)
+    {
+        switch ($code) {
+            case 'deployment_running':
+                return pm_Locale::lmsg('errorDeploymentRunning');
+            case 'operation_in_progress':
+                return pm_Locale::lmsg('errorOperationInProgress');
+            case 'stopped_meanwhile':
+                return pm_Locale::lmsg('errorStoppedMeanwhile');
+            default:
+                return $error;
+        }
     }
 
     private static function actor()

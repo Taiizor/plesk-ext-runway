@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'このランタイムはサブスクリプションのサービスプランで許可されていません。',
+    'planLimitApps' => 'Runway: 有効なアプリケーション数',
+    'planLimitMemory' => 'Runway: アプリケーションあたりのメモリ（MiB）',
+    'planLimitCpu' => 'Runway: アプリケーションあたりの CPU（%）',
+    'planLimitTasks' => 'Runway: アプリケーションあたりのプロセス / スレッド数',
+    'permissionRuntime' => 'Runway: %%runtime%% の使用',
+    'permissionRuntimeDescription' => 'サービスプランのポリシーが有効な場合に、新規または再度有効にした Runway アプリケーションでこのランタイムの使用を許可します。',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'ツールチェーンをインストールし、Docker なしでアプリケーションをサービスとして実行します。',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => '特権ヘルパが失敗しました: %%details%%',
+    'errorDeploymentRunning' => 'このアプリケーションのデプロイが実行中です。完了するまで待ってから、もう一度お試しください。',
+    'errorOperationInProgress' => 'このアプリケーションの別の操作がまだ進行中です。しばらくしてからもう一度お試しください。',
+    'errorStoppedMeanwhile' => 'この操作の待機中にアプリケーションが停止されました。実行する必要がある場合は、再度起動してください。',
     'errorAccessDenied' => 'アクセスが拒否されました。',
     'errorNoDomain' => 'ドメインが見つかりません。',
     'errorNoHosting' => 'このドメインにはウェブホスティングがありません。',

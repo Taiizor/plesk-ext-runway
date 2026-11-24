@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Deze runtime is niet toegestaan door het serviceplan van het abonnement.',
+    'planLimitApps' => 'Runway: ingeschakelde applicaties',
+    'planLimitMemory' => 'Runway: geheugen per applicatie (MiB)',
+    'planLimitCpu' => 'Runway: CPU per applicatie (%)',
+    'planLimitTasks' => 'Runway: processen/threads per applicatie',
+    'permissionRuntime' => 'Runway: %%runtime%% gebruiken',
+    'permissionRuntimeDescription' => 'Sta deze runtime toe voor nieuwe of opnieuw ingeschakelde Runway-applicaties wanneer het beleid van serviceplannen is ingeschakeld.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Installeer toolchains en draai applicaties als services, zonder Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Fout in het hulpprogramma met verhoogde rechten: %%details%%',
+    'errorDeploymentRunning' => 'Er loopt een deployment voor deze applicatie. Wacht tot deze is voltooid en probeer het daarna opnieuw.',
+    'errorOperationInProgress' => 'Er wordt nog een andere bewerking voor deze applicatie uitgevoerd. Probeer het zo meteen opnieuw.',
+    'errorStoppedMeanwhile' => 'De applicatie is gestopt terwijl deze actie wachtte. Start de applicatie opnieuw als deze moet draaien.',
     'errorAccessDenied' => 'Toegang geweigerd.',
     'errorNoDomain' => 'Het domein is niet gevonden.',
     'errorNoHosting' => 'Het domein heeft geen webhosting.',

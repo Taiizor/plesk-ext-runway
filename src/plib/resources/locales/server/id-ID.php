@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Runtime ini tidak diizinkan oleh paket layanan langganan.',
+    'planLimitApps' => 'Runway: aplikasi aktif',
+    'planLimitMemory' => 'Runway: memori per aplikasi (MiB)',
+    'planLimitCpu' => 'Runway: CPU per aplikasi (%)',
+    'planLimitTasks' => 'Runway: proses/thread per aplikasi',
+    'permissionRuntime' => 'Runway: penggunaan %%runtime%%',
+    'permissionRuntimeDescription' => 'Izinkan runtime ini untuk aplikasi Runway baru atau yang diaktifkan kembali saat kebijakan paket layanan diaktifkan.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instal toolchain dan jalankan aplikasi sebagai layanan, tanpa Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Helper dengan hak istimewa gagal: %%details%%',
+    'errorDeploymentRunning' => 'Deployment sedang berjalan untuk aplikasi ini. Tunggu hingga selesai, lalu coba lagi.',
+    'errorOperationInProgress' => 'Operasi lain pada aplikasi ini masih berlangsung. Coba lagi dalam beberapa saat.',
+    'errorStoppedMeanwhile' => 'Aplikasi dihentikan saat tindakan ini menunggu. Mulai lagi jika aplikasi seharusnya berjalan.',
     'errorAccessDenied' => 'Akses ditolak.',
     'errorNoDomain' => 'Domain tidak ditemukan.',
     'errorNoHosting' => 'Domain ini tidak memiliki hosting web.',

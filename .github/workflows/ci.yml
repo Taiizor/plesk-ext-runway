@@ -164,7 +164,7 @@ jobs:
           retention-days: 14
 
   e2e:
-    # Three Plesk containers in parallel, one per group of suites (SMOKE_SUITES of
+    # Four Plesk containers in parallel, one per group of suites (SMOKE_SUITES of
     # .github/scripts/plesk-e2e.sh): the container start and the preparation are repeated,
     # the suites themselves are the long part.
     name: End-to-end (${{ matrix.name }})
@@ -187,12 +187,19 @@ jobs:
             suites: api,customer
           - name: runtime
             suites: runtime
+          # Application isolation (bubblewrap) in every layer: isolated Go builds and starts
+          # through the panel, then tests/isolation-e2e.py (namespaces, files, network, web
+          # server). The container runs without Docker's seccomp profile (nested pivot_root).
+          - name: isolation
+            suites: isolation
+            isolation: "1"
     env:
       CONTAINER: runway-plesk
       PLESK_IMAGE: plesk/plesk:latest
       PANEL_PORT: "18880"
       SMOKE_SUITES: ${{ matrix.suites }}
       RUNWAY_SMOKE_SELF_UPDATE: ${{ matrix.self_update || '0' }}
+      RUNWAY_E2E_ISOLATION: ${{ matrix.isolation || '0' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -207,14 +214,22 @@ jobs:
           name: runway-package
           path: dist
 
+      # bubblewrap creates unprivileged user namespaces inside the container; Ubuntu 24.04
+      # runners restrict them through AppArmor.
+      - name: Permit unprivileged user namespaces
+        if: matrix.name == 'isolation'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Start Plesk
         run: bash .github/scripts/plesk-e2e.sh start
 
       - name: Install the package
         run: bash .github/scripts/plesk-e2e.sh install "dist/${{ needs.build.outputs.package }}"
 
+      # Every job that installs a toolchain from GitHub releases (helper: bun, uv, FrankenPHP;
+      # panel and isolation: uv for Python); the anonymous API quota of a runner is 60 per hour.
       - name: Cache GitHub toolchain releases
-        if: matrix.name == 'helper'
+        if: matrix.name != 'runtime'
         env:
           GH_TOKEN: ${{ github.token }}
         # Seed public metadata through gh; the workflow token stays on the runner. Forced

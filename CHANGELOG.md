@@ -22,10 +22,13 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
   explicit writable folders and Unix sockets, gives each application private caches and supports
   offline networking. Unset isolated resource limits default to 1024 MiB, 100% CPU, 1024 tasks.
   Policy changes stop old slots and rebuild; customers cannot disable policy through application
-  removal or recovery. New isolation UI strings are English and Turkish, with English text in
-  the remaining locales pending translation.
+  removal or recovery. The isolation strings are translated into every panel language.
 - Offline Linux namespace regression runner and an opt-in isolated runtime E2E matrix
-  (`RUNWAY_E2E_ISOLATION=1`); live Plesk verification remains separate.
+  (`RUNWAY_E2E_ISOLATION=1`). CI runs isolation end to end in its own Plesk container: the Go
+  sample isolated through the panel, then the namespace, file, network and web server checks of
+  `tests/isolation-e2e.py`.
+- The optional operations, the service-plan policy settings and the document root options are
+  translated into every panel language (they were English outside English and Turkish).
 
 ### Fixed
 
@@ -44,6 +47,19 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Classic and slot-based configuration/start operations share the deployment lock so an
   isolation policy change cannot race a stale unit writer. Private command/environment payloads
   are restored inside the namespace, after the trusted unprivileged launcher has started.
+- Build & restart, the optional operations (settings, rollback, clearing releases, recovery
+  import) and isolation policy saves wait up to 30 seconds for a short holder of the deployment
+  lock instead of failing at once or after a minute, and a running deployment refuses them at
+  once. The lock refusals are shown in the panel language. A tampered Unix socket found by the
+  status page or the Reconcile waits briefly for a Start in progress, so the Start cannot run the
+  application again right after the containment.
+- The frontend bundle shrinks from 246 KiB to 201 KiB: the SDK's query-string helper uses a small
+  equivalent of `qs.stringify` instead of the full `qs` package, below webpack's size limit.
+- Isolated applications start on regular Linux servers: their services no longer set
+  `ProtectKernelTunables`, whose read-only `/proc` paths made the kernel refuse bubblewrap's own
+  `/proc` (builds were not affected; Docker Desktop test containers hid the problem).
+- CI warms the GitHub release cache for every end-to-end job that installs a toolchain from
+  GitHub, so the panel job no longer fails on the anonymous API limit of the runner.
 - Saves, Start, Restart and Recover of every application take the deployment lock and wait up to
   30 seconds for a short holder (the health watch, the convergence, another save); 1.3.0 refused
   zero-downtime saves and Restart in that case and did not lock the others. A save that keeps the

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => '订阅的服务方案不允许使用此运行时。',
+    'planLimitApps' => 'Runway：已启用的应用程序数',
+    'planLimitMemory' => 'Runway：每个应用程序的内存（MiB）',
+    'planLimitCpu' => 'Runway：每个应用程序的 CPU（%）',
+    'planLimitTasks' => 'Runway：每个应用程序的进程/线程数',
+    'permissionRuntime' => 'Runway：使用 %%runtime%%',
+    'permissionRuntimeDescription' => '启用服务方案策略时，允许新建或重新启用的 Runway 应用程序使用此运行时。',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => '安装工具链，无需 Docker 即可将应用程序作为服务运行。',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => '特权辅助程序执行失败：%%details%%',
+    'errorDeploymentRunning' => '此应用程序正在进行部署。请等待部署完成后重试。',
+    'errorOperationInProgress' => '此应用程序的另一项操作仍在进行中。请稍后重试。',
+    'errorStoppedMeanwhile' => '在此操作等待期间，应用程序已被停止。如需运行，请再次启动。',
     'errorAccessDenied' => '访问被拒绝。',
     'errorNoDomain' => '未找到该域名。',
     'errorNoHosting' => '该域名没有 web 主机。',

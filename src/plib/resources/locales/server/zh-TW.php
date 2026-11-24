@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => '訂閱的服務方案不允許此執行環境。',
+    'planLimitApps' => 'Runway：已啟用的應用程式數',
+    'planLimitMemory' => 'Runway：每個應用程式的記憶體 (MiB)',
+    'planLimitCpu' => 'Runway：每個應用程式的 CPU (%)',
+    'planLimitTasks' => 'Runway：每個應用程式的處理程序 / 執行緒數',
+    'permissionRuntime' => 'Runway：使用 %%runtime%%',
+    'permissionRuntimeDescription' => '啟用服務方案原則時，允許新的或重新啟用的 Runway 應用程式使用此執行環境。',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => '安裝工具鏈，並將應用程式作為服務執行，無需 Docker。',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => '特權輔助程式執行失敗：%%details%%',
+    'errorDeploymentRunning' => '此應用程式正在進行部署。請等待部署完成後再試一次。',
+    'errorOperationInProgress' => '此應用程式的另一項操作仍在進行中。請稍後再試。',
+    'errorStoppedMeanwhile' => '此操作等待期間，應用程式已被停止。如需執行，請再次啟動。',
     'errorAccessDenied' => '存取遭拒。',
     'errorNoDomain' => '找不到域名。',
     'errorNoHosting' => '此域名沒有網站託管。',

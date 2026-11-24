@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Denne runtime er ikke tilladt i abonnementets serviceplan.',
+    'planLimitApps' => 'Runway: aktiverede applikationer',
+    'planLimitMemory' => 'Runway: hukommelse pr. applikation (MiB)',
+    'planLimitCpu' => 'Runway: CPU pr. applikation (%)',
+    'planLimitTasks' => 'Runway: processer/tråde pr. applikation',
+    'permissionRuntime' => 'Runway: brug %%runtime%%',
+    'permissionRuntimeDescription' => 'Tillader denne runtime for nye eller genaktiverede Runway-applikationer, når serviceplanpolitikkerne er slået til.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Installer værktøjskæder, og kør applikationer som tjenester uden Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Der opstod en fejl i det privilegerede hjælpeprogram: %%details%%',
+    'errorDeploymentRunning' => 'Der kører en udrulning for denne applikation. Vent, til den er færdig, og prøv derefter igen.',
+    'errorOperationInProgress' => 'En anden handling for denne applikation er stadig i gang. Prøv igen om et øjeblik.',
+    'errorStoppedMeanwhile' => 'Applikationen blev stoppet, mens denne handling ventede. Start den igen, hvis den skal køre.',
     'errorAccessDenied' => 'Adgang nægtet.',
     'errorNoDomain' => 'Domænet blev ikke fundet.',
     'errorNoHosting' => 'Domænet har ingen webhosting.',

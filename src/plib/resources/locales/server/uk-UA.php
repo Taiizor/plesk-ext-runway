@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Тарифний план передплати не дозволяє це середовище виконання.',
+    'planLimitApps' => 'Runway: увімкнені застосунки',
+    'planLimitMemory' => 'Runway: пам’ять на застосунок (МіБ)',
+    'planLimitCpu' => 'Runway: CPU на застосунок (%)',
+    'planLimitTasks' => 'Runway: процеси / потоки на застосунок',
+    'permissionRuntime' => 'Runway: використання %%runtime%%',
+    'permissionRuntimeDescription' => 'Дозволити це середовище виконання для нових або повторно ввімкнених застосунків Runway, коли ввімкнено політики тарифних планів.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Встановлюйте набори інструментів і запускайте застосунки як служби без Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Помилка привілейованого помічника: %%details%%',
+    'errorDeploymentRunning' => 'Для цього застосунку виконується розгортання. Дочекайтеся його завершення й повторіть спробу.',
+    'errorOperationInProgress' => 'Інша операція цього застосунку ще виконується. Повторіть спробу за мить.',
+    'errorStoppedMeanwhile' => 'Застосунок було зупинено, поки ця дія очікувала. Якщо він має працювати, запустіть його знову.',
     'errorAccessDenied' => 'Доступ заборонено.',
     'errorNoDomain' => 'Домен не знайдено.',
     'errorNoHosting' => 'Домен не має вебхостингу.',

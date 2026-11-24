@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Эта среда выполнения не разрешена тарифным планом подписки.',
+    'planLimitApps' => 'Runway: включённые приложения',
+    'planLimitMemory' => 'Runway: память на приложение (МиБ)',
+    'planLimitCpu' => 'Runway: ЦП на приложение (%)',
+    'planLimitTasks' => 'Runway: процессы / потоки на приложение',
+    'permissionRuntime' => 'Runway: использование %%runtime%%',
+    'permissionRuntimeDescription' => 'Разрешить эту среду выполнения для новых или повторно включённых приложений Runway, когда применяются политики тарифных планов.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Устанавливайте наборы инструментов и запускайте приложения как службы без Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Сбой привилегированного помощника: %%details%%',
+    'errorDeploymentRunning' => 'Для этого приложения выполняется развёртывание. Дождитесь его завершения и повторите попытку.',
+    'errorOperationInProgress' => 'Другая операция этого приложения ещё выполняется. Повторите попытку чуть позже.',
+    'errorStoppedMeanwhile' => 'Приложение было остановлено, пока это действие ожидало выполнения. Запустите его снова, если оно должно работать.',
     'errorAccessDenied' => 'Доступ запрещён.',
     'errorNoDomain' => 'Домен не найден.',
     'errorNoHosting' => 'У домена нет веб-хостинга.',

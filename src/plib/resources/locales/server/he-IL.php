@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'סביבת ריצה זו אינה מותרת בתוכנית השירות של המנוי.',
+    'planLimitApps' => 'Runway: יישומים מופעלים',
+    'planLimitMemory' => 'Runway: זיכרון לכל יישום (MiB)',
+    'planLimitCpu' => 'Runway: CPU לכל יישום (%)',
+    'planLimitTasks' => 'Runway: תהליכים / תהליכונים לכל יישום',
+    'permissionRuntime' => 'Runway: שימוש ב-%%runtime%%',
+    'permissionRuntimeDescription' => 'אפשר סביבת ריצה זו ליישומי Runway חדשים או ליישומים שהופעלו שוב לאחר השבתה, כאשר מדיניות תוכניות השירות מופעלת.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'התקן ערכות כלים והרץ יישומים כשירותים, ללא Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'תוכנית העזר בעלת ההרשאות נכשלה: %%details%%',
+    'errorDeploymentRunning' => 'פריסה של יישום זה מתבצעת כעת. המתן עד שתסתיים ונסה שוב.',
+    'errorOperationInProgress' => 'פעולה אחרת של יישום זה עדיין מתבצעת. נסה שוב בעוד רגע.',
+    'errorStoppedMeanwhile' => 'היישום נעצר בזמן שפעולה זו המתינה. הפעל אותו שוב אם הוא אמור לפעול.',
     'errorAccessDenied' => 'הגישה נדחתה.',
     'errorNoDomain' => 'הדומיין לא נמצא.',
     'errorNoHosting' => 'לדומיין אין אירוח אתרים.',

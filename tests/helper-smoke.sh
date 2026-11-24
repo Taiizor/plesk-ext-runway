@@ -1234,7 +1234,10 @@ st=$(python3 -c "import json; d = json.load(open('/var/lib/runway/apps/$ID.json'
 loop_stop "tcp: turning on, restart, build, failed health, missing content, held standby port, killed job"
 call app-apply "{$(zd_base '{"ZD_DELAY": "6s"}'), \"listen\": \"tcp\", \"zero_downtime\": true}" >/dev/null
 for _ in $(seq 1 40); do [ "$(call job-status "{\"job\": \"deploy-$ID\"}" | field "['phase']" 2>/dev/null)" = "waiting" ] && break; sleep 0.5; done
-call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}" | grep -q 'A deployment is running' && ok "a save is refused while a switch runs" || bad "app-apply during a switch was not refused"
+# Refusals carry a code (the panel words them in every language); the 1.0 text stays in "error".
+out=$(call app-apply "{$(zd_base), \"listen\": \"tcp\", \"zero_downtime\": true}")
+[ "$(echo "$out" | jexpr "(d.get('code'), d['error'].startswith('A deployment is running'))")" = "('deployment_running', True)" ] \
+    && ok "a save is refused while a switch runs" || bad "app-apply during a switch was not refused: $out"
 call app-action "{\"domain_id\": $ID, \"action\": \"stop\"}" >/dev/null
 st=$(wait_job deploy-$ID)
 [ "$st" = "succeeded" ] && job_msg | grep -q 'stopped during the switch' && [ "$(systemctl is-active runway-app-$ID-a runway-app-$ID-b | sort -u | tr '\n' ' ')" = "inactive " ] \
@@ -1250,8 +1253,9 @@ echo "$out" | grep -q "#$ID: a deployment is running; its units are re-rendered 
     && systemctl list-timers --all --no-legend "runway-rerender-$ID.timer" | grep -q "runway-rerender-$ID.timer" \
     && [ -e /var/lib/runway/rerender/$ID ] && ok "reapply-all during a deployment defers the application to runway-rerender-$ID" || bad "reapply-all during a deployment: $out"
 systemctl stop "runway-rerender-$ID.timer" 2>/dev/null
-call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" | grep -q 'A deployment is already running for this application' \
-    && ok "Start is refused while a deployment runs" || bad "Start during a deployment was not refused"
+[ "$(call app-action "{\"domain_id\": $ID, \"action\": \"start\"}" | jexpr "d.get('code')")" = "deployment_running" ] \
+    && [ "$(call app-deploy "{\"domain_id\": $ID, \"build\": true}" | jexpr "d.get('code')")" = "deployment_running" ] \
+    && ok "Start and Build & restart are refused while a deployment runs (code deployment_running)" || bad "Start during a deployment was not refused"
 st=$(wait_job deploy-$ID)
 [ "$st" = "succeeded" ] && wait_listening || bad "switch after reapply-all: $st $(job_msg)"
 # The deferred re-render, once the lock is free, rewrites a changed env file of the live slot.

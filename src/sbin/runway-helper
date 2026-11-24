@@ -1870,7 +1870,12 @@ def render_app_unit(state, pw):
         "PrivateTmp=yes",
         "PrivateDevices=yes",
         "ProtectSystem=full",
-        "ProtectKernelTunables=yes",
+        # An isolated application starts bubblewrap, which mounts a fresh /proc in its user
+        # namespace: the kernel refuses that while every procfs of the mount namespace has
+        # read-only or masked paths over it (mount_too_revealing), which ProtectKernelTunables
+        # adds. bubblewrap makes /proc/sys, sysrq-trigger, irq and bus read-only in the sandbox
+        # itself, and the service runs unprivileged (docs/DESIGN.md section 14).
+        "ProtectKernelTunables=%s" % ("no" if isolation_options(domain_id)["enabled"] else "yes"),
         "ProtectKernelModules=yes",
         "ProtectControlGroups=yes",
         "RestrictSUIDSGID=yes",
@@ -5553,7 +5558,7 @@ def app_status(domain_id, state=None):
         # (docs/DESIGN.md section 7, "tampered"): nginx would follow a symbolic link elsewhere.
         found = socket_check(state, pw)
         if found and not state.get("tampered"):
-            contain_tampering(state, found[0])
+            contain_tampering_waiting(state, pw, found[0])
         elif found:
             unlink_socket_entry(domain_id, os.path.basename(found[2]["path"]))
     slots = bool(state) and zd_has_slots(state)
@@ -6900,12 +6905,42 @@ def try_deploy_lock(domain_id, wait=None):
         time.sleep(0.5)
 
 
-def deploy_lock(domain_id, deployment_message, busy_message):
-    """try_deploy_lock() for a command: the held lock, or a HelperError with the reason's message."""
+def deploy_lock(domain_id, deployment_message, busy_message=None):
+    """try_deploy_lock() for a command: the held lock, or a HelperError with the reason's message
+    and code ("deployment_running" or "operation_in_progress": the panel words them itself)."""
     lock, reason = try_deploy_lock(domain_id)
     if lock is None:
-        raise HelperError(deployment_message if reason == "deployment" else busy_message)
+        if reason == "deployment":
+            raise HelperError(deployment_message, code="deployment_running")
+        raise HelperError(busy_message or "Another operation of this application is still in progress. Please try again in a moment.",
+                          code="operation_in_progress")
     return lock
+
+
+def contain_tampering_waiting(state, pw, detail):
+    """contain_tampering() for callers without the deploy lock (status queries, Reconcile): it
+    waits up to STOP_LOCK_WAIT for a Start in progress, which could otherwise run the application
+    again right after the containment; never for a deployment, and it contains anyway when the
+    lock stays busy (security first). With the lock it checks again first: the operation it
+    waited for may have removed the entry (prepare_start unlinks it) or changed the application.
+    `state` (the caller's stored state) gets the flags of a containment."""
+    lock = try_deploy_lock(state["domain_id"], STOP_LOCK_WAIT)[0]
+    try:
+        current = state
+        if lock is not None:
+            current = read_json(app_state_path(state["domain_id"]))
+            if not isinstance(current, dict) or current.get("listen") != "unix" or current.get("tampered"):
+                return
+            found = socket_check(current, pw)
+            if not found:
+                return
+            detail = found[0]
+        contain_tampering(current, detail)
+        if current is not state:
+            state.update({key: current[key] for key in ("stopped", "tampered", "tampered_detail")})
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def _app_apply(payload):
@@ -6935,7 +6970,8 @@ def _app_apply(payload):
         systemctl("stop", UNIT_DEPLOY % domain_id, timeout=ZD_DEPLOY_STOP + 30)
         lock = FileLock("deploy-%d" % domain_id)
         if not lock.acquire(blocking=True, timeout=60):
-            raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+            raise HelperError("Another operation of this application is still in progress. Please try again in a moment.",
+                              code="operation_in_progress")
     else:
         # A running deployment refuses the save at once (the 1.0 wording, docs/DESIGN.md section
         # 12.5; the smoke tests match on it); a short operation (the health watch, the convergence,
@@ -7126,7 +7162,8 @@ def remove_app(domain_id, force=False):
     systemctl("disable", "--now", *units, timeout=120)
     lock = FileLock("deploy-%d" % domain_id)
     if not lock.acquire(blocking=True, timeout=LOCK_TIMEOUT) and not force:
-        raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+        raise HelperError("Another operation of this application is still in progress. Please try again in a moment.",
+                          code="operation_in_progress")
     try:
         # A writer may have completed while removal waited; drain any newly created slots too.
         units = list(dict.fromkeys(units + existing_app_units(domain_id)))
@@ -7189,7 +7226,7 @@ def cmd_app_action(payload):
         state, pw = load_app_state(domain_id)
         if state["stopped"] and not stopped_before and action != "recover":
             # A Stop (or a containment) arrived while this action waited: the later request wins.
-            raise HelperError("The application was stopped while this action waited; start it again")
+            raise HelperError("The application was stopped while this action waited; start it again", code="stopped_meanwhile")
         return _app_action(state, pw, action, payload)
     finally:
         lock.release()
@@ -7311,13 +7348,16 @@ def cmd_app_deploy(payload):
         raise HelperError("The application is disabled")
     if state["suspended"]:
         raise HelperError("The domain is suspended")
-    job = "deploy-%d" % domain_id
-    unit = UNIT_DEPLOY % domain_id
-    lock = FileLock(job)
-    # The deploy job holds this lock while it runs; a running job means "busy".
-    if unit_is_active(unit) or not lock.acquire(blocking=False):
-        raise HelperError("A deployment is already running for this application")
+    # The deploy job holds this lock while it runs: a running job refuses the request at once, a
+    # short holder (the health watch, a save) is waited for.
+    lock = deploy_lock(domain_id, "A deployment is already running for this application")
     try:
+        # What the operation waited for (a save, a Stop) may have changed the state.
+        state, _pw = load_app_state(domain_id)
+        if not state["enabled"]:
+            raise HelperError("The application is disabled")
+        if state["suspended"]:
+            raise HelperError("The domain is suspended")
         stopped = state["stopped"] or state["tampered"]
         if payload.get("start") and stopped:
             # "Build & restart" in the panel is an explicit start: it clears "stopped". Deploys
@@ -7882,7 +7922,7 @@ def cmd_apps_list(payload):
             continue
         found = socket_check(state, pw)
         if found and not state.get("tampered"):
-            contain_tampering(state, found[0])
+            contain_tampering_waiting(state, pw, found[0])
         elif found:
             unlink_socket_entry(state["domain_id"], os.path.basename(found[2]["path"]))
     if converge:
@@ -9141,9 +9181,8 @@ def cmd_isolation(payload):
             isolation_backend()
             if options["network"] == "offline" and state["listen"] == "tcp":
                 raise HelperError("Offline isolation requires Unix socket mode or a worker")
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("Wait for the current deployment before changing isolation")
+        lock = deploy_lock(domain_id, "Wait for the current deployment before changing isolation")
+        try:
             state, pw = load_app_state(domain_id)
             if options["enabled"] and options["network"] == "offline" and state["listen"] == "tcp":
                 raise HelperError("Offline isolation requires Unix socket mode or a worker")
@@ -9172,6 +9211,8 @@ def cmd_isolation(payload):
                 update_state_flags(domain_id, stopped=True)
                 systemctl("stop", *existing_app_units(domain_id), timeout=120)
                 raise
+        finally:
+            lock.release()
     elif action != "status":
         raise HelperError("Invalid isolation operation")
     try:
@@ -10802,12 +10843,14 @@ def cmd_operations(payload):
     domain_id, state, pw, options = ops_context(payload)
     action = payload.get("action", "status")
     if action == "save":
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("A deployment is already running for this application")
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            state, pw = load_app_state(domain_id)
             ops_save(domain_id, payload.get("options"))
             write_file_atomic(os.path.join(UNIT_DIR, UNIT_DEPLOY % domain_id), render_deploy_service(state), 0o644)
             systemctl("daemon-reload", check=True)
+        finally:
+            lock.release()
         return ops_summary(domain_id)
     if action == "status":
         return ops_summary(domain_id, options)
@@ -10824,21 +10867,31 @@ def cmd_operations(payload):
     if action == "rollback":
         if not options["releases"]:
             raise HelperError("Release management is disabled")
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("A deployment is already running for this application")
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            # The operation it waited for may have changed the state or the settings.
+            state, pw = load_app_state(domain_id)
+            if not ops_options(domain_id)["releases"]:
+                raise HelperError("Release management is disabled")
             release = ops_valid_release(payload.get("id"))
             ops_require_release(domain_id, release)
             return start_deploy_job(domain_id, "rollback", state["stopped"], release=release,
                                     actor=ops_actor(payload.get("actor")))
+        finally:
+            lock.release()
     if action == "clear-releases":
-        with FileLock("deploy-%d" % domain_id):
-            if options["releases"] or not state["stopped"] or unit_is_active(UNIT_DEPLOY % domain_id) \
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            state, pw = load_app_state(domain_id)
+            options = ops_options(domain_id)
+            if options["releases"] or not state["stopped"] \
                     or any(unit_is_active(unit) for unit in existing_app_units(domain_id)):
                 raise HelperError("Turn off release management and stop the application before clearing releases")
             ops_clear_releases(state, pw)
             write_units(state, pw)
             systemctl("daemon-reload", check=True)
+        finally:
+            lock.release()
         return ops_summary(domain_id)
     if action == "export":
         return ops_export(state, options)
@@ -11427,8 +11480,9 @@ def ops_import(state, pw, bundle, restore_secrets=False):
     if not ops_options(state["domain_id"])["backup"]:
         raise HelperError("Recovery backup is disabled")
     config, environment = ops_check_import(bundle, restore_secrets)
-    with FileLock("deploy-%d" % state["domain_id"]):
-        if unit_is_active(UNIT_DEPLOY % state["domain_id"]) or any(unit_is_active(unit) for unit in existing_app_units(state["domain_id"])):
+    lock = deploy_lock(state["domain_id"], "Stop the application and wait for deployments to finish before restoring settings")
+    try:
+        if any(unit_is_active(unit) for unit in existing_app_units(state["domain_id"])):
             raise HelperError("Stop the application and wait for deployments to finish before restoring settings")
         if environment is not None:
             with FileLock("ports"):
@@ -11439,6 +11493,8 @@ def ops_import(state, pw, bundle, restore_secrets=False):
                 write_json(app_state_path(state["domain_id"]), current)
         ensure_dir(OPS_CONFIG_DIR, 0o700)
         write_json(ops_config_path(state["domain_id"]), config)
+    finally:
+        lock.release()
     return {"restored": True, "environment_restored": environment is not None}
 
 # Source: helper/entrypoint.py

@@ -469,9 +469,8 @@ def cmd_isolation(payload):
             isolation_backend()
             if options["network"] == "offline" and state["listen"] == "tcp":
                 raise HelperError("Offline isolation requires Unix socket mode or a worker")
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("Wait for the current deployment before changing isolation")
+        lock = deploy_lock(domain_id, "Wait for the current deployment before changing isolation")
+        try:
             state, pw = load_app_state(domain_id)
             if options["enabled"] and options["network"] == "offline" and state["listen"] == "tcp":
                 raise HelperError("Offline isolation requires Unix socket mode or a worker")
@@ -500,6 +499,8 @@ def cmd_isolation(payload):
                 update_state_flags(domain_id, stopped=True)
                 systemctl("stop", *existing_app_units(domain_id), timeout=120)
                 raise
+        finally:
+            lock.release()
     elif action != "status":
         raise HelperError("Invalid isolation operation")
     try:

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Masa jalan ini tidak dibenarkan oleh pelan perkhidmatan langganan.',
+    'planLimitApps' => 'Runway: aplikasi yang didayakan',
+    'planLimitMemory' => 'Runway: memori setiap aplikasi (MiB)',
+    'planLimitCpu' => 'Runway: CPU setiap aplikasi (%)',
+    'planLimitTasks' => 'Runway: proses/bebenang setiap aplikasi',
+    'permissionRuntime' => 'Runway: gunakan %%runtime%%',
+    'permissionRuntimeDescription' => 'Benarkan masa jalan ini untuk aplikasi Runway yang baharu atau didayakan semula apabila dasar pelan perkhidmatan didayakan.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Pasang rantaian alat dan jalankan aplikasi sebagai perkhidmatan, tanpa Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Pembantu berkeistimewaan gagal: %%details%%',
+    'errorDeploymentRunning' => 'Penyebaran sedang berjalan untuk aplikasi ini. Tunggu sehingga ia selesai, kemudian cuba lagi.',
+    'errorOperationInProgress' => 'Operasi lain bagi aplikasi ini masih sedang berjalan. Cuba lagi sebentar nanti.',
+    'errorStoppedMeanwhile' => 'Aplikasi telah dihentikan semasa tindakan ini menunggu. Mulakannya semula jika ia sepatutnya berjalan.',
     'errorAccessDenied' => 'Akses ditolak.',
     'errorNoDomain' => 'Domain tidak ditemui.',
     'errorNoHosting' => 'Domain ini tidak mempunyai pengehosan web.',

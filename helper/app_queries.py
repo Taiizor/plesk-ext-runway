@@ -252,7 +252,7 @@ def cmd_apps_list(payload):
             continue
         found = socket_check(state, pw)
         if found and not state.get("tampered"):
-            contain_tampering(state, found[0])
+            contain_tampering_waiting(state, pw, found[0])
         elif found:
             unlink_socket_entry(state["domain_id"], os.path.basename(found[2]["path"]))
     if converge:

@@ -36,12 +36,42 @@ def try_deploy_lock(domain_id, wait=None):
         time.sleep(0.5)
 
 
-def deploy_lock(domain_id, deployment_message, busy_message):
-    """try_deploy_lock() for a command: the held lock, or a HelperError with the reason's message."""
+def deploy_lock(domain_id, deployment_message, busy_message=None):
+    """try_deploy_lock() for a command: the held lock, or a HelperError with the reason's message
+    and code ("deployment_running" or "operation_in_progress": the panel words them itself)."""
     lock, reason = try_deploy_lock(domain_id)
     if lock is None:
-        raise HelperError(deployment_message if reason == "deployment" else busy_message)
+        if reason == "deployment":
+            raise HelperError(deployment_message, code="deployment_running")
+        raise HelperError(busy_message or "Another operation of this application is still in progress. Please try again in a moment.",
+                          code="operation_in_progress")
     return lock
+
+
+def contain_tampering_waiting(state, pw, detail):
+    """contain_tampering() for callers without the deploy lock (status queries, Reconcile): it
+    waits up to STOP_LOCK_WAIT for a Start in progress, which could otherwise run the application
+    again right after the containment; never for a deployment, and it contains anyway when the
+    lock stays busy (security first). With the lock it checks again first: the operation it
+    waited for may have removed the entry (prepare_start unlinks it) or changed the application.
+    `state` (the caller's stored state) gets the flags of a containment."""
+    lock = try_deploy_lock(state["domain_id"], STOP_LOCK_WAIT)[0]
+    try:
+        current = state
+        if lock is not None:
+            current = read_json(app_state_path(state["domain_id"]))
+            if not isinstance(current, dict) or current.get("listen") != "unix" or current.get("tampered"):
+                return
+            found = socket_check(current, pw)
+            if not found:
+                return
+            detail = found[0]
+        contain_tampering(current, detail)
+        if current is not state:
+            state.update({key: current[key] for key in ("stopped", "tampered", "tampered_detail")})
+    finally:
+        if lock is not None:
+            lock.release()
 
 
 def _app_apply(payload):
@@ -71,7 +101,8 @@ def _app_apply(payload):
         systemctl("stop", UNIT_DEPLOY % domain_id, timeout=ZD_DEPLOY_STOP + 30)
         lock = FileLock("deploy-%d" % domain_id)
         if not lock.acquire(blocking=True, timeout=60):
-            raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+            raise HelperError("Another operation of this application is still in progress. Please try again in a moment.",
+                              code="operation_in_progress")
     else:
         # A running deployment refuses the save at once (the 1.0 wording, docs/DESIGN.md section
         # 12.5; the smoke tests match on it); a short operation (the health watch, the convergence,
@@ -262,7 +293,8 @@ def remove_app(domain_id, force=False):
     systemctl("disable", "--now", *units, timeout=120)
     lock = FileLock("deploy-%d" % domain_id)
     if not lock.acquire(blocking=True, timeout=LOCK_TIMEOUT) and not force:
-        raise HelperError("Another operation of this application is still in progress. Please try again in a moment.")
+        raise HelperError("Another operation of this application is still in progress. Please try again in a moment.",
+                          code="operation_in_progress")
     try:
         # A writer may have completed while removal waited; drain any newly created slots too.
         units = list(dict.fromkeys(units + existing_app_units(domain_id)))
@@ -325,7 +357,7 @@ def cmd_app_action(payload):
         state, pw = load_app_state(domain_id)
         if state["stopped"] and not stopped_before and action != "recover":
             # A Stop (or a containment) arrived while this action waited: the later request wins.
-            raise HelperError("The application was stopped while this action waited; start it again")
+            raise HelperError("The application was stopped while this action waited; start it again", code="stopped_meanwhile")
         return _app_action(state, pw, action, payload)
     finally:
         lock.release()
@@ -447,13 +479,16 @@ def cmd_app_deploy(payload):
         raise HelperError("The application is disabled")
     if state["suspended"]:
         raise HelperError("The domain is suspended")
-    job = "deploy-%d" % domain_id
-    unit = UNIT_DEPLOY % domain_id
-    lock = FileLock(job)
-    # The deploy job holds this lock while it runs; a running job means "busy".
-    if unit_is_active(unit) or not lock.acquire(blocking=False):
-        raise HelperError("A deployment is already running for this application")
+    # The deploy job holds this lock while it runs: a running job refuses the request at once, a
+    # short holder (the health watch, a save) is waited for.
+    lock = deploy_lock(domain_id, "A deployment is already running for this application")
     try:
+        # What the operation waited for (a save, a Stop) may have changed the state.
+        state, _pw = load_app_state(domain_id)
+        if not state["enabled"]:
+            raise HelperError("The application is disabled")
+        if state["suspended"]:
+            raise HelperError("The domain is suspended")
         stopped = state["stopped"] or state["tampered"]
         if payload.get("start") and stopped:
             # "Build & restart" in the panel is an explicit start: it clears "stopped". Deploys

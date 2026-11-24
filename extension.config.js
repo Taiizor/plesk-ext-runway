@@ -8,6 +8,8 @@
 // (src/plib/resources/locales/app/*.php); "title" below is only the fallback.
 // "parent" adds the parent page to the Plesk breadcrumbs (SDK Page component).
 
+const path = require('path');
+
 module.exports = {
     routes: [
         { path: 'overview', component: 'Overview', title: 'Runway' },
@@ -21,5 +23,14 @@ module.exports = {
         ...config,
         // No source maps in the package: they would double its size.
         devtool: isDev ? 'cheap-module-source-map' : false,
+        resolve: {
+            ...config.resolve,
+            alias: {
+                ...(config.resolve && config.resolve.alias),
+                // The SDK's api helper only needs qs.stringify; the full package (with
+                // object-inspect and side-channel) would put main.js over webpack's size limit.
+                qs: path.resolve(__dirname, 'src/frontend/lib/qs.js'),
+            },
+        },
     }),
 };

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Este runtime não é permitido pelo plano de serviço da assinatura.',
+    'planLimitApps' => 'Runway: aplicativos ativados',
+    'planLimitMemory' => 'Runway: memória por aplicativo (MiB)',
+    'planLimitCpu' => 'Runway: CPU por aplicativo (%)',
+    'planLimitTasks' => 'Runway: processos / threads por aplicativo',
+    'permissionRuntime' => 'Runway: usar %%runtime%%',
+    'permissionRuntimeDescription' => 'Permite este runtime em aplicativos Runway novos ou reativados quando as políticas dos planos de serviço estão ativadas.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instale toolchains e execute aplicativos como serviços, sem Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'O programa auxiliar privilegiado falhou: %%details%%',
+    'errorDeploymentRunning' => 'Há uma implantação em andamento para este aplicativo. Aguarde até que ela termine e tente novamente.',
+    'errorOperationInProgress' => 'Outra operação deste aplicativo ainda está em andamento. Tente novamente em instantes.',
+    'errorStoppedMeanwhile' => 'O aplicativo foi parado enquanto esta ação aguardava. Inicie-o novamente se ele precisar estar em execução.',
     'errorAccessDenied' => 'Acesso negado.',
     'errorNoDomain' => 'O domínio não foi encontrado.',
     'errorNoHosting' => 'O domínio não tem hospedagem web.',

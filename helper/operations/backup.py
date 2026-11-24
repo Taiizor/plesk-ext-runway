@@ -33,8 +33,9 @@ def ops_import(state, pw, bundle, restore_secrets=False):
     if not ops_options(state["domain_id"])["backup"]:
         raise HelperError("Recovery backup is disabled")
     config, environment = ops_check_import(bundle, restore_secrets)
-    with FileLock("deploy-%d" % state["domain_id"]):
-        if unit_is_active(UNIT_DEPLOY % state["domain_id"]) or any(unit_is_active(unit) for unit in existing_app_units(state["domain_id"])):
+    lock = deploy_lock(state["domain_id"], "Stop the application and wait for deployments to finish before restoring settings")
+    try:
+        if any(unit_is_active(unit) for unit in existing_app_units(state["domain_id"])):
             raise HelperError("Stop the application and wait for deployments to finish before restoring settings")
         if environment is not None:
             with FileLock("ports"):
@@ -45,4 +46,6 @@ def ops_import(state, pw, bundle, restore_secrets=False):
                 write_json(app_state_path(state["domain_id"]), current)
         ensure_dir(OPS_CONFIG_DIR, 0o700)
         write_json(ops_config_path(state["domain_id"]), config)
+    finally:
+        lock.release()
     return {"restored": True, "environment_restored": environment is not None}

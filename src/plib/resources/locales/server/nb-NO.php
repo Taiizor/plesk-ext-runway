@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Dette kjøretidsmiljøet er ikke tillatt i tjenesteplanen til abonnementet.',
+    'planLimitApps' => 'Runway: aktiverte applikasjoner',
+    'planLimitMemory' => 'Runway: minne per applikasjon (MiB)',
+    'planLimitCpu' => 'Runway: CPU per applikasjon (%)',
+    'planLimitTasks' => 'Runway: prosesser/tråder per applikasjon',
+    'permissionRuntime' => 'Runway: bruk %%runtime%%',
+    'permissionRuntimeDescription' => 'Tillat dette kjøretidsmiljøet for nye eller reaktiverte Runway-applikasjoner når policyer fra tjenesteplaner er aktivert.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Installer verktøykjeder og kjør applikasjoner som tjenester, uten Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Det privilegerte hjelpeprogrammet feilet: %%details%%',
+    'errorDeploymentRunning' => 'En utrulling pågår for denne applikasjonen. Vent til den er ferdig, og prøv deretter på nytt.',
+    'errorOperationInProgress' => 'En annen operasjon for denne applikasjonen pågår fortsatt. Prøv igjen om et øyeblikk.',
+    'errorStoppedMeanwhile' => 'Applikasjonen ble stoppet mens denne handlingen ventet. Start den igjen hvis den skal kjøre.',
     'errorAccessDenied' => 'Tilgang nektet.',
     'errorNoDomain' => 'Domenet ble ikke funnet.',
     'errorNoHosting' => 'Domenet har ikke webhotell.',

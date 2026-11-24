@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Αυτό το περιβάλλον εκτέλεσης δεν επιτρέπεται από το πακέτο υπηρεσιών της συνδρομής.',
+    'planLimitApps' => 'Runway: ενεργοποιημένες εφαρμογές',
+    'planLimitMemory' => 'Runway: μνήμη ανά εφαρμογή (MiB)',
+    'planLimitCpu' => 'Runway: CPU ανά εφαρμογή (%)',
+    'planLimitTasks' => 'Runway: διεργασίες/νήματα ανά εφαρμογή',
+    'permissionRuntime' => 'Runway: χρήση %%runtime%%',
+    'permissionRuntimeDescription' => 'Επιτρέπει αυτό το περιβάλλον εκτέλεσης σε νέες ή επανενεργοποιημένες εφαρμογές Runway όταν είναι ενεργοποιημένες οι πολιτικές των πακέτων υπηρεσιών.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Εγκαταστήστε αλυσίδες εργαλείων και εκτελέστε εφαρμογές ως υπηρεσίες, χωρίς Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Το βοηθητικό πρόγραμμα με αυξημένα δικαιώματα απέτυχε: %%details%%',
+    'errorDeploymentRunning' => 'Εκτελείται μια ανάπτυξη για αυτή την εφαρμογή. Περιμένετε να ολοκληρωθεί και δοκιμάστε ξανά.',
+    'errorOperationInProgress' => 'Μια άλλη ενέργεια αυτής της εφαρμογής βρίσκεται ακόμη σε εξέλιξη. Δοκιμάστε ξανά σε λίγο.',
+    'errorStoppedMeanwhile' => 'Η εφαρμογή σταμάτησε ενώ αυτή η ενέργεια περίμενε. Εκκινήστε την ξανά αν πρέπει να εκτελείται.',
     'errorAccessDenied' => 'Δεν επιτρέπεται η πρόσβαση.',
     'errorNoDomain' => 'Ο τομέας δεν βρέθηκε.',
     'errorNoHosting' => 'Ο τομέας δεν έχει φιλοξενία web.',

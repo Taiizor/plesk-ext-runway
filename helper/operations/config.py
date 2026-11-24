@@ -152,12 +152,14 @@ def cmd_operations(payload):
     domain_id, state, pw, options = ops_context(payload)
     action = payload.get("action", "status")
     if action == "save":
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("A deployment is already running for this application")
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            state, pw = load_app_state(domain_id)
             ops_save(domain_id, payload.get("options"))
             write_file_atomic(os.path.join(UNIT_DIR, UNIT_DEPLOY % domain_id), render_deploy_service(state), 0o644)
             systemctl("daemon-reload", check=True)
+        finally:
+            lock.release()
         return ops_summary(domain_id)
     if action == "status":
         return ops_summary(domain_id, options)
@@ -174,21 +176,31 @@ def cmd_operations(payload):
     if action == "rollback":
         if not options["releases"]:
             raise HelperError("Release management is disabled")
-        with FileLock("deploy-%d" % domain_id):
-            if unit_is_active(UNIT_DEPLOY % domain_id):
-                raise HelperError("A deployment is already running for this application")
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            # The operation it waited for may have changed the state or the settings.
+            state, pw = load_app_state(domain_id)
+            if not ops_options(domain_id)["releases"]:
+                raise HelperError("Release management is disabled")
             release = ops_valid_release(payload.get("id"))
             ops_require_release(domain_id, release)
             return start_deploy_job(domain_id, "rollback", state["stopped"], release=release,
                                     actor=ops_actor(payload.get("actor")))
+        finally:
+            lock.release()
     if action == "clear-releases":
-        with FileLock("deploy-%d" % domain_id):
-            if options["releases"] or not state["stopped"] or unit_is_active(UNIT_DEPLOY % domain_id) \
+        lock = deploy_lock(domain_id, "A deployment is already running for this application")
+        try:
+            state, pw = load_app_state(domain_id)
+            options = ops_options(domain_id)
+            if options["releases"] or not state["stopped"] \
                     or any(unit_is_active(unit) for unit in existing_app_units(domain_id)):
                 raise HelperError("Turn off release management and stop the application before clearing releases")
             ops_clear_releases(state, pw)
             write_units(state, pw)
             systemctl("daemon-reload", check=True)
+        finally:
+            lock.release()
         return ops_summary(domain_id)
     if action == "export":
         return ops_export(state, options)

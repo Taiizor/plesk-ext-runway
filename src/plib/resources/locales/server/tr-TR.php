@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Yetkili yardımcı program başarısız oldu: %%details%%',
+    'errorDeploymentRunning' => 'Bu uygulama için bir dağıtım sürüyor. Bitmesini bekleyip yeniden deneyin.',
+    'errorOperationInProgress' => 'Bu uygulamanın başka bir işlemi hâlâ sürüyor. Biraz sonra yeniden deneyin.',
+    'errorStoppedMeanwhile' => 'Bu işlem beklerken uygulama durduruldu. Çalışması gerekiyorsa yeniden başlatın.',
     'errorAccessDenied' => 'Erişim reddedildi.',
     'errorNoDomain' => 'Alan adı bulunamadı.',
     'errorNoHosting' => 'Bu alan adının web barındırması yok.',

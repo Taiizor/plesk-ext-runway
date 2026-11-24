@@ -66,7 +66,7 @@ CI (`.github/workflows/ci.yml`):
    frontend regression tests and build, `build.py --check`, `php -l` and optional-operation PHP
    contracts (`php tests/php/operations.php`, `php tests/php/isolation.php`) with PHP 7.4 and 8.2.
 2. **Package**: `bun run package` (`python build.py --strict`), uploads the zip as the `runway-package` artifact.
-3. **End-to-end**: three parallel jobs, each starting `plesk/plesk` with systemd, installing
+3. **End-to-end**: four parallel jobs, each starting `plesk/plesk` with systemd, installing
    the zip, creating the subscription `gotest.local` and (when the license allows customer
    accounts) its owner `cust1` and installing Go through Runway; then *helper* runs
    `tests/helper-smoke.sh` with `RUNWAY_SMOKE_SELF_UPDATE=1` (its self-update section then also
@@ -76,9 +76,12 @@ CI (`.github/workflows/ci.yml`):
    without the setting get the same files as from the 1.0.0 helper, which `plesk-e2e.sh smoke`
    takes from the `v1.0.0` tag), *panel* runs `tests/api-smoke.sh` (with a real deployment) and
    `tests/customer-smoke.sh` (skipped without the customer), *runtime* runs
-   `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`). `.github/scripts/plesk-e2e.sh` does
+   `tests/runtime-e2e.sh` for Go (`RUNWAY_E2E_RUNTIMES=go`), *isolation* updates the system
+   packages they need, installs the isolation dependencies and Python through Runway and runs `tests/runtime-e2e.sh` for Go with
+   `RUNWAY_E2E_ISOLATION=1`, then `tests/isolation-e2e.py`. `.github/scripts/plesk-e2e.sh` does
    the same on your machine: `start`, `install dist/<zip>`, `prepare`, `smoke`, `stop`
-   (`SMOKE_SUITES=helper,api,customer,runtime` picks the suites; `scripts/plesk-dev.sh` wraps
+   (`SMOKE_SUITES=helper,api,customer,runtime` picks the suites; `SMOKE_SUITES=isolation` with
+   `RUNWAY_E2E_ISOLATION=1` from `start` on runs the isolation job; `scripts/plesk-dev.sh` wraps
    it: `up`, `install`, `prepare`, `test`, `down`).
 
 CodeQL (`.github/workflows/codeql.yml`) analyses the helper, the frontend and the workflows on
@@ -98,8 +101,8 @@ installs tools or contacts Plesk. Windows contributors can invoke it through WSL
 checkout's `/mnt/...` path. Real namespace fixtures in `tests/test_isolation.py` run only through
 this runner; policy/rendering tests run in the regular Linux suite too.
 
-Plesk isolation E2E is separate and opt-in. Run it only on a disposable test subscription with
-the needed toolchains installed. It interrupts applications, changes their policy, builds
+Plesk isolation E2E runs in CI (the *isolation* job, Go only) and is opt-in locally. Run it only
+on a disposable test subscription with the needed toolchains installed. It interrupts applications, changes their policy, builds
 samples and restores the previous settings. Validate backend/kernel support in that environment
 before using it for customer workloads. Apache/nginx configuration and the panel require live
 Plesk verification even when offline namespace fixtures pass.

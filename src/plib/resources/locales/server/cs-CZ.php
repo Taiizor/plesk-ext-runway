@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Servisní plán předplatného toto běhové prostředí nepovoluje.',
+    'planLimitApps' => 'Runway: povolené aplikace',
+    'planLimitMemory' => 'Runway: paměť na aplikaci (MiB)',
+    'planLimitCpu' => 'Runway: CPU na aplikaci (%)',
+    'planLimitTasks' => 'Runway: procesy / vlákna na aplikaci',
+    'permissionRuntime' => 'Runway: použití %%runtime%%',
+    'permissionRuntimeDescription' => 'Povoluje toto běhové prostředí pro nové nebo znovu povolené aplikace Runway, pokud jsou zapnuté politiky servisních plánů.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instalujte sady nástrojů a spouštějte aplikace jako služby, bez Dockeru.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Privilegovaný pomocný program selhal: %%details%%',
+    'errorDeploymentRunning' => 'Pro tuto aplikaci právě probíhá nasazení. Počkejte, až skončí, a zkuste to znovu.',
+    'errorOperationInProgress' => 'Jiná operace této aplikace stále probíhá. Zkuste to znovu za chvíli.',
+    'errorStoppedMeanwhile' => 'Aplikace byla zastavena, zatímco tato akce čekala. Pokud má běžet, znovu ji spusťte.',
     'errorAccessDenied' => 'Přístup odepřen.',
     'errorNoDomain' => 'Doména nebyla nalezena.',
     'errorNoHosting' => 'Doména nemá webhosting.',

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Diese Laufzeitumgebung ist im Service-Paket des Abonnements nicht erlaubt.',
+    'planLimitApps' => 'Runway: aktivierte Anwendungen',
+    'planLimitMemory' => 'Runway: Arbeitsspeicher pro Anwendung (MiB)',
+    'planLimitCpu' => 'Runway: CPU pro Anwendung (%)',
+    'planLimitTasks' => 'Runway: Prozesse/Threads pro Anwendung',
+    'permissionRuntime' => 'Runway: %%runtime%% verwenden',
+    'permissionRuntimeDescription' => 'Erlaubt diese Laufzeitumgebung für neue oder wieder aktivierte Runway-Anwendungen, wenn Service-Paket-Richtlinien aktiviert sind.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Toolchains installieren und Anwendungen ohne Docker als Dienste ausführen.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Das privilegierte Hilfsprogramm ist fehlgeschlagen: %%details%%',
+    'errorDeploymentRunning' => 'Für diese Anwendung läuft eine Bereitstellung. Warten Sie, bis sie abgeschlossen ist, und versuchen Sie es dann erneut.',
+    'errorOperationInProgress' => 'Ein anderer Vorgang dieser Anwendung läuft noch. Versuchen Sie es gleich noch einmal.',
+    'errorStoppedMeanwhile' => 'Die Anwendung wurde gestoppt, während diese Aktion wartete. Starten Sie sie erneut, falls sie laufen soll.',
     'errorAccessDenied' => 'Zugriff verweigert.',
     'errorNoDomain' => 'Die Domain wurde nicht gefunden.',
     'errorNoHosting' => 'Die Domain hat kein Webhosting.',

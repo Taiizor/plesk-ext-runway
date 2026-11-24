@@ -103,14 +103,17 @@ class IsolationTests(unittest.TestCase):
                 self.assertEqual(self.h.isolation_home(state, self.pw), env["HOME"])
                 unit = self.h.render_app_unit(state, self.pw)
                 self.assertIn(" _isolate ", unit)
-                for line in ("MemoryMax=1024M", "CPUQuota=100%", "TasksMax=1024", "NoNewPrivileges=yes"):
+                # ProtectKernelTunables would make the kernel refuse bubblewrap's own /proc.
+                for line in ("MemoryMax=1024M", "CPUQuota=100%", "TasksMax=1024", "NoNewPrivileges=yes", "ProtectKernelTunables=no"):
                     self.assertIn(line, unit)
         self.assertEqual(set(self.h.RUNTIME_KEYS), set(self.h.ISOLATION_RUNTIME_PATHS))
 
     def test_disabled_policy_preserves_existing_execution_and_explicit_resource_limits_win(self):
         command = ["/bin/bash", "-c", "./app"]
         self.assertIs(command, self.h.isolation_command(self.state, self.pw, command))
-        self.assertNotIn(" _isolate ", self.h.render_app_unit(self.state, self.pw))
+        unit = self.h.render_app_unit(self.state, self.pw)
+        self.assertNotIn(" _isolate ", unit)
+        self.assertIn("ProtectKernelTunables=yes", unit)
         self.options()
         state = dict(self.state, limits={"memory_mb": 2048, "cpu_percent": 250, "tasks": 4096})
         self.assertEqual(state["limits"], self.h.isolation_limits(state))
@@ -178,9 +181,36 @@ class IsolationTests(unittest.TestCase):
         with mock.patch.object(self.h, "DEPLOY_LOCK_WAIT", 0.3), self.h.FileLock("deploy-17"):
             with self.assertRaisesRegex(self.h.HelperError, "Another deployment or settings change is in progress"):
                 self.h._app_apply(dict(self.state))
-            with self.assertRaisesRegex(self.h.HelperError, "still in progress"):
+            with self.assertRaisesRegex(self.h.HelperError, "still in progress") as refused:
                 self.h.cmd_app_action({"domain_id": 17, "action": "start"})
+            self.assertEqual("operation_in_progress", refused.exception.code)
+            with self.assertRaises(self.h.HelperError) as refused:
+                self.h.cmd_app_deploy({"domain_id": 17})
+            self.assertEqual("operation_in_progress", refused.exception.code)
         self.systemctl.assert_not_called()
+
+    def test_tampering_found_by_a_status_query_waits_for_a_start_in_progress(self):
+        holder = self.h.FileLock("deploy-17")
+        self.assertTrue(holder.acquire(blocking=False))
+        threading.Timer(0.4, holder.release).start()
+        self.h.write_json(self.h.app_state_path(17), self.state)
+        found = [("a symbolic link (still there)", "", {"path": "/run/runway/17/app.sock"})]
+        with mock.patch.object(self.h, "contain_tampering", side_effect=lambda s, d: s.update(stopped=True, tampered=True, tampered_detail=d)) as contain, \
+                mock.patch.object(self.h, "socket_check", side_effect=lambda s, pw: found[0] if found else None):
+            caller = dict(self.state)
+            started = time.monotonic()
+            self.h.contain_tampering_waiting(caller, self.pw, "a symbolic link")
+            self.assertGreaterEqual(time.monotonic() - started, 0.3)
+            contain.assert_called_once()
+            self.assertEqual("a symbolic link (still there)", contain.call_args.args[1])
+            self.assertTrue(caller["tampered"])  # the caller's state carries the containment
+            contain.reset_mock()
+            found.clear()  # the operation it waited for (e.g. a Start) removed the entry
+            self.h.contain_tampering_waiting(dict(self.state), self.pw, "a symbolic link")
+            contain.assert_not_called()
+            with mock.patch.object(self.h, "STOP_LOCK_WAIT", 0.2), self.h.FileLock("deploy-17"):
+                self.h.contain_tampering_waiting(dict(self.state), self.pw, "a symbolic link")  # contained anyway
+            contain.assert_called_once()
 
     def test_saves_and_starts_wait_for_a_short_holder_of_the_deploy_lock(self):
         holder = self.h.FileLock("deploy-17")
@@ -201,8 +231,15 @@ class IsolationTests(unittest.TestCase):
         with deploying, mock.patch.object(self.h, "DEPLOY_LOCK_WAIT", 30):
             started = time.monotonic()
             # The 1.0 wording: tests/helper-smoke.sh and docs/DESIGN.md section 12.5 rely on it.
-            with self.assertRaisesRegex(self.h.HelperError, "^A deployment is running for this application"):
+            with self.assertRaisesRegex(self.h.HelperError, "^A deployment is running for this application") as refused:
                 self.h._app_apply(dict(self.state))
+            self.assertEqual("deployment_running", refused.exception.code)
+            for refuse in (lambda: self.h.cmd_app_deploy({"domain_id": 17}),
+                           lambda: self.h.cmd_isolation({"domain_id": 17, "action": "save", "options": {"enabled": True}}),
+                           lambda: self.h.cmd_operations({"domain_id": 17, "action": "save", "options": {}})):
+                with self.assertRaises(self.h.HelperError) as refused:
+                    refuse()
+                self.assertEqual("deployment_running", refused.exception.code)
             for action in ("start", "restart", "recover"):
                 with self.subTest(action=action), \
                         self.assertRaisesRegex(self.h.HelperError, "^A deployment is already running for this application$"):
@@ -266,8 +303,9 @@ class IsolationTests(unittest.TestCase):
             holder.release()
 
         threading.Timer(0.4, stop).start()
-        with self.assertRaisesRegex(self.h.HelperError, "stopped while this action waited"):
+        with self.assertRaisesRegex(self.h.HelperError, "stopped while this action waited") as refused:
             self.h.cmd_app_action({"domain_id": 17, "action": "restart"})
+        self.assertEqual("stopped_meanwhile", refused.exception.code)
         self.systemctl.assert_not_called()
 
     def test_stop_waits_briefly_for_a_short_holder_but_never_fails_on_the_lock(self):

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Gói dịch vụ của thuê bao không cho phép môi trường chạy này.',
+    'planLimitApps' => 'Runway: số ứng dụng được bật',
+    'planLimitMemory' => 'Runway: bộ nhớ mỗi ứng dụng (MiB)',
+    'planLimitCpu' => 'Runway: CPU mỗi ứng dụng (%)',
+    'planLimitTasks' => 'Runway: số tiến trình / luồng mỗi ứng dụng',
+    'permissionRuntime' => 'Runway: dùng %%runtime%%',
+    'permissionRuntimeDescription' => 'Cho phép môi trường chạy này đối với các ứng dụng Runway mới hoặc được bật lại khi chính sách gói dịch vụ được bật.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Cài đặt bộ công cụ và chạy ứng dụng dưới dạng dịch vụ, không cần Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Trình trợ giúp đặc quyền gặp lỗi: %%details%%',
+    'errorDeploymentRunning' => 'Ứng dụng này đang được triển khai. Hãy chờ cho đến khi quá trình triển khai hoàn tất rồi thử lại.',
+    'errorOperationInProgress' => 'Một thao tác khác của ứng dụng này vẫn đang được thực hiện. Hãy thử lại sau giây lát.',
+    'errorStoppedMeanwhile' => 'Ứng dụng đã bị dừng trong khi thao tác này đang chờ. Nếu ứng dụng cần chạy, hãy khởi động lại.',
     'errorAccessDenied' => 'Truy cập bị từ chối.',
     'errorNoDomain' => 'Không tìm thấy tên miền.',
     'errorNoHosting' => 'Tên miền này không có dịch vụ lưu trữ web.',

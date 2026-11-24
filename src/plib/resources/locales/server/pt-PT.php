@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Este ambiente de execução não é permitido pelo plano de serviço da subscrição.',
+    'planLimitApps' => 'Runway: aplicações ativadas',
+    'planLimitMemory' => 'Runway: memória por aplicação (MiB)',
+    'planLimitCpu' => 'Runway: CPU por aplicação (%)',
+    'planLimitTasks' => 'Runway: processos / threads por aplicação',
+    'permissionRuntime' => 'Runway: utilizar %%runtime%%',
+    'permissionRuntimeDescription' => 'Permite este ambiente de execução em aplicações Runway novas ou reativadas quando as políticas dos planos de serviço estão ativadas.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instale cadeias de ferramentas e execute aplicações como serviços, sem Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'O programa auxiliar privilegiado falhou: %%details%%',
+    'errorDeploymentRunning' => 'Está em curso uma implementação desta aplicação. Aguarde até que termine e tente novamente.',
+    'errorOperationInProgress' => 'Ainda está em curso outra operação desta aplicação. Tente novamente daqui a pouco.',
+    'errorStoppedMeanwhile' => 'A aplicação foi parada enquanto esta ação aguardava. Inicie-a novamente se tiver de estar em execução.',
     'errorAccessDenied' => 'Acesso negado.',
     'errorNoDomain' => 'O domínio não foi encontrado.',
     'errorNoHosting' => 'O domínio não tem alojamento web.',

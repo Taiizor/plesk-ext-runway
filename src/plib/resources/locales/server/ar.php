@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'لا تسمح خطة الخدمة الخاصة بالاشتراك ببيئة التشغيل هذه.',
+    'planLimitApps' => 'Runway: التطبيقات الممكّنة',
+    'planLimitMemory' => 'Runway: الذاكرة لكل تطبيق (MiB)',
+    'planLimitCpu' => 'Runway: CPU لكل تطبيق (%)',
+    'planLimitTasks' => 'Runway: العمليات / مؤشرات الترابط لكل تطبيق',
+    'permissionRuntime' => 'Runway: استخدام %%runtime%%',
+    'permissionRuntimeDescription' => 'السماح ببيئة التشغيل هذه لتطبيقات Runway الجديدة أو المعاد تمكينها عند تفعيل سياسات خطط الخدمة.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'ثبّت سلاسل الأدوات وشغّل التطبيقات كخدمات بدون Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'فشل البرنامج المساعد ذو الامتيازات: %%details%%',
+    'errorDeploymentRunning' => 'هناك عملية نشر جارية لهذا التطبيق. انتظر حتى تنتهي، ثم حاول مرة أخرى.',
+    'errorOperationInProgress' => 'لا تزال عملية أخرى لهذا التطبيق قيد التنفيذ. حاول مرة أخرى بعد قليل.',
+    'errorStoppedMeanwhile' => 'تم إيقاف التطبيق بينما كان هذا الإجراء ينتظر. ابدأ تشغيله مرة أخرى إذا كان يجب أن يعمل.',
     'errorAccessDenied' => 'تم رفض الوصول.',
     'errorNoDomain' => 'لم يتم العثور على النطاق.',
     'errorNoHosting' => 'لا توجد استضافة ويب لهذا النطاق.',

@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Cet environnement d\'exécution n\'est pas autorisé par le plan de service de l\'abonnement.',
+    'planLimitApps' => 'Runway : applications activées',
+    'planLimitMemory' => 'Runway : mémoire par application (Mio)',
+    'planLimitCpu' => 'Runway : CPU par application (%)',
+    'planLimitTasks' => 'Runway : processus / threads par application',
+    'permissionRuntime' => 'Runway : utiliser %%runtime%%',
+    'permissionRuntimeDescription' => 'Autoriser cet environnement d\'exécution pour les applications Runway nouvelles ou réactivées lorsque les politiques des plans de service sont activées.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Installez des chaînes d\'outils et exécutez des applications en tant que services, sans Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Le helper privilégié a échoué : %%details%%',
+    'errorDeploymentRunning' => 'Un déploiement est en cours pour cette application. Attendez qu\'il se termine, puis réessayez.',
+    'errorOperationInProgress' => 'Une autre opération de cette application est toujours en cours. Réessayez dans un instant.',
+    'errorStoppedMeanwhile' => 'L\'application a été arrêtée pendant que cette action était en attente. Démarrez-la de nouveau si elle doit s\'exécuter.',
     'errorAccessDenied' => 'Accès refusé.',
     'errorNoDomain' => 'Le domaine est introuvable.',
     'errorNoHosting' => 'Ce domaine n\'a pas d\'hébergement Web.',

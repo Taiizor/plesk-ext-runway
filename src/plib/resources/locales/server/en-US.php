@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'The privileged helper failed: %%details%%',
+    'errorDeploymentRunning' => 'A deployment is running for this application. Wait until it finishes, then try again.',
+    'errorOperationInProgress' => 'Another operation of this application is still in progress. Try again in a moment.',
+    'errorStoppedMeanwhile' => 'The application was stopped while this action waited. Start it again if it should run.',
     'errorAccessDenied' => 'Access denied.',
     'errorNoDomain' => 'The domain was not found.',
     'errorNoHosting' => 'The domain has no web hosting.',

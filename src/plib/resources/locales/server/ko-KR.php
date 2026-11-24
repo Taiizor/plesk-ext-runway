@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => '구독의 서비스 플랜에서 이 런타임을 허용하지 않습니다.',
+    'planLimitApps' => 'Runway: 활성화된 애플리케이션',
+    'planLimitMemory' => 'Runway: 애플리케이션당 메모리(MiB)',
+    'planLimitCpu' => 'Runway: 애플리케이션당 CPU(%)',
+    'planLimitTasks' => 'Runway: 애플리케이션당 프로세스 / 스레드',
+    'permissionRuntime' => 'Runway: %%runtime%% 사용',
+    'permissionRuntimeDescription' => '서비스 플랜 정책이 활성화된 경우 새로 만들거나 다시 활성화한 Runway 애플리케이션에서 이 런타임을 허용합니다.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Docker 없이 툴체인을 설치하고 애플리케이션을 서비스로 실행합니다.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => '권한 있는 헬퍼에서 오류가 발생했습니다: %%details%%',
+    'errorDeploymentRunning' => '이 애플리케이션의 배포가 진행 중입니다. 완료될 때까지 기다린 후 다시 시도하십시오.',
+    'errorOperationInProgress' => '이 애플리케이션의 다른 작업이 아직 진행 중입니다. 잠시 후 다시 시도하십시오.',
+    'errorStoppedMeanwhile' => '이 작업이 대기하는 동안 애플리케이션이 중지되었습니다. 실행되어야 하는 경우 다시 시작하십시오.',
     'errorAccessDenied' => '액세스가 거부되었습니다.',
     'errorNoDomain' => '도메인을 찾을 수 없습니다.',
     'errorNoHosting' => '이 도메인에는 웹 호스팅이 없습니다.',

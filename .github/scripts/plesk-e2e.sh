@@ -9,7 +9,9 @@
 #   .github/scripts/plesk-e2e.sh prepare           # customer, subscription, Go toolchain, Go sample app
 #   .github/scripts/plesk-e2e.sh smoke             # helper-smoke, api-smoke, customer-smoke and the Go
 #                                                  # part of runtime-e2e (RUNWAY_E2E_RUNTIMES=go); the
-#                                                  # SMOKE_SUITES variable picks a subset
+#                                                  # SMOKE_SUITES variable picks a subset; "isolation"
+#                                                  # (not in the default set) runs the Go part of
+#                                                  # runtime-e2e isolated and tests/isolation-e2e.py
 #   .github/scripts/plesk-e2e.sh diagnostics DIR   # copy logs into DIR (after a failure)
 #   .github/scripts/plesk-e2e.sh stop              # remove the container
 #
@@ -17,8 +19,9 @@
 # DOMAIN (gotest.local), SYSUSER (gotestuser, the name tests/helper-smoke.sh expects),
 # CUSTOMER (cust1, owner of DOMAIN for tests/customer-smoke.sh), GO_VERSION (1.27.4),
 # WAIT_MINUTES (25), E2E_RUNTIMES (go: runtimes of tests/runtime-e2e.sh in "smoke", "" skips it),
-# SMOKE_SUITES (helper,api,customer,runtime: the suites "smoke" runs; CI runs them in three
-# parallel containers: helper | api,customer | runtime), PUBLISH (extra port mappings of
+# SMOKE_SUITES (helper,api,customer,runtime: the suites "smoke" runs; CI runs them in four
+# parallel containers: helper | api,customer | runtime | isolation; "isolation" needs
+# RUNWAY_E2E_ISOLATION=1 for "start", and "prepare" then installs bubblewrap and Python), PUBLISH (extra port mappings of
 # "start", e.g. "18443:8443 18080:80"; scripts/plesk-dev.sh), RUNWAY_SMOKE_SELF_UPDATE (0; 1
 # lets tests/helper-smoke.sh really upgrade the installed extension to a repackaged release+1,
 # which cannot be undone: CI sets it for its throw-away helper container only).
@@ -58,8 +61,10 @@ cmd_start() {
     local -a publish=()
     local -a security=(--security-opt apparmor=unconfined)
     if [ "${RUNWAY_E2E_ISOLATION:-0}" = "1" ]; then
-        # Development containers only: permit bubblewrap's nested pivot_root/user namespaces.
-        security+=(--security-opt seccomp=unconfined)
+        # Test containers only: permit bubblewrap's nested pivot_root/user namespaces, and give
+        # it an unmasked /proc (Docker's masked and read-only /proc paths make the kernel refuse
+        # the fresh /proc of the sandbox; Docker Desktop happens to hide an unmasked one).
+        security+=(--security-opt seccomp=unconfined --security-opt systempaths=unconfined)
     fi
     local mapping
     for mapping in $PUBLISH; do publish+=(-p "$mapping"); done
@@ -147,11 +152,29 @@ cmd_prepare() {
         wait_admin_job
     fi
     in_c "/opt/runway/go/$GO_VERSION/bin/go" version
-    # api-smoke's single-file sample test needs a Python toolchain; helper-smoke installs one
-    # itself, so only the panel job (api without helper) installs it here.
-    if want api && ! want helper && [ -z "$(in_c sh -c 'ls /opt/runway/python 2>/dev/null')" ]; then
-        log "installing Python 3.13 through the Runway helper (api-smoke sample test)"
+    # api-smoke's single-file sample test and tests/isolation-e2e.py need a Python toolchain;
+    # helper-smoke installs one itself, so only the panel and isolation jobs install it here.
+    if { { want api && ! want helper; } || want isolation; } && [ -z "$(in_c sh -c 'ls /opt/runway/python 2>/dev/null')" ]; then
+        log "installing Python 3.13 through the Runway helper (api-smoke sample test, isolation checks)"
         echo '{"runtime": "python", "version": "3.13"}' | in_ci "$HELPER" toolchain-install
+        echo
+        wait_admin_job
+    fi
+    if want isolation; then
+        # The job never upgrades installed packages as a side effect ("Update system packages
+        # separately"): bring the ones that its packages need (e.g. libc6 for build-essential on
+        # an older image) to the current version first, as an administrator would.
+        log "updating the system packages the isolation dependencies need"
+        in_c bash -c 'command -v apt-get >/dev/null || exit 0
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq >/dev/null
+            up=$(apt-get install --simulate build-essential pkg-config meson ninja-build libcap-dev libseccomp2 bubblewrap 2>/dev/null \
+                | sed -n "s/^Inst \([^ ]*\) \[.*/\1/p")
+            [ -z "$up" ] || { echo "upgrading: $up"; apt-get install -y -qq --only-upgrade $up >/dev/null; }'
+        # The administrator job of the Toolchains page: distribution packages, or the pinned
+        # bubblewrap built into /opt/runway/bin/bwrap when the distribution's is too old.
+        log "installing the isolation dependencies (bubblewrap, libseccomp) through the Runway helper"
+        echo '{}' | in_ci "$HELPER" isolation-deps-install
         echo
         wait_admin_job
     fi
@@ -203,6 +226,16 @@ cmd_smoke() {
         CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
             RUNWAY_E2E_RUNTIMES="$E2E_RUNTIMES" bash "$ROOT/tests/runtime-e2e.sh" || rc=1
     fi
+    if want isolation; then
+        # Isolated builds and starts (also the features with the Go sample), then the boundary
+        # checks; runtime-e2e restores the domain's configuration, which isolation-e2e needs.
+        log "tests/runtime-e2e.sh with application isolation (runtimes: go)"
+        CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" DOMAIN="$DOMAIN" \
+            RUNWAY_E2E_ISOLATION=1 RUNWAY_E2E_RUNTIMES=go bash "$ROOT/tests/runtime-e2e.sh" || rc=1
+        log "tests/isolation-e2e.py (namespaces, files, network, web server)"
+        CONTAINER="$CONTAINER" PANEL="http://localhost:$PANEL_PORT" SITE_ID="$id" \
+            "${PY:-python3}" "$ROOT/tests/isolation-e2e.py" || rc=1
+    fi
     return "$rc"
 }
 
@@ -234,5 +267,5 @@ case "$command" in
     smoke) cmd_smoke ;;
     diagnostics) cmd_diagnostics "$@" ;;
     stop) cmd_stop ;;
-    *) sed -n '2,24p' "$0"; exit 2 ;;
+    *) sed -n '2,/^set -euo/{/^#/p}' "$0"; exit 2 ;;
 esac

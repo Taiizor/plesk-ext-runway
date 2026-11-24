@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'แผนบริการของการสมัครใช้บริการไม่อนุญาตให้ใช้รันไทม์นี้',
+    'planLimitApps' => 'Runway: แอปพลิเคชันที่เปิดใช้งาน',
+    'planLimitMemory' => 'Runway: หน่วยความจำต่อแอปพลิเคชัน (MiB)',
+    'planLimitCpu' => 'Runway: CPU ต่อแอปพลิเคชัน (%)',
+    'planLimitTasks' => 'Runway: โปรเซส / เธรดต่อแอปพลิเคชัน',
+    'permissionRuntime' => 'Runway: ใช้ %%runtime%%',
+    'permissionRuntimeDescription' => 'อนุญาตให้ใช้รันไทม์นี้กับแอปพลิเคชัน Runway ที่สร้างใหม่หรือเปิดใช้งานอีกครั้ง เมื่อเปิดใช้นโยบายแผนบริการ',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'ติดตั้งชุดเครื่องมือและรันแอปพลิเคชันเป็นบริการ โดยไม่ต้องใช้ Docker',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'ตัวช่วยที่มีสิทธิ์พิเศษทำงานล้มเหลว: %%details%%',
+    'errorDeploymentRunning' => 'กำลังมีการดีพลอยสำหรับแอปพลิเคชันนี้ โปรดรอจนกว่าจะเสร็จสิ้น แล้วลองอีกครั้ง',
+    'errorOperationInProgress' => 'การดำเนินการอื่นของแอปพลิเคชันนี้ยังคงดำเนินอยู่ โปรดลองอีกครั้งในอีกสักครู่',
+    'errorStoppedMeanwhile' => 'แอปพลิเคชันถูกหยุดขณะที่การดำเนินการนี้รออยู่ หากแอปพลิเคชันควรทำงาน โปรดเริ่มอีกครั้ง',
     'errorAccessDenied' => 'การเข้าถึงถูกปฏิเสธ',
     'errorNoDomain' => 'ไม่พบโดเมน',
     'errorNoHosting' => 'โดเมนนี้ไม่มีเว็บโฮสติ้ง',

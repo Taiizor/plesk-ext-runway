@@ -329,7 +329,12 @@ Config fields (JSON, camelCase on the API, snake_case toward the helper):
 Every answer is one JSON object: `{"ok": true, ...result}` or `{"ok": false, "error": "...",
 "code"?: "..."}` (exit code 1). `code` is a machine-readable reason the panel maps to a form field:
 `not_empty` and `unix_unsupported` (app-sample). Errors raised inside `call_as_user` children keep
-their code.
+their code. The refusals of the deploy lock (§12.5) carry a code the panel words itself in the
+user's language (`Modules_Runway_Helper::call()` replaces the message; the helper's English
+`error` stays in its JSON answer, which scripts and tests read, and in the panel's debug log): `deployment_running` (`errorDeploymentRunning`: a deployment runs or waits for the lock),
+`operation_in_progress` (`errorOperationInProgress`: another operation kept the lock longer than
+the command waits) and `stopped_meanwhile` (`errorStoppedMeanwhile`: Start or Restart of an
+application that was stopped while it waited).
 
 | Command | Payload | Result |
 |---|---|---|
@@ -1146,7 +1151,13 @@ running for this application"), so none of them starts a unit that a save or a p
 rewriting; one whose application was stopped while it waited is refused. Stop waits up to 10 s
 (`STOP_LOCK_WAIT`) for a short holder, so a Start in progress does not override it, but never for
 a deployment (it stops a running switch, §12.4) and goes ahead without the lock when it stays
-busy. A trigger file touched during a switch starts another round afterwards, as in 1.0. Applications switch
+busy. Build & restart (`app-deploy`), the operations settings, a rollback, clearing releases, a
+recovery import and an isolation policy save take the lock the same way (refused at once while a
+deployment runs, another holder waited for up to 30 s). A tampered socket path found by a status
+query or the Reconcile (`app-status`, `apps-list`) is contained under the lock when it is free
+within 10 s, so a Start in progress cannot run the application again right after it; never
+waiting for a deployment, and contained anyway when the lock stays busy. A trigger file touched
+during a switch starts another round afterwards, as in 1.0. Applications switch
 independently; their include writes, reloads and confirmations are serialized by the server-wide
 `web-reload` lock.
 
@@ -1577,8 +1588,14 @@ The launcher uses libseccomp through stdlib ctypes to export a native-ABI BPF fi
 private descriptor consumed by bubblewrap. It denies `unshare`, `setns`, and `clone` with
 `CLONE_NEWUSER`; `clone3` returns `ENOSYS` so ordinary threads/processes can use `clone`.
 Other ABIs fail closed. This replaces bubblewrap's sysctl-based nested-namespace restriction,
-which cannot write through Docker/systemd's protected `/proc/sys`. Existing
-`ProtectKernelTunables=yes` remains enabled. Build-only `/usr/include` and
+which cannot write through Docker/systemd's protected `/proc/sys`. The app units of isolated
+applications have `ProtectKernelTunables=no` (all others keep `yes`): bubblewrap mounts a fresh
+`/proc` in its user namespace, and the kernel refuses that while every procfs of the mount
+namespace has read-only or masked paths over it (`mount_too_revealing()`), which
+`ProtectKernelTunables` adds; bubblewrap itself makes `/proc/sys`, `sysrq-trigger`, `irq` and
+`bus` read-only inside the sandbox, and the service runs unprivileged. Test containers need the
+same: `plesk-e2e.sh start` with `RUNWAY_E2E_ISOLATION=1` adds `systempaths=unconfined` to
+`seccomp=unconfined` (Docker masks `/proc/kcore` and others and makes `/proc/sys` read-only). Build-only `/usr/include` and
 `/usr/local/include` mounts are read-only for cgo and other native dependencies.
 
 At runtime, source is read-only with explicit writable submounts. Builds may write their own
@@ -1613,4 +1630,9 @@ and Plesk password protection. It restores configuration/policy and removes its 
 fixtures. `tests/customer-smoke.sh` checks real customer isolation authorization as well.
 `RUNWAY_E2E_ISOLATION=1 bash tests/runtime-e2e.sh` opts the installed-runtime matrix into isolated
 builds/starts; it backs up/restores policy and checks wrapped units. Live Plesk integration,
-native web-server parsing and the panel are separate from offline fixture results.
+native web-server parsing and the panel are separate from offline fixture results. CI's
+*End-to-end (isolation)* job runs both against a fresh Plesk container: the Go sample isolated
+(with the features of runtime-e2e), then `tests/isolation-e2e.py`; the container runs without
+Docker's seccomp profile and with an unmasked `/proc` (`systempaths=unconfined`), and the
+runner permits unprivileged user namespaces (`kernel.apparmor_restrict_unprivileged_userns=0`
+on Ubuntu 24.04).

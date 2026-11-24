@@ -94,8 +94,6 @@ made is described in [docs/RELEASING.md](docs/RELEASING.md#screenshots).
 **Languages**: the interface follows the panel language, in all 32 languages of Plesk. English and
 Turkish are written by hand; the other 30 were machine-translated and reviewed, and corrections
 from native speakers are welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
-New optional-operation labels currently have English and Turkish values, with English in the
-other locales until translations are contributed.
 
 ## Requirements
 
@@ -433,8 +431,11 @@ stops all old slots, rewrites their units and queues a build to populate the app
 private dependency home. It interrupts traffic. An explicitly stopped application stays stopped.
 
 For a **development Plesk container**, Docker's default seccomp profile can reject bubblewrap's
-`pivot_root`. Set `RUNWAY_E2E_ISOLATION=1` when creating it through `scripts/plesk-dev.sh up` or
-`scripts/plesk-dev.ps1 up`; this opts only that test container into `seccomp=unconfined`. Existing
+`pivot_root`, and Docker's masked `/proc` paths make the kernel refuse the sandbox's own `/proc`.
+Set `RUNWAY_E2E_ISOLATION=1` when creating it through `scripts/plesk-dev.sh up` or
+`scripts/plesk-dev.ps1 up`; this opts only that test container into `seccomp=unconfined` (and,
+through `plesk-dev.sh`, `systempaths=unconfined`; Docker Desktop, which `plesk-dev.ps1` uses,
+does not need it). Existing
 containers retain their original profile and need a preserved-data recreation to change it.
 Install the dependencies from Toolchains inside the test panel. These are nested-container test settings,
 not a recommendation to disable production security profiles.
@@ -461,8 +462,10 @@ not a recommendation to disable production security profiles.
 - Processes keep the subscription UID for Plesk file ownership, but get separate mount, user,
   PID, IPC and UTS namespaces, no additional privileges, and no further user namespaces.
   A native-ABI seccomp filter denies namespace entry/creation and makes `clone3` return `ENOSYS`
-  so ordinary thread/process creation can use `clone`. It needs no writable `/proc/sys` and
-  keeps `ProtectKernelTunables=yes`. Toolchains, system libraries and build headers are mounted
+  so ordinary thread/process creation can use `clone`. It needs no writable `/proc/sys`. The
+  services of isolated applications run with `ProtectKernelTunables=no`, because the kernel
+  only lets bubblewrap mount the sandbox's own `/proc` (which keeps `/proc/sys` read-only) when
+  no read-only paths cover the service's `/proc`. Toolchains, system libraries and build headers are mounted
   read-only. Custom tools
   or certificates outside those locations must be placed in the application directory.
 
@@ -766,7 +769,8 @@ browser ── Plesk panel (React UI) ── JSON API (PHP, psaadm)
 - The child processes that inspect customer files have memory, file size and CPU limits, and
   directory listings are capped, so a crafted application directory cannot exhaust the server.
 - Services run as the system user with `NoNewPrivileges`, `ProtectSystem=full`, `PrivateTmp`,
-  `PrivateDevices`, `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectControlGroups`,
+  `PrivateDevices`, `ProtectKernelTunables` (isolated applications: inside the sandbox instead),
+  `ProtectKernelModules`, `ProtectControlGroups`,
   `RestrictSUIDSGID`, `RestrictRealtime`, `LockPersonality`, the per-port bind restriction and
   the configured `MemoryMax`/`CPUQuota`/`TasksMax` (with a memory or CPU limit on systemd 254 and
   later also `MemoryPressureWatch=off`, see *Memory*). Builds always have a task limit.

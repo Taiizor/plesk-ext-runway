@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'El plan de servicio de la suscripción no permite este entorno de ejecución.',
+    'planLimitApps' => 'Runway: aplicaciones activadas',
+    'planLimitMemory' => 'Runway: memoria por aplicación (MiB)',
+    'planLimitCpu' => 'Runway: CPU por aplicación (%)',
+    'planLimitTasks' => 'Runway: procesos / hilos por aplicación',
+    'permissionRuntime' => 'Runway: usar %%runtime%%',
+    'permissionRuntimeDescription' => 'Permitir este entorno de ejecución para las aplicaciones de Runway nuevas o reactivadas cuando las políticas de los planes de servicio estén activadas.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Instale cadenas de herramientas y ejecute aplicaciones como servicios, sin Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'El programa auxiliar con privilegios ha fallado: %%details%%',
+    'errorDeploymentRunning' => 'Hay un despliegue en curso para esta aplicación. Espere a que termine e inténtelo de nuevo.',
+    'errorOperationInProgress' => 'Otra operación de esta aplicación sigue en curso. Inténtelo de nuevo dentro de un momento.',
+    'errorStoppedMeanwhile' => 'La aplicación se ha detenido mientras esta acción esperaba. Vuelva a iniciarla si debe estar en ejecución.',
     'errorAccessDenied' => 'Acceso denegado.',
     'errorNoDomain' => 'No se ha encontrado el dominio.',
     'errorNoHosting' => 'El dominio no tiene hosting web.',

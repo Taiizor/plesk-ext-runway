@@ -568,7 +568,12 @@ def render_app_unit(state, pw):
         "PrivateTmp=yes",
         "PrivateDevices=yes",
         "ProtectSystem=full",
-        "ProtectKernelTunables=yes",
+        # An isolated application starts bubblewrap, which mounts a fresh /proc in its user
+        # namespace: the kernel refuses that while every procfs of the mount namespace has
+        # read-only or masked paths over it (mount_too_revealing), which ProtectKernelTunables
+        # adds. bubblewrap makes /proc/sys, sysrq-trigger, irq and bus read-only in the sandbox
+        # itself, and the service runs unprivileged (docs/DESIGN.md section 14).
+        "ProtectKernelTunables=%s" % ("no" if isolation_options(domain_id)["enabled"] else "yes"),
         "ProtectKernelModules=yes",
         "ProtectControlGroups=yes",
         "RestrictSUIDSGID=yes",

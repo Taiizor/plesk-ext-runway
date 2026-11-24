@@ -84,7 +84,7 @@ def app_status(domain_id, state=None):
         # (docs/DESIGN.md section 7, "tampered"): nginx would follow a symbolic link elsewhere.
         found = socket_check(state, pw)
         if found and not state.get("tampered"):
-            contain_tampering(state, found[0])
+            contain_tampering_waiting(state, pw, found[0])
         elif found:
             unlink_socket_entry(domain_id, os.path.basename(found[2]["path"]))
     slots = bool(state) and zd_has_slots(state)

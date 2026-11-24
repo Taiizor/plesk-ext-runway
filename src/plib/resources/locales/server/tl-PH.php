@@ -8,13 +8,13 @@
 
 return [
     'errorInvalidOperation' => 'Invalid operation.',
-    'errorPlanRuntime' => 'This runtime is not allowed by the subscription service plan.',
-    'planLimitApps' => 'Runway: enabled applications',
-    'planLimitMemory' => 'Runway: memory per application (MiB)',
-    'planLimitCpu' => 'Runway: CPU per application (%)',
-    'planLimitTasks' => 'Runway: tasks per application',
-    'permissionRuntime' => 'Runway: use %%runtime%%',
-    'permissionRuntimeDescription' => 'Allow this runtime for new or re-enabled Runway applications when service-plan policies are enabled.',
+    'errorPlanRuntime' => 'Hindi pinapayagan ng service plan ng subscription ang runtime na ito.',
+    'planLimitApps' => 'Runway: mga naka-enable na application',
+    'planLimitMemory' => 'Runway: memorya sa bawat application (MiB)',
+    'planLimitCpu' => 'Runway: CPU sa bawat application (%)',
+    'planLimitTasks' => 'Runway: proseso / thread sa bawat application',
+    'permissionRuntime' => 'Runway: paggamit ng %%runtime%%',
+    'permissionRuntimeDescription' => 'Payagan ang runtime na ito para sa mga bago o muling na-enable na application ng Runway kapag naka-enable ang mga policy ng service plan.',
     // Navigation and permission
     'buttonAdminTitle' => 'Runway',
     'buttonAdminDescription' => 'Mag-install ng mga toolchain at patakbuhin ang mga application bilang mga serbisyo, nang walang Docker.',
@@ -25,6 +25,9 @@ return [
 
     // Errors
     'errorHelperFailed' => 'Nabigo ang privileged helper: %%details%%',
+    'errorDeploymentRunning' => 'May tumatakbong deployment para sa application na ito. Hintayin itong matapos, pagkatapos ay subukang muli.',
+    'errorOperationInProgress' => 'Isinasagawa pa ang isa pang operasyon ng application na ito. Subukang muli maya-maya.',
+    'errorStoppedMeanwhile' => 'Inihinto ang application habang naghihintay ang pagkilos na ito. Simulan itong muli kung dapat itong tumakbo.',
     'errorAccessDenied' => 'Tinanggihan ang access.',
     'errorNoDomain' => 'Hindi nahanap ang domain.',
     'errorNoHosting' => 'Walang web hosting ang domain.',
