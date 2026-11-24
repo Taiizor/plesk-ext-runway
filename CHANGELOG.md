@@ -10,6 +10,8 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-24
+
 ### Added
 
 - Toolchains can install application isolation dependencies in the existing administrator job
@@ -30,6 +32,30 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - The optional operations, the service-plan policy settings and the document root options are
   translated into every panel language (they were English outside English and Turkish).
 
+### Changed
+
+- Build & restart, the optional operations (settings, rollback, clearing releases, recovery
+  import) and isolation policy saves wait up to 30 seconds for a short holder of the deployment
+  lock instead of failing at once or after a minute, and a running deployment refuses them at
+  once. The lock refusals are shown in the panel language. A tampered Unix socket found by the
+  status page or the Reconcile waits briefly for a Start in progress, so the Start cannot run the
+  application again right after the containment.
+- Saves, Start, Restart and Recover of every application take the deployment lock and wait up to
+  30 seconds for a short holder (the health watch, the convergence, another save); 1.3.0 refused
+  zero-downtime saves and Restart in that case and did not lock the others. A save that keeps the
+  stored environment variables reads them after the wait. While a deployment runs, Start,
+  Restart, Recover and saves are refused at once with the 1.0 messages (1.3.0 refused only saves
+  of zero-downtime applications or with a build, and Restart of zero-downtime applications).
+  Stop waits up to 10 seconds for a short holder, never for a deployment, and a Start that waited
+  while a Stop ran is refused.
+- Upgrades and toolchain changes re-render an application whose deployment lock is busy a
+  minute later instead of skipping it (Reconcile schedules a lost re-render again, e.g. after a
+  reboot); upgrades also strip root-privileged Exec lines from its old units meanwhile.
+  Uninstalling removes an application even when its lock stays busy, deletes any leftover
+  application units and reports what it could not remove.
+- The frontend bundle shrinks from 246 KiB to 201 KiB: the SDK's query-string helper uses a small
+  equivalent of `qs.stringify` instead of the full `qs` package, below webpack's size limit.
+
 ### Fixed
 
 - Dependency installation now checks development packages as well as build executables, skips
@@ -47,32 +73,11 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 - Classic and slot-based configuration/start operations share the deployment lock so an
   isolation policy change cannot race a stale unit writer. Private command/environment payloads
   are restored inside the namespace, after the trusted unprivileged launcher has started.
-- Build & restart, the optional operations (settings, rollback, clearing releases, recovery
-  import) and isolation policy saves wait up to 30 seconds for a short holder of the deployment
-  lock instead of failing at once or after a minute, and a running deployment refuses them at
-  once. The lock refusals are shown in the panel language. A tampered Unix socket found by the
-  status page or the Reconcile waits briefly for a Start in progress, so the Start cannot run the
-  application again right after the containment.
-- The frontend bundle shrinks from 246 KiB to 201 KiB: the SDK's query-string helper uses a small
-  equivalent of `qs.stringify` instead of the full `qs` package, below webpack's size limit.
 - Isolated applications start on regular Linux servers: their services no longer set
   `ProtectKernelTunables`, whose read-only `/proc` paths made the kernel refuse bubblewrap's own
   `/proc` (builds were not affected; Docker Desktop test containers hid the problem).
 - CI warms the GitHub release cache for every end-to-end job that installs a toolchain from
   GitHub, so the panel job no longer fails on the anonymous API limit of the runner.
-- Saves, Start, Restart and Recover of every application take the deployment lock and wait up to
-  30 seconds for a short holder (the health watch, the convergence, another save); 1.3.0 refused
-  zero-downtime saves and Restart in that case and did not lock the others. A save that keeps the
-  stored environment variables reads them after the wait. While a deployment runs, Start,
-  Restart, Recover and saves are refused at once with the 1.0 messages (1.3.0 refused only saves
-  of zero-downtime applications or with a build, and Restart of zero-downtime applications).
-  Stop waits up to 10 seconds for a short holder, never for a deployment, and a Start that waited
-  while a Stop ran is refused.
-- Upgrades and toolchain changes re-render an application whose deployment lock is busy a
-  minute later instead of skipping it (Reconcile schedules a lost re-render again, e.g. after a
-  reboot); upgrades also strip root-privileged Exec lines from its old units meanwhile.
-  Uninstalling removes an application even when its lock stays busy, deletes any leftover
-  application units and reports what it could not remove.
 - Isolation keeps Docker/systemd's read-only kernel settings: a native-ABI libseccomp filter
   prevents namespace creation/entry without writing `/proc/sys`. Native build headers are
   available read-only for cgo and other compiled dependencies.
@@ -507,7 +512,8 @@ Hardening from the pre-release security review (no released version was affected
   release workflow fails when the tag and `src/meta.xml` differ. CI runs customer-smoke and the
   Go runtime matrix and fails on every shell syntax error.
 
-[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Taiizor/plesk-ext-runway/compare/v1.0.0...v1.1.0

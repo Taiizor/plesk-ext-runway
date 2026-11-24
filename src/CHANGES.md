@@ -1,3 +1,15 @@
+# 1.4.0-1 (24 November 2026)
+
+* [+] Optional application isolation for every runtime, set by the administrator: bubblewrap confines builds and services to the application's own files, with read-only source code, declared writable folders, private caches, granted Unix sockets and optional offline networking.
+* [+] The Toolchains page installs the isolation dependencies (bubblewrap, libseccomp) and builds a verified bubblewrap release when the distribution's version is too old.
+* [*] Deployments, saves, Start, Restart, Recover and policy changes of an application no longer overlap: a running deployment refuses them at once, short operations are waited for, and the refusals are shown in the panel language.
+* [*] Upgrades and toolchain changes re-render an application that is busy once it is free instead of skipping it; uninstalling removes every application unit and reports what it could not remove.
+* [*] Optional operations, service-plan policies, document root options and isolation are translated into all 32 panel languages; the frontend bundle is smaller (201 KiB).
+* [-] Isolated applications start on regular Linux servers: their services no longer set ProtectKernelTunables, which made the kernel refuse bubblewrap's own /proc.
+* [-] Files uploaded into a document root after a build get periodic permission checks; static paths refuse hidden files and server-side script extensions.
+* [-] Dependency installation keeps compatible installed versions and never upgrades unrelated system packages.
+* [-] Zero-downtime switching works for the server's default domain (nginx_ip_default.conf).
+
 # 1.3.0-1 (17 November 2026)
 
 * [+] Continuous application and server resource monitoring, with a background collector, 1-hour/24-hour/7-day charts and 14-day history retained while the panel is closed.

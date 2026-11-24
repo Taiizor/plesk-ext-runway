@@ -53,7 +53,7 @@ import xml.etree.ElementTree as ElementTree
 import zipfile
 from types import SimpleNamespace
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 
 BASE_DIR = "/opt/runway"
 BIN_DIR = BASE_DIR + "/bin"
