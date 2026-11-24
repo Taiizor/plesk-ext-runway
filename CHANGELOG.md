@@ -10,6 +10,11 @@ The extension catalog shows `src/CHANGES.md`; keep both files in sync when relea
 
 ## [Unreleased]
 
+### Fixed
+
+- The runtime cards of the Toolchains page show how many applications use the runtime; they
+  always said "No apps using", because they read a field that `api/toolchains` does not send.
+
 ## [1.4.0] - 2026-11-24
 
 ### Added

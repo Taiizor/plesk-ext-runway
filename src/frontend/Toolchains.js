@@ -7,6 +7,7 @@ import {
     Toolbar, ToolbarExpander, Translate, withStatusMessages, useTranslate,
 } from '@plesk/plesk-ext-sdk';
 import { helperText, isObject, isolate, jobTitle, runtimeName } from './lib/format';
+import { runtimeDomains } from './lib/toolchains';
 import { isBusy, POLL_BUSY_MS, POLL_IDLE_MS, useApi, useApiData, useLatest, usePolling } from './lib/hooks';
 import ConfirmDialog from './components/ConfirmDialog';
 import ErrorAlert from './components/ErrorAlert';
@@ -420,12 +421,7 @@ const Toolchains = ({ baseUrl, statusMessages }) => {
                     const isSelected = meta.key === activeKey;
                     const entry = isObject(data.runtimes) && isObject(data.runtimes[meta.key]) ? data.runtimes[meta.key] : {};
                     const instList = Array.isArray(entry.installed) ? entry.installed : [];
-                    const allDomains = new Set();
-                    instList.forEach(item => {
-                        if (Array.isArray(item.domains)) {
-                            item.domains.forEach(d => allDomains.add(d.name || d));
-                        }
-                    });
+                    const allDomains = runtimeDomains(entry);
                     const count = instList.length;
 
                     return (
